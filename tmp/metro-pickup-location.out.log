@@ -1,0 +1,9 @@
+Starting project at C:\dev\Spinner\repo\frontend\owner-mobile
+Starting Metro Bundler
+
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+Waiting on http://localhost:8081
+Logs for your project will appear below.
+Android Bundled 27362ms index.ts (1288 modules)
+Android Bundled 2876ms index.ts (1 module)
+Android Bundled 241ms index.ts (1 module)

@@ -1,0 +1,9 @@
+<aside
+  class="notice-card"
+  [class.success]="tone() === 'success'"
+  [class.warning]="tone() === 'warning'"
+  [class.danger]="tone() === 'danger'"
+>
+  <strong>{{ title() }}</strong>
+  <p>{{ message() }}</p>
+</aside>

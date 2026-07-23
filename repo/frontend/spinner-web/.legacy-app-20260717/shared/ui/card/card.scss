@@ -1,0 +1,12 @@
+.card {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+  padding: 1rem;
+}
+
+.card-warm {
+  background: var(--color-card-warm);
+  border-color: #f0e0b8;
+}

@@ -1,0 +1,11 @@
+<article class="service-card" [class.selected]="selected()">
+  <div>
+    <h3>{{ name() }}</h3>
+    @if (description()) {
+      <p>{{ description() }}</p>
+    }
+  </div>
+  @if (price()) {
+    <strong>{{ price() }}</strong>
+  }
+</article>

@@ -1,0 +1,32 @@
+.service-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+}
+
+.selected {
+  background: var(--color-card-warm);
+  border-color: var(--color-gold);
+}
+
+h3 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 1rem;
+}
+
+p {
+  margin: 0.4rem 0 0;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}
+
+strong {
+  color: var(--color-gold-dark);
+  white-space: nowrap;
+}

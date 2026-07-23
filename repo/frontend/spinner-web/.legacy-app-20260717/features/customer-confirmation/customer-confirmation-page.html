@@ -1,0 +1,83 @@
+<section class="confirmation-page" aria-labelledby="confirmation-title">
+  <div class="confirmation-shell">
+    <header class="confirmation-header">
+      <a class="back-link" routerLink="/book" aria-label="Back to booking">‹</a>
+      <div class="brand">
+        <img src="assets/brand/logo.jpg" alt="Engr. Spin Laundry logo" />
+        <div>
+          <strong>ENGR. SPIN</strong>
+          <span>LAUNDROMAT</span>
+        </div>
+      </div>
+    </header>
+
+    @if (isLoading) {
+      <article class="state-card">
+        <span class="status-icon">...</span>
+        <h1 id="confirmation-title">Loading Booking</h1>
+        <p>Please wait while we prepare your booking confirmation.</p>
+      </article>
+    } @else if (errorMessage) {
+      <article class="state-card error">
+        <span class="status-icon">!</span>
+        <h1 id="confirmation-title">Booking Not Found</h1>
+        <p>{{ errorMessage }}</p>
+        <a class="primary-link" routerLink="/book">Back to Booking</a>
+      </article>
+    } @else if (confirmation) {
+      <article class="confirmation-card">
+        <div class="success-mark" aria-hidden="true">
+          <img src="assets/icons/confirm-booking.svg" alt="" />
+        </div>
+
+        <p class="eyebrow">Booking Request Received</p>
+        <h1 id="confirmation-title">Thank you, {{ confirmation.customerName }}.</h1>
+        <p class="intro">
+          Your laundry booking has been received. Please wait for staff confirmation before pickup or drop-off.
+        </p>
+
+        <div class="order-code">
+          <span>Order Code</span>
+          <strong>{{ confirmation.orderCode }}</strong>
+        </div>
+
+        <dl class="summary-list">
+          <div>
+            <dt>Status</dt>
+            <dd><span class="status-pill">{{ formatStatus(confirmation.status) }}</span></dd>
+          </div>
+          <div>
+            <dt>Service</dt>
+            <dd>{{ confirmation.serviceName }}</dd>
+          </div>
+          <div>
+            <dt>Schedule</dt>
+            <dd>{{ confirmation.preferredDate }} · {{ confirmation.preferredTimeWindow }}</dd>
+          </div>
+          <div>
+            <dt>Fulfillment</dt>
+            <dd>{{ formatFulfillment(confirmation.fulfillmentType) }}</dd>
+          </div>
+          <div>
+            <dt>Payment</dt>
+            <dd>{{ formatPayment(confirmation.paymentMethod) }}</dd>
+          </div>
+          <div>
+            <dt>Estimated Total</dt>
+            <dd class="amount">{{ formatPeso(confirmation.estimatedTotalAmount) }}</dd>
+          </div>
+        </dl>
+
+        <aside class="next-step">
+          <strong>Next step</strong>
+          <span>Our staff will review your request and confirm the schedule.</span>
+        </aside>
+
+        <div class="actions">
+          <a class="primary-link" [routerLink]="['/track', confirmation.trackingCode]">Track My Order</a>
+          <a class="secondary-link" routerLink="/book">Book Another Service</a>
+        </div>
+      </article>
+    }
+  </div>
+</section>

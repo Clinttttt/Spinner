@@ -1,0 +1,148 @@
+Starting project at C:\dev\Spinner\repo\frontend\owner-mobile
+Starting Metro Bundler
+
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+Waiting on http://localhost:8081
+Logs for your project will appear below.
+Android Bundled 35568ms index.ts (1227 modules)
+Android Bundled 4548ms index.ts (1 module)
+Android Bundled 253ms index.ts (1 module)
+Android Bundling failed 5933ms index.ts (1 module)
+Unable to resolve "@react-navigation/native" from "App.tsx"
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m { [33mNavigationContainer[39m[33m,[39m [33mDefaultTheme[39m } [36mfrom[39m [32m"@react-navigation/native"[39m[33m;[39m
+ [90m   |[39m                                                    [31m[1m^[22m[39m
+ [90m 2 |[39m [36mimport[39m { [33mNavigationBar[39m } [36mfrom[39m [32m"expo-navigation-bar"[39m[33m;[39m
+ [90m 3 |[39m [36mimport[39m { [33mStatusBar[39m } [36mfrom[39m [32m"expo-status-bar"[39m[33m;[39m
+ [90m 4 |[39m [36mimport[39m { [33mSafeAreaProvider[39m } [36mfrom[39m [32m"react-native-safe-area-context"[39m[33m;[39m[0m
+
+Import stack:
+
+ App.tsx
+ | import "@react-navigation/native"
+
+ index.ts
+ | import "./App"
+
+ 
+ | import "./index.ts"
+
+Android Bundling failed 16826ms index.ts (1 module)
+Unable to resolve "@react-navigation/native" from "node_modules\@react-navigation\bottom-tabs\lib\module\navigators\createBottomTabNavigator.js"
+[0m [90m 1 |[39m [32m"use strict"[39m[33m;[39m
+ [90m 2 |[39m
+[31m[1m>[22m[39m[90m 3 |[39m [36mimport[39m { createNavigatorFactory[33m,[39m createScreenFactory[33m,[39m [33mTabRouter[39m[33m,[39m useNavigationBuilder } [36mfrom[39m [32m'@react-navigation/native'[39m[33m;[39m
+ [90m   |[39m                                                                                               [31m[1m^[22m[39m
+ [90m 4 |[39m [36mimport[39m { [33mBottomTabView[39m } [36mfrom[39m [32m"../views/BottomTabView.js"[39m[33m;[39m
+ [90m 5 |[39m [36mimport[39m { jsx [36mas[39m _jsx } [36mfrom[39m [32m"react/jsx-runtime"[39m[33m;[39m
+ [90m 6 |[39m [36mfunction[39m [33mBottomTabNavigator[39m({[0m
+
+Import stack:
+
+ node_modules\@react-navigation\bottom-tabs\lib\module\navigators\createBottomTabNavigator.js
+ | import "@react-navigation/native"
+
+ node_modules\@react-navigation\bottom-tabs\lib\module\index.js
+ | import "./navigators/createBottomTabNavigator.js"
+
+ src\navigation\AppTabs.tsx
+ | import "@react-navigation/bottom-tabs"
+
+ App.tsx
+ | import "./src/navigation/AppTabs"
+
+ index.ts
+ | import "./App"
+
+ 
+ | import "./index.ts"
+
+Android Bundling failed 11944ms index.ts (1 module)
+Unable to resolve "@react-navigation/native" from "node_modules\@react-navigation\bottom-tabs\lib\module\navigators\createBottomTabNavigator.js"
+[0m [90m 1 |[39m [32m"use strict"[39m[33m;[39m
+ [90m 2 |[39m
+[31m[1m>[22m[39m[90m 3 |[39m [36mimport[39m { createNavigatorFactory[33m,[39m createScreenFactory[33m,[39m [33mTabRouter[39m[33m,[39m useNavigationBuilder } [36mfrom[39m [32m'@react-navigation/native'[39m[33m;[39m
+ [90m   |[39m                                                                                               [31m[1m^[22m[39m
+ [90m 4 |[39m [36mimport[39m { [33mBottomTabView[39m } [36mfrom[39m [32m"../views/BottomTabView.js"[39m[33m;[39m
+ [90m 5 |[39m [36mimport[39m { jsx [36mas[39m _jsx } [36mfrom[39m [32m"react/jsx-runtime"[39m[33m;[39m
+ [90m 6 |[39m [36mfunction[39m [33mBottomTabNavigator[39m({[0m
+
+Import stack:
+
+ node_modules\@react-navigation\bottom-tabs\lib\module\navigators\createBottomTabNavigator.js
+ | import "@react-navigation/native"
+
+ node_modules\@react-navigation\bottom-tabs\lib\module\index.js
+ | import "./navigators/createBottomTabNavigator.js"
+
+ src\navigation\AppTabs.tsx
+ | import "@react-navigation/bottom-tabs"
+
+ App.tsx
+ | import "./src/navigation/AppTabs"
+
+ index.ts
+ | import "./App"
+
+ 
+ | import "./index.ts"
+
+Android Bundling failed 5132ms index.ts (1 module)
+Unable to resolve "@react-navigation/native" from "node_modules\@react-navigation\bottom-tabs\lib\module\navigators\createBottomTabNavigator.js"
+[0m [90m 1 |[39m [32m"use strict"[39m[33m;[39m
+ [90m 2 |[39m
+[31m[1m>[22m[39m[90m 3 |[39m [36mimport[39m { createNavigatorFactory[33m,[39m createScreenFactory[33m,[39m [33mTabRouter[39m[33m,[39m useNavigationBuilder } [36mfrom[39m [32m'@react-navigation/native'[39m[33m;[39m
+ [90m   |[39m                                                                                               [31m[1m^[22m[39m
+ [90m 4 |[39m [36mimport[39m { [33mBottomTabView[39m } [36mfrom[39m [32m"../views/BottomTabView.js"[39m[33m;[39m
+ [90m 5 |[39m [36mimport[39m { jsx [36mas[39m _jsx } [36mfrom[39m [32m"react/jsx-runtime"[39m[33m;[39m
+ [90m 6 |[39m [36mfunction[39m [33mBottomTabNavigator[39m({[0m
+
+Import stack:
+
+ node_modules\@react-navigation\bottom-tabs\lib\module\navigators\createBottomTabNavigator.js
+ | import "@react-navigation/native"
+
+ node_modules\@react-navigation\bottom-tabs\lib\module\index.js
+ | import "./navigators/createBottomTabNavigator.js"
+
+ src\navigation\AppTabs.tsx
+ | import "@react-navigation/bottom-tabs"
+
+ App.tsx
+ | import "./src/navigation/AppTabs"
+
+ index.ts
+ | import "./App"
+
+ 
+ | import "./index.ts"
+
+Android Bundling failed 4767ms index.ts (1 module)
+Unable to resolve "@react-navigation/native" from "node_modules\@react-navigation\bottom-tabs\lib\module\navigators\createBottomTabNavigator.js"
+[0m [90m 1 |[39m [32m"use strict"[39m[33m;[39m
+ [90m 2 |[39m
+[31m[1m>[22m[39m[90m 3 |[39m [36mimport[39m { createNavigatorFactory[33m,[39m createScreenFactory[33m,[39m [33mTabRouter[39m[33m,[39m useNavigationBuilder } [36mfrom[39m [32m'@react-navigation/native'[39m[33m;[39m
+ [90m   |[39m                                                                                               [31m[1m^[22m[39m
+ [90m 4 |[39m [36mimport[39m { [33mBottomTabView[39m } [36mfrom[39m [32m"../views/BottomTabView.js"[39m[33m;[39m
+ [90m 5 |[39m [36mimport[39m { jsx [36mas[39m _jsx } [36mfrom[39m [32m"react/jsx-runtime"[39m[33m;[39m
+ [90m 6 |[39m [36mfunction[39m [33mBottomTabNavigator[39m({[0m
+
+Import stack:
+
+ node_modules\@react-navigation\bottom-tabs\lib\module\navigators\createBottomTabNavigator.js
+ | import "@react-navigation/native"
+
+ node_modules\@react-navigation\bottom-tabs\lib\module\index.js
+ | import "./navigators/createBottomTabNavigator.js"
+
+ src\navigation\AppTabs.tsx
+ | import "@react-navigation/bottom-tabs"
+
+ App.tsx
+ | import "./src/navigation/AppTabs"
+
+ index.ts
+ | import "./App"
+
+ 
+ | import "./index.ts"
+

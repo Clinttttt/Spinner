@@ -1,0 +1,27 @@
+.summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.65rem 0;
+}
+
+span {
+  color: var(--color-text-muted);
+}
+
+strong {
+  color: var(--color-text);
+  text-align: right;
+}
+
+.strong {
+  border-top: 1px solid var(--color-border);
+  margin-top: 0.25rem;
+  padding-top: 0.9rem;
+}
+
+.strong strong {
+  color: var(--color-gold-dark);
+  font-size: 1.2rem;
+}

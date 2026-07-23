@@ -1,0 +1,79 @@
+<section class="customer-page" aria-labelledby="tracking-title">
+  <div class="customer-shell">
+    <header class="customer-header">
+      <a class="back-link" routerLink="/book" aria-label="Back to booking">‹</a>
+      <div class="brand">
+        <img src="assets/brand/logo.jpg" alt="Engr. Spin Laundry logo" />
+        <div>
+          <strong>ENGR. SPIN</strong>
+          <span>LAUNDROMAT</span>
+        </div>
+      </div>
+    </header>
+
+    @if (isLoading) {
+      <article class="state-card">
+        <span class="state-icon">...</span>
+        <h1 id="tracking-title">Loading Tracking</h1>
+        <p>Please wait while we check your laundry status.</p>
+      </article>
+    } @else if (errorMessage) {
+      <article class="state-card error">
+        <span class="state-icon">!</span>
+        <h1 id="tracking-title">Tracking Not Found</h1>
+        <p>{{ errorMessage }}</p>
+        <a class="primary-link" routerLink="/book">Back to Booking</a>
+      </article>
+    } @else if (tracking) {
+      <main class="tracking-card">
+        <p class="eyebrow">Track Your Laundry</p>
+        <h1 id="tracking-title">{{ tracking.customerFacingStatus }}</h1>
+        <p class="intro">
+          Hi {{ tracking.customerName }}, here is the latest status of your laundry order.
+        </p>
+
+        <div class="order-strip">
+          <span>Order Code</span>
+          <strong>{{ tracking.orderCode }}</strong>
+        </div>
+
+        <ol class="timeline" aria-label="Laundry order timeline">
+          @for (step of steps(); track step.status) {
+            <li [class]="stepState(step.status)">
+              <span class="dot" aria-hidden="true"></span>
+              <span>{{ step.label }}</span>
+            </li>
+          }
+        </ol>
+
+        <dl class="summary-list">
+          <div>
+            <dt>Service</dt>
+            <dd>{{ tracking.serviceName }}</dd>
+          </div>
+          <div>
+            <dt>Schedule</dt>
+            <dd>{{ tracking.preferredDate }} · {{ tracking.preferredTimeWindow }}</dd>
+          </div>
+          <div>
+            <dt>Fulfillment</dt>
+            <dd>{{ formatFulfillment(tracking.fulfillmentType) }}</dd>
+          </div>
+          <div>
+            <dt>Payment</dt>
+            <dd>{{ formatPayment(tracking.paymentMethod) }} · {{ tracking.paymentStatus }}</dd>
+          </div>
+          <div>
+            <dt>Estimated Total</dt>
+            <dd class="amount">{{ formatPeso(tracking.estimatedTotalAmount) }}</dd>
+          </div>
+        </dl>
+
+        <aside class="notice-card">
+          <strong>Need help?</strong>
+          <span>Call Engr. Spin Laundromat at 0910-222-1020 for schedule changes or urgent concerns.</span>
+        </aside>
+      </main>
+    }
+  </div>
+</section>

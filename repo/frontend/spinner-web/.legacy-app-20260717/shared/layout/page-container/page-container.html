@@ -1,0 +1,13 @@
+<section class="page-container">
+  <div class="page-heading">
+    @if (eyebrow()) {
+      <p class="eyebrow">{{ eyebrow() }}</p>
+    }
+    <h1>{{ title() }}</h1>
+    @if (description()) {
+      <p class="description">{{ description() }}</p>
+    }
+  </div>
+
+  <ng-content />
+</section>

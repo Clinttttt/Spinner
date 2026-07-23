@@ -1,0 +1,8 @@
+<span
+  class="status-pill"
+  [class.success]="tone() === 'success'"
+  [class.warning]="tone() === 'warning'"
+  [class.danger]="tone() === 'danger'"
+>
+  {{ label() }}
+</span>

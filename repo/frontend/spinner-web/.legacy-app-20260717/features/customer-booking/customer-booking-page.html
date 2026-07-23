@@ -1,0 +1,138 @@
+<section class="booking-page" aria-labelledby="booking-title">
+  <div class="booking-shell">
+    <header class="booking-header">
+      <a class="back-link" href="/book" aria-label="Back">‹</a>
+      <div class="brand">
+        <img src="assets/brand/logo.jpg" alt="Engr. Spin Laundry logo" />
+        <div>
+          <strong>ENGR. SPIN</strong>
+          <span>LAUNDROMAT</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="hero">
+      <div class="hero-copy">
+        <span class="hero-kicker">
+          <img src="assets/icons/preferred-date.svg" alt="" aria-hidden="true" />
+          Laundry booking
+        </span>
+        <h1 id="booking-title">Book Your Service</h1>
+        <p class="brief-desc">Schedule your laundry service in a few easy steps.</p>
+      </div>
+      <img src="assets/customer/laundromat-background.png" alt="Engr. Spin laundromat interior" />
+    </section>
+
+    <form class="booking-content" [formGroup]="bookingForm" (ngSubmit)="submitBooking()" novalidate>
+      <section class="section">
+        <h2>1. Choose Your Service</h2>
+        <p class="form-note">You may select one or more services.</p>
+        @if (isLoadingServices) {
+          <p class="form-note">Loading current services and pricing...</p>
+        }
+        <div class="service-grid">
+          @for (service of services; track service.name) {
+            <button
+              class="service-card"
+              [class.selected]="service.selected"
+              type="button"
+              [attr.aria-pressed]="service.selected"
+              (click)="selectService(service)"
+            >
+              <img [src]="service.icon" alt="" aria-hidden="true" />
+              <span>{{ service.name }}</span>
+              <small>{{ service.description }}</small>
+              @if (service.selected) {
+                <em aria-label="Selected">✓</em>
+              }
+            </button>
+          }
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>2. Your Booking Details</h2>
+        <div class="field-list">
+          @for (field of fields; track field.control) {
+            <div>
+              <label class="field-row" [class.invalid]="isInvalid(field.control)">
+                <span class="field-name">
+                  <img [src]="field.icon" alt="" aria-hidden="true" />
+                  <span>{{ field.label }}</span>
+                </span>
+                <input
+                  [type]="field.type"
+                  [placeholder]="field.placeholder"
+                  [formControlName]="field.control"
+                  [autocomplete]="field.autocomplete"
+                  [readonly]="field.control === 'serviceType'"
+                />
+              </label>
+              @if (isInvalid(field.control)) {
+                <p class="field-error">{{ errorFor(field.control) }}</p>
+              }
+            </div>
+          }
+
+          <div class="field-row segmented-row">
+            <span class="field-name">
+              <img src="assets/icons/payment-method.svg" alt="" aria-hidden="true" />
+              <span>Payment Method</span>
+            </span>
+            <div class="segmented payment" role="group" aria-label="Payment method">
+              <button
+                [class.active]="bookingForm.controls.paymentMethod.value === 'Cash on Delivery'"
+                type="button"
+                (click)="selectPaymentMethod('Cash on Delivery')"
+              >
+                <img src="assets/icons/payment-method.svg" alt="" aria-hidden="true" />
+                Cash on Delivery
+              </button>
+              <button
+                [class.active]="bookingForm.controls.paymentMethod.value === 'QR Code Online Payment'"
+                type="button"
+                (click)="selectPaymentMethod('QR Code Online Payment')"
+              >
+                <img src="assets/icons/payment-method.svg" alt="" aria-hidden="true" />
+                QR Code Online Payment
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="business-card">
+        <div class="business-details">
+          <h2>Operating Hours & Location</h2>
+          <p>
+            <img src="assets/icons/operating-hours.svg" alt="" aria-hidden="true" />
+            <span><strong>8:00 AM - 6:00 PM</strong>Monday - Sunday</span>
+          </p>
+          <p>
+            <img src="assets/icons/phone.svg" alt="" aria-hidden="true" />
+            <strong>0910-222-1020</strong>
+          </p>
+          <p>
+            <img src="assets/icons/location.svg" alt="" aria-hidden="true" />
+            <span>SLG Bldg., Brgy. 10, Ojeda Ave., Cabadbaran City near Jollibee</span>
+          </p>
+        </div>
+       
+      </aside>
+
+      @if (submitError) {
+        <p class="submit-error">{{ submitError }}</p>
+      }
+
+      <button class="confirm-button" type="submit" [disabled]="isSubmitting">
+        <img src="assets/icons/confirm-booking.svg" alt="" aria-hidden="true" />
+        {{ isSubmitting ? 'SUBMITTING...' : 'CONFIRM BOOKING' }}
+      </button>
+
+      <p class="privacy-note">
+        <img src="assets/icons/lock.svg" alt="" aria-hidden="true" />
+        Your information is safe with us.
+      </p>
+    </form>
+  </div>
+</section>

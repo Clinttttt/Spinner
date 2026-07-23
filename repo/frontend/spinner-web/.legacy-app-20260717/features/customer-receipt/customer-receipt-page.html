@@ -1,0 +1,93 @@
+<section class="customer-page" aria-labelledby="receipt-title">
+  <div class="customer-shell">
+    <header class="customer-header">
+      <a class="back-link" routerLink="/book" aria-label="Back to booking">‹</a>
+      <div class="brand">
+        <img src="assets/brand/logo.jpg" alt="Engr. Spin Laundry logo" />
+        <div>
+          <strong>ENGR. SPIN</strong>
+          <span>LAUNDROMAT</span>
+        </div>
+      </div>
+    </header>
+
+    @if (isLoading) {
+      <article class="state-card">
+        <span class="state-icon">...</span>
+        <h1 id="receipt-title">Loading Receipt</h1>
+        <p>Please wait while we prepare your digital receipt.</p>
+      </article>
+    } @else if (errorMessage) {
+      <article class="state-card error">
+        <span class="state-icon">!</span>
+        <h1 id="receipt-title">Receipt Not Found</h1>
+        <p>{{ errorMessage }}</p>
+        <a class="primary-link" routerLink="/book">Back to Booking</a>
+      </article>
+    } @else if (receipt) {
+      <main class="receipt-card">
+        <p class="eyebrow">Payment Receipt</p>
+        <h1 id="receipt-title">{{ receipt.receiptTitle }}</h1>
+        <p class="intro">
+          This summarizes the laundry service and payment recorded for your order.
+        </p>
+
+        <div class="receipt-code">
+          <span>Receipt Code</span>
+          <strong>{{ receipt.receiptCode }}</strong>
+        </div>
+
+        <dl class="summary-list">
+          <div>
+            <dt>Order Code</dt>
+            <dd>{{ receipt.orderCode }}</dd>
+          </div>
+          <div>
+            <dt>Customer</dt>
+            <dd>{{ receipt.customerName }}</dd>
+          </div>
+          <div>
+            <dt>Service</dt>
+            <dd>{{ receipt.serviceName }}</dd>
+          </div>
+          <div>
+            <dt>Quantity</dt>
+            <dd>{{ receipt.loadCount }} {{ receipt.unitLabel }}</dd>
+          </div>
+          <div>
+            <dt>Payment Method</dt>
+            <dd>{{ formatPayment(receipt.paymentMethod) }}</dd>
+          </div>
+          <div>
+            <dt>Payment Status</dt>
+            <dd><span class="status-pill">{{ receipt.paymentStatus }}</span></dd>
+          </div>
+          <div>
+            <dt>Paid At</dt>
+            <dd>{{ paidDate(receipt.paidAt) }}</dd>
+          </div>
+        </dl>
+
+        <section class="totals-card" aria-label="Receipt total">
+          <div>
+            <span>Service Amount</span>
+            <strong>{{ formatPeso(receipt.serviceAmount) }}</strong>
+          </div>
+          <div>
+            <span>Delivery Fee</span>
+            <strong>{{ formatPeso(receipt.deliveryFee) }}</strong>
+          </div>
+          <div class="total">
+            <span>Total Amount</span>
+            <strong>{{ formatPeso(receipt.totalAmount) }}</strong>
+          </div>
+        </section>
+
+        <aside class="notice-card">
+          <strong>Thank you for choosing Engr. Spin Laundromat.</strong>
+          <span>This is a digital order/payment receipt for customer reference.</span>
+        </aside>
+      </main>
+    }
+  </div>
+</section>

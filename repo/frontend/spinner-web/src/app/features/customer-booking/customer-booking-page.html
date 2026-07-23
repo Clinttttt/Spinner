@@ -1,0 +1,373 @@
+<main class="customer-page">
+  <header class="site-header page-width">
+    <a class="brand" href="#top" aria-label="Engr. Spin Laundromat home">
+      <img src="/assets/logo.jpg" alt="Engr. Spin Laundromat logo" />
+      <span class="brand-copy">
+        <strong>ENGR. SPIN</strong>
+        <small>LAUNDROMAT</small>
+      </span>
+    </a>
+    <button class="header-action" type="button" (click)="showTrackingNotice()">
+      <span>Track order</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="m9 18 6-6-6-6" />
+      </svg>
+    </button>
+  </header>
+
+  <div class="page-width page-layout" id="top">
+    <section class="hero-card" aria-labelledby="hero-title">
+      <img
+        class="hero-image"
+        src="/assets/laundromat-background.png"
+        alt="Modern Engr. Spin laundromat machines"
+      />
+      <div class="hero-shade"></div>
+      <div class="hero-content">
+        <span class="eyebrow light">Doorstep laundry care</span>
+        <h1 id="hero-title">Fresh laundry without the back-and-forth.</h1>
+        <p>Book in minutes. We’ll confirm your schedule and keep you updated.</p>
+        <div class="hero-points" aria-label="Service benefits">
+          <span><b>✓</b> Professional care</span>
+          <span><b>✓</b> Easy tracking</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="booking-card" aria-labelledby="booking-title">
+      <div class="booking-intro">
+        <div>
+          <span class="eyebrow">Quick booking</span>
+          <h2 id="booking-title">Book your laundry</h2>
+          <p>No account needed. We’ll confirm your request shortly.</p>
+        </div>
+        <div class="secure-chip"><span>✓</span> Secure</div>
+      </div>
+
+      @if (errorMessage()) {
+        <div class="inline-notice" role="status">
+          {{ errorMessage() }}
+        </div>
+      }
+      @if (trackingNoticeVisible() && confirmation()) {
+        <div class="inline-notice" role="status">
+          {{ confirmation()!.orderCode }} is currently {{ confirmation()!.status }}.
+        </div>
+      }
+
+      <form [formGroup]="bookingForm" (ngSubmit)="submitBooking()" novalidate>
+        <section class="form-section">
+          <div class="section-heading">
+            <span class="section-number">1</span>
+            <div>
+              <h3>Choose your service</h3>
+              <p>Select the care that fits your laundry.</p>
+            </div>
+          </div>
+          @if (loadingServices()) {
+            <div class="inline-notice" role="status">Loading available services…</div>
+          } @else {
+          <div class="choice-grid">
+            @for (option of services(); track option.id) {
+              <button
+                class="choice-card"
+                type="button"
+                [class.selected]="bookingForm.controls.service.value === option.id"
+                [attr.aria-pressed]="bookingForm.controls.service.value === option.id"
+                (click)="selectService(option.id)"
+              >
+                <span class="radio-dot"></span>
+                <span class="choice-copy">
+                  <strong>{{ option.name }}</strong>
+                  <small>
+                    {{ option.description || ('₱' + option.basePrice + ' ' + option.unitLabel) }}
+                  </small>
+                </span>
+              </button>
+            }
+          </div>
+          }
+        </section>
+
+        <section class="form-section">
+          <div class="section-heading">
+            <span class="section-number">2</span>
+            <div>
+              <h3>How should we receive it?</h3>
+              <p>Choose pickup or bring it to the shop.</p>
+            </div>
+          </div>
+          <div class="choice-grid">
+            @for (option of orderMethods; track option.value) {
+              <button
+                class="choice-card"
+                type="button"
+                [class.selected]="bookingForm.controls.orderMethod.value === option.value"
+                [attr.aria-pressed]="bookingForm.controls.orderMethod.value === option.value"
+                (click)="selectOrderMethod(option.value)"
+              >
+                <span class="radio-dot"></span>
+                <span class="choice-copy">
+                  <strong>{{ option.title }}</strong>
+                  <small>{{ option.caption }}</small>
+                </span>
+              </button>
+            }
+          </div>
+        </section>
+
+        <section class="form-section">
+          <div class="section-heading">
+            <span class="section-number">3</span>
+            <div>
+              <h3>Your details</h3>
+              <p>We’ll use these to confirm and update you.</p>
+            </div>
+          </div>
+          <div class="field-grid">
+            <label class="field">
+              <span>Full name</span>
+              <input
+                class="field-control"
+                formControlName="fullName"
+                autocomplete="name"
+                placeholder="Juan Dela Cruz"
+              />
+              @if (hasError('fullName')) {
+                <small class="field-error">Please enter your full name.</small>
+              }
+            </label>
+            <label class="field">
+              <span>Mobile number</span>
+              <input
+                class="field-control"
+                formControlName="mobileNumber"
+                autocomplete="tel"
+                inputmode="tel"
+                placeholder="09XX XXX XXXX"
+              />
+              @if (hasError('mobileNumber')) {
+                <small class="field-error">Enter a valid Philippine mobile number.</small>
+              }
+            </label>
+            <label class="field field-wide">
+              <span>Email <em>Optional</em></span>
+              <input
+                class="field-control"
+                formControlName="email"
+                autocomplete="email"
+                inputmode="email"
+                placeholder="you@example.com"
+              />
+              @if (hasError('email')) {
+                <small class="field-error">Enter a valid email address.</small>
+              }
+            </label>
+          </div>
+        </section>
+
+        <section class="form-section">
+          <div class="section-heading">
+            <span class="section-number">4</span>
+            <div>
+              <h3>Schedule & laundry</h3>
+              <p>Tell us when and how much to expect.</p>
+            </div>
+          </div>
+          <div class="field-grid">
+            <label class="field">
+              <span>Preferred date</span>
+              <input
+                class="field-control"
+                formControlName="preferredDate"
+                type="date"
+                [min]="minimumDate"
+              />
+              @if (hasError('preferredDate')) {
+                <small class="field-error">Choose your preferred date.</small>
+              }
+            </label>
+            <label class="field">
+              <span>Preferred time</span>
+              <select class="field-control" formControlName="preferredTime">
+                <option value="">Select a time</option>
+                <option value="08:00-10:00">8:00 AM – 10:00 AM</option>
+                <option value="10:00-12:00">10:00 AM – 12:00 PM</option>
+                <option value="13:00-15:00">1:00 PM – 3:00 PM</option>
+                <option value="15:00-17:00">3:00 PM – 5:00 PM</option>
+              </select>
+              @if (hasError('preferredTime')) {
+                <small class="field-error">Choose a preferred time.</small>
+              }
+            </label>
+            <label class="field">
+              <span>Estimated loads</span>
+              <select class="field-control" formControlName="loadCount">
+                <option [ngValue]="1">1 load</option>
+                <option [ngValue]="2">2 loads</option>
+                <option [ngValue]="3">3 loads</option>
+                <option [ngValue]="4">4 loads</option>
+                <option [ngValue]="5">5+ loads</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Notes <em>Optional</em></span>
+              <input
+                class="field-control"
+                formControlName="notes"
+                placeholder="Special instructions"
+              />
+            </label>
+          </div>
+        </section>
+
+        @if (bookingForm.controls.orderMethod.value === 'pickupDelivery') {
+          <section class="form-section">
+            <div class="section-heading">
+              <span class="section-number">5</span>
+              <div>
+                <h3>Pickup address</h3>
+                <p>Include your street, barangay, and city.</p>
+              </div>
+            </div>
+            <label class="field">
+              <span>Complete address</span>
+              <textarea
+                class="field-control textarea"
+                formControlName="address"
+                autocomplete="street-address"
+                placeholder="House number, street, barangay, city"
+              ></textarea>
+              @if (hasError('address')) {
+                <small class="field-error">Pickup address is required.</small>
+              }
+            </label>
+          </section>
+        }
+
+        <section class="form-section">
+          <div class="section-heading">
+            <span class="section-number">{{
+              bookingForm.controls.orderMethod.value === 'pickupDelivery' ? 6 : 5
+            }}</span>
+            <div>
+              <h3>Payment method</h3>
+              <p>Choose how you prefer to settle your order.</p>
+            </div>
+          </div>
+          <div class="choice-grid">
+            @for (option of paymentMethods; track option.value) {
+              <button
+                class="choice-card"
+                type="button"
+                [class.selected]="bookingForm.controls.paymentMethod.value === option.value"
+                [attr.aria-pressed]="bookingForm.controls.paymentMethod.value === option.value"
+                (click)="selectPayment(option.value)"
+              >
+                <span class="radio-dot"></span>
+                <span class="choice-copy">
+                  <strong>{{ option.title }}</strong>
+                  <small>{{ option.caption }}</small>
+                </span>
+              </button>
+            }
+          </div>
+        </section>
+
+        <section class="estimate-card" aria-live="polite">
+          <div class="estimate-heading">
+            <div>
+              <span class="eyebrow">Estimated summary</span>
+              <h3>Review your booking</h3>
+            </div>
+            <span class="estimate-badge">No payment yet</span>
+          </div>
+          <dl>
+            <div>
+              <dt>Service estimate</dt>
+              <dd>₱{{ serviceAmount }}.00</dd>
+            </div>
+            <div>
+              <dt>Pickup & delivery</dt>
+              <dd>{{ deliveryFee ? '₱' + deliveryFee + '.00' : 'Free' }}</dd>
+            </div>
+            <div class="total">
+              <dt>Total estimate</dt>
+              <dd>₱{{ estimatedTotal }}.00</dd>
+            </div>
+          </dl>
+          <p class="estimate-note">
+            Final price is confirmed after staff reviews the actual laundry volume.
+          </p>
+        </section>
+
+        <div class="booking-actions">
+          <button
+            class="primary-button"
+            type="submit"
+            [disabled]="submitting() || loadingServices() || !services().length"
+          >
+            <span>{{ submitting() ? 'Submitting…' : 'Confirm booking request' }}</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+          </button>
+          <button class="secondary-button" type="button" (click)="showTrackingNotice()">
+            Track an existing order
+          </button>
+          <p><span>✓</span> Secure booking · Trusted service · Quality care</p>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <section class="how-it-works page-width" aria-labelledby="how-title">
+    <div class="how-heading">
+      <span class="eyebrow">Simple from start to finish</span>
+      <h2 id="how-title">How it works</h2>
+    </div>
+    <ol>
+      <li>
+        <span>1</span>
+        <div><strong>Book</strong><small>Choose your service and schedule.</small></div>
+      </li>
+      <li>
+        <span>2</span>
+        <div><strong>Confirm</strong><small>Our team reviews your request.</small></div>
+      </li>
+      <li>
+        <span>3</span>
+        <div><strong>Track</strong><small>Follow your laundry status online.</small></div>
+      </li>
+    </ol>
+  </section>
+
+  <footer class="page-width">
+    <img src="/assets/logo.jpg" alt="" />
+    <p>Engr. Spin Laundromat</p>
+    <span>Fast. Clean. Convenient.</span>
+  </footer>
+
+  @if (bookingComplete()) {
+    <div class="modal-backdrop" role="presentation">
+      <section
+        class="confirmation-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirmation-title"
+      >
+        <div class="success-icon">✓</div>
+        <span class="eyebrow">Request received</span>
+        <h2 id="confirmation-title">Your laundry booking is in!</h2>
+        <p>Our team will review your schedule and contact you using the mobile number provided.</p>
+        <div class="reference-row">
+          <span>Order reference</span>
+          <strong>{{ confirmation()?.orderCode }}</strong>
+        </div>
+        <div class="reference-row">
+          <span>Tracking code</span>
+          <strong>{{ confirmation()?.trackingCode }}</strong>
+        </div>
+        <button class="primary-button" type="button" (click)="closeConfirmation()">Done</button>
+      </section>
+    </div>
+  }
+</main>

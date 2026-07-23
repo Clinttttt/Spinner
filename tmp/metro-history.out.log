@@ -1,0 +1,7 @@
+
+> owner-mobile@1.0.0 start
+> expo start --lan --clear
+
+Starting project at C:\dev\Spinner\repo\frontend\owner-mobile
+› Port 8081 is being used by another process
+› Skipping dev server

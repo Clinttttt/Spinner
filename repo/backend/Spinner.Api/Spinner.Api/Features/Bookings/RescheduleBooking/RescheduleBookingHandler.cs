@@ -1,0 +1,48 @@
+using MediatR;
+using Microsoft.EntityFrameworkCore;
+using Spinner.Api.Common.Results;
+using Spinner.Api.Database;
+using Spinner.Api.Domain.Orders;
+using Spinner.Api.Features.BusinessSettings;
+using Spinner.Api.Features.Orders;
+
+namespace Spinner.Api.Features.Bookings.RescheduleBooking;
+
+public sealed class RescheduleBookingHandler : IRequestHandler<RescheduleBookingCommand, Result<OrderDetailsResponse>>
+{
+    private readonly AppDbContext _dbContext;
+
+    public RescheduleBookingHandler(AppDbContext dbContext)
+    {
+        _dbContext = dbContext;
+    }
+
+    public async Task<Result<OrderDetailsResponse>> Handle(
+        RescheduleBookingCommand request,
+        CancellationToken cancellationToken)
+    {
+        var order = await _dbContext.LaundryOrders
+            .Include(order => order.Customer)
+            .FirstOrDefaultAsync(
+                order => order.Id == request.BookingId && order.Source == OrderSource.CustomerWeb,
+                cancellationToken);
+
+        if (order is null)
+            return Result<OrderDetailsResponse>.NotFound("Booking was not found.");
+
+        var transition = order.Reschedule(
+            request.PreferredDate,
+            request.PreferredTimeWindow,
+            DateTimeOffset.UtcNow);
+
+        if (!transition.IsSuccess)
+            return Result<OrderDetailsResponse>.Conflict(transition.Error.Message);
+
+        var settings = await BusinessSettingsDefaults.GetOrCreateAsync(_dbContext, cancellationToken);
+        BookingNotificationQueue.QueueBookingRescheduled(_dbContext, order, settings.BusinessName, DateTimeOffset.UtcNow);
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return Result<OrderDetailsResponse>.Success(OrderDetailsResponse.FromEntity(order));
+    }
+}

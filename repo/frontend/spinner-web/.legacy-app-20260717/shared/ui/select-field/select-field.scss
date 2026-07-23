@@ -1,0 +1,20 @@
+.select-field {
+  display: grid;
+  gap: 0.45rem;
+}
+
+span {
+  color: var(--color-text-soft);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+select {
+  width: 100%;
+  min-height: 56px;
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  color: var(--color-text);
+  padding: 0 1rem;
+}

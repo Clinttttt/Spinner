@@ -1,0 +1,21 @@
+<article class="placeholder-page">
+  <section class="hero-card">
+    <p class="eyebrow">{{ data.eyebrow }}</p>
+    <h1>{{ data.title }}</h1>
+    <p class="description">{{ data.description }}</p>
+    <div class="status-row">
+      <span>UI-0 placeholder</span>
+      <span>No backend connection</span>
+    </div>
+  </section>
+
+  <section class="foundation-grid" aria-label="Planned page areas">
+    @for (action of data.actions; track action) {
+      <div class="foundation-card">
+        <span class="dot"></span>
+        <strong>{{ action }}</strong>
+        <p>Route shell only. Full UI and API behavior will be added in a later UI phase.</p>
+      </div>
+    }
+  </section>
+</article>

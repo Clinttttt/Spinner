@@ -1,0 +1,35 @@
+.state-card {
+  display: grid;
+  place-items: center;
+  gap: 0.5rem;
+  min-height: 180px;
+  text-align: center;
+  background: var(--color-danger-bg);
+  border: 1px solid #f5c9c9;
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+}
+
+.icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  background: #fff;
+  border-radius: 999px;
+  color: var(--color-danger);
+  font-weight: 900;
+}
+
+h2 {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 1.1rem;
+}
+
+p {
+  max-width: 420px;
+  margin: 0;
+  color: var(--color-text-soft);
+  line-height: 1.55;
+}

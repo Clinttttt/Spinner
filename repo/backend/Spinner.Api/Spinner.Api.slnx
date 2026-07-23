@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Spinner.Api/Spinner.Api.csproj" />
+  <Project Path="Spinner.Test/Spinner.Test.csproj" />
+</Solution>
