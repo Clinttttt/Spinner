@@ -80,8 +80,12 @@ $subscriptionId = $account.id
 $tenantId = $account.tenantId
 Write-Ok "Azure subscription: $($account.name) ($subscriptionId)"
 
+$previousPreference = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
 gh auth status 2>&1 | Out-Null
-if ($LASTEXITCODE -ne 0) { throw 'GitHub CLI is not authenticated. Run: gh auth login' }
+$ghAuthenticated = $LASTEXITCODE -eq 0
+$ErrorActionPreference = $previousPreference
+if (-not $ghAuthenticated) { throw 'GitHub CLI is not authenticated. Run: gh auth login' }
 Write-Ok "GitHub repository: $GitHubRepository"
 
 # ---------------------------------------------------------------------------
@@ -303,7 +307,10 @@ foreach ($entry in $secrets.GetEnumerator()) {
     }
 
     if ($PSCmdlet.ShouldProcess($entry.Key, 'Set GitHub secret')) {
-        $entry.Value | gh secret set $entry.Key --repo $GitHubRepository --body -
+        # `--body -` does NOT read stdin; it stores the literal string "-".
+        # The value must be passed directly.
+        gh secret set $entry.Key --repo $GitHubRepository --body $entry.Value
+        if ($LASTEXITCODE -ne 0) { throw "Failed to set GitHub secret $($entry.Key)." }
         Write-Ok "Set $($entry.Key)"
     }
 }
