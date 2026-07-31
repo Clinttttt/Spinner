@@ -14,17 +14,30 @@ import {
   type AddressSuggestion,
   AddressLookupService,
 } from '../../core/address-lookup.service';
-import { DeviceLocationService } from '../../core/device-location.service';
+import {
+  DeviceLocationService,
+  GeolocationUnavailableError,
+} from '../../core/device-location.service';
 import {
   type BookingConfirmationDto,
   type LaundryServiceDto,
   type PickupLocationPayload,
   SpinnerApiService,
 } from '../../core/spinner-api.service';
+import { LocationPickerMap, type MapPoint } from './location-picker-map';
 
 type OrderMethod = 'pickupDelivery' | 'dropOff';
 type PaymentMethod = 'cod' | 'qr';
-type PinSource = 'currentLocation' | 'addressSearch';
+
+/** How the coordinates were obtained. Mirrors the API's LocationSource. */
+type PinSource = 'currentLocation' | 'addressSearch' | 'manualPin';
+
+/**
+ * Mutually exclusive. Only one may be rendered, which prevents the previous
+ * "Pickup pin saved" and "Finding your location took too long" appearing
+ * together.
+ */
+type LocationStatus = 'idle' | 'locating' | 'ready' | 'failed';
 
 interface ChoiceOption<T extends string> {
   caption: string;
@@ -34,16 +47,8 @@ interface ChoiceOption<T extends string> {
 
 interface PickupPin {
   accuracyMeters: number | null;
-  /**
-   * True when the pin was resolved from the typed address on submit rather than
-   * chosen or captured by the customer. Such a pin is sent as unconfirmed so the
-   * owner treats it as an approximation.
-   */
-  autoResolved: boolean;
-  barangay: string | null;
-  cityOrMunicipality: string | null;
-  /** Address text at the moment the pin was captured. */
-  capturedAddress: string;
+  /** Nearby address reported by the geocoder. Never shown as the customer's own. */
+  formattedAddress: string | null;
   latitude: number;
   longitude: number;
   placeId: string | null;
@@ -52,9 +57,12 @@ interface PickupPin {
 
 const SUGGESTION_DEBOUNCE_MS = 320;
 
+/** Laundromat service area centre, used as the map's starting view. */
+const SERVICE_AREA_CENTRE: MapPoint = { latitude: 9.2381784, longitude: 125.9624521 };
+
 @Component({
   selector: 'app-customer-booking-page',
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, LocationPickerMap],
   templateUrl: './customer-booking-page.html',
   styleUrl: './customer-booking-page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -80,26 +88,35 @@ export class CustomerBookingPage {
   readonly suggestionsOpen = signal(false);
   readonly searchingAddress = signal(false);
   readonly activeSuggestionIndex = signal(-1);
-  readonly locatingDevice = signal(false);
-  readonly locationMessage = signal('');
+
+  readonly locationStatus = signal<LocationStatus>('idle');
   readonly locationError = signal('');
   readonly pickupPin = signal<PickupPin | null>(null);
+  readonly mapVisible = signal(false);
+
   readonly geolocationSupported = this.deviceLocation.isSupported;
+  readonly inAppBrowser = this.deviceLocation.isInAppBrowser;
 
-  /**
-   * Mirrors the address control so signal-based state can react to edits.
-   * A `computed` cannot track a FormControl value directly.
-   */
-  private readonly addressText = signal('');
-
-  /**
-   * True when the address text was edited after the pin was captured, so the
-   * saved coordinates may no longer describe what the customer typed.
-   */
-  readonly pinNeedsRecheck = computed(() => {
+  readonly mapCentre = computed<MapPoint>(() => {
     const pin = this.pickupPin();
-    if (!pin) return false;
-    return normalize(pin.capturedAddress) !== normalize(this.addressText());
+    return pin ? { latitude: pin.latitude, longitude: pin.longitude } : SERVICE_AREA_CENTRE;
+  });
+
+  readonly pinCoordinates = computed(() => {
+    const pin = this.pickupPin();
+    if (!pin) return '';
+    return `${pin.latitude.toFixed(5)}, ${pin.longitude.toFixed(5)}`;
+  });
+
+  readonly pinSourceLabel = computed(() => {
+    const pin = this.pickupPin();
+    if (!pin) return '';
+    if (pin.source === 'currentLocation') {
+      return pin.accuracyMeters
+        ? `From your current location (±${pin.accuracyMeters} m)`
+        : 'From your current location';
+    }
+    return pin.source === 'manualPin' ? 'Chosen on the map' : 'From the selected place';
   });
 
   readonly orderMethods: readonly ChoiceOption<OrderMethod>[] = [
@@ -214,11 +231,7 @@ export class CustomerBookingPage {
   }
 
   onAddressInput(event: Event): void {
-    // Read the element directly rather than the form control so this never
-    // depends on which `input` listener Angular happens to run first.
     const value = (event.target as HTMLTextAreaElement | null)?.value ?? '';
-    this.addressText.set(value);
-    this.locationError.set('');
 
     if (value.trim().length < 3) {
       this.closeSuggestions();
@@ -237,9 +250,7 @@ export class CustomerBookingPage {
       event.preventDefault();
       const step = event.key === 'ArrowDown' ? 1 : -1;
       const total = this.suggestions().length;
-      this.activeSuggestionIndex.set(
-        (this.activeSuggestionIndex() + step + total) % total,
-      );
+      this.activeSuggestionIndex.set((this.activeSuggestionIndex() + step + total) % total);
       return;
     }
 
@@ -255,29 +266,21 @@ export class CustomerBookingPage {
     if (event.key === 'Escape') this.closeSuggestions();
   }
 
+  /**
+   * Moves the pin to a searched place. The customer's own address text is left
+   * untouched on purpose: a geocoder hit is a nearby reference such as the
+   * barangay school, not where the customer actually lives.
+   */
   applySuggestion(suggestion: AddressSuggestion): void {
-    this.setAddress(suggestion.formattedAddress);
-    this.pickupPin.set({
+    this.setPin({
       accuracyMeters: null,
-      autoResolved: false,
-      barangay: suggestion.barangay,
-      capturedAddress: suggestion.formattedAddress,
-      cityOrMunicipality: suggestion.cityOrMunicipality,
+      formattedAddress: suggestion.formattedAddress,
       latitude: suggestion.latitude,
       longitude: suggestion.longitude,
       placeId: suggestion.placeId,
       source: 'addressSearch',
     });
-    this.locationMessage.set('Map pin saved from the selected address.');
-    this.locationError.set('');
     this.closeSuggestions();
-  }
-
-  private setAddress(value: string): void {
-    const control = this.bookingForm.controls.address;
-    control.setValue(value);
-    control.markAsDirty();
-    this.addressText.set(value);
   }
 
   closeSuggestions(): void {
@@ -285,70 +288,112 @@ export class CustomerBookingPage {
     this.activeSuggestionIndex.set(-1);
   }
 
-  /**
-   * Captures the customer's current coordinates so the owner's pickup map has a
-   * real destination instead of only free-text directions.
-   */
-  async markMyLocation(): Promise<void> {
-    if (this.locatingDevice()) return;
-
-    this.locatingDevice.set(true);
-    this.locationError.set('');
-    this.locationMessage.set('');
-
-    try {
-      const position = await this.deviceLocation.getCurrentPosition();
-      const resolved = await this.resolveAddress(position.latitude, position.longitude);
-      const addressText = resolved?.formattedAddress ?? this.addressText().trim();
-
-      if (resolved?.formattedAddress) {
-        this.setAddress(resolved.formattedAddress);
-      }
-
-      this.pickupPin.set({
-        accuracyMeters: position.accuracyMeters,
-        autoResolved: false,
-        barangay: resolved?.barangay ?? null,
-        capturedAddress: addressText,
-        cityOrMunicipality: resolved?.cityOrMunicipality ?? null,
-        latitude: position.latitude,
-        longitude: position.longitude,
-        placeId: resolved?.placeId ?? null,
-        source: 'currentLocation',
+  showMap(): void {
+    this.mapVisible.set(true);
+    if (!this.pickupPin()) {
+      // Seed the pin at the service-area centre so dragging has a starting point.
+      this.setPin({
+        accuracyMeters: null,
+        formattedAddress: null,
+        latitude: SERVICE_AREA_CENTRE.latitude,
+        longitude: SERVICE_AREA_CENTRE.longitude,
+        placeId: null,
+        source: 'manualPin',
       });
-      this.closeSuggestions();
-      this.locationMessage.set(
-        resolved?.formattedAddress
-          ? 'Your current location is pinned for the rider.'
-          : 'Your coordinates are pinned. Please still type your street and barangay.',
-      );
-    } catch (error) {
-      this.locationError.set(
-        error instanceof Error
-          ? error.message
-          : 'Your location could not be captured. Type your address instead.',
-      );
-    } finally {
-      this.locatingDevice.set(false);
     }
   }
 
-  clearPin(): void {
-    this.pickupPin.set(null);
-    this.locationMessage.set('');
+  /** The customer dragged the map; the centre is now the pickup point. */
+  onMapPointChosen(point: MapPoint): void {
+    const previous = this.pickupPin();
+    if (
+      previous &&
+      Math.abs(previous.latitude - point.latitude) < 0.000005 &&
+      Math.abs(previous.longitude - point.longitude) < 0.000005
+    ) {
+      return;
+    }
+
+    this.setPin({
+      accuracyMeters: null,
+      formattedAddress: null,
+      latitude: point.latitude,
+      longitude: point.longitude,
+      placeId: null,
+      source: 'manualPin',
+    });
+
+    // Label the point for reference only; never overwrite what the customer typed.
+    this.addressLookup
+      .reverse(point.latitude, point.longitude)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((nearby) => {
+        if (!nearby) return;
+        const current = this.pickupPin();
+        if (!current || current.source !== 'manualPin') return;
+        this.pickupPin.set({ ...current, formattedAddress: nearby.formattedAddress });
+      });
+  }
+
+  async useCurrentLocation(): Promise<void> {
+    if (this.locationStatus() === 'locating') return;
+
+    this.locationStatus.set('locating');
     this.locationError.set('');
+
+    try {
+      const position = await this.deviceLocation.getCurrentPosition((refined) => {
+        const current = this.pickupPin();
+        // Only upgrade if the customer has not moved the pin since.
+        if (!current || current.source !== 'currentLocation') return;
+        this.pickupPin.set({
+          ...current,
+          accuracyMeters: refined.accuracyMeters,
+          latitude: refined.latitude,
+          longitude: refined.longitude,
+        });
+      });
+
+      this.setPin({
+        accuracyMeters: position.accuracyMeters,
+        formattedAddress: null,
+        latitude: position.latitude,
+        longitude: position.longitude,
+        placeId: null,
+        source: 'currentLocation',
+      });
+      this.mapVisible.set(true);
+      this.closeSuggestions();
+
+      this.addressLookup
+        .reverse(position.latitude, position.longitude)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe((nearby) => {
+          if (!nearby) return;
+          const current = this.pickupPin();
+          if (!current || current.source !== 'currentLocation') return;
+          this.pickupPin.set({ ...current, formattedAddress: nearby.formattedAddress });
+        });
+    } catch (error) {
+      // Failing here must not erase a pin the customer already has.
+      this.locationStatus.set(this.pickupPin() ? 'ready' : 'failed');
+      this.locationError.set(
+        error instanceof GeolocationUnavailableError
+          ? error.message
+          : 'Your location could not be captured. Move the map pin to your pickup point instead.',
+      );
+      this.mapVisible.set(true);
+    }
   }
 
-  pinSummary(): string {
-    const pin = this.pickupPin();
-    if (!pin) return '';
-    const coordinates = `${pin.latitude.toFixed(5)}, ${pin.longitude.toFixed(5)}`;
-    return pin.accuracyMeters
-      ? `${coordinates} (±${pin.accuracyMeters} m)`
-      : coordinates;
+  changeLocation(): void {
+    this.pickupPin.set(null);
+    this.locationStatus.set('idle');
+    this.locationError.set('');
+    this.mapVisible.set(true);
   }
 
-  async submitBooking(): Promise<void> {
+  submitBooking(): void {
     if (this.submitting()) return;
 
     this.bookingForm.markAllAsTouched();
@@ -364,27 +409,6 @@ export class CustomerBookingPage {
     this.closeSuggestions();
     const value = this.bookingForm.getRawValue();
     const isPickup = value.orderMethod === 'pickupDelivery';
-
-    // Most customers type an address and submit without ever opening the
-    // suggestion list, which previously meant the owner received no map pin at
-    // all. Resolve the typed text once, as a best effort, and send it as an
-    // unconfirmed pin. A lookup failure must never block the booking.
-    if (isPickup && !this.pickupPin() && value.address.trim().length >= 3) {
-      const resolved = await this.resolveFirstSuggestion(value.address.trim());
-      if (resolved) {
-        this.pickupPin.set({
-          accuracyMeters: null,
-          autoResolved: true,
-          barangay: resolved.barangay,
-          capturedAddress: value.address.trim(),
-          cityOrMunicipality: resolved.cityOrMunicipality,
-          latitude: resolved.latitude,
-          longitude: resolved.longitude,
-          placeId: resolved.placeId,
-          source: 'addressSearch',
-        });
-      }
-    }
 
     this.api
       .createBooking({
@@ -439,55 +463,34 @@ export class CustomerBookingPage {
     this.bookingComplete.set(false);
   }
 
+  private setPin(pin: PickupPin): void {
+    this.pickupPin.set(pin);
+    this.locationStatus.set('ready');
+    this.locationError.set('');
+  }
+
   private toPickupLocationPayload(): PickupLocationPayload | null {
     const pin = this.pickupPin();
     if (!pin) return null;
 
     const landmark = this.bookingForm.controls.landmark.value.trim();
-    // An auto-resolved pin is an approximation from typed text, so it is never
-    // reported as confirmed even though the address still matches.
-    const confirmed = !pin.autoResolved && !this.pinNeedsRecheck();
 
     return {
-      barangay: pin.barangay,
-      cityOrMunicipality: pin.cityOrMunicipality,
-      confirmedAt: confirmed ? new Date().toISOString() : null,
+      barangay: null,
+      cityOrMunicipality: null,
+      // Any pin the customer placed or accepted is a deliberate choice.
+      confirmedAt: new Date().toISOString(),
       formattedAddress:
-        this.bookingForm.controls.address.value.trim() || pin.capturedAddress,
+        pin.formattedAddress ?? this.bookingForm.controls.address.value.trim(),
       landmark: landmark || null,
       latitude: pin.latitude,
-      locationConfirmed: confirmed,
+      locationConfirmed: true,
       locationSource: pin.source,
       longitude: pin.longitude,
       pickupInstructions: null,
       placeId: pin.placeId,
       plusCode: null,
     };
-  }
-
-  /** Best-effort single lookup. Resolves to null on any failure. */
-  private resolveFirstSuggestion(query: string) {
-    return new Promise<AddressSuggestion | null>((resolve) => {
-      this.addressLookup
-        .search(query)
-        .pipe(takeUntilDestroyed(this.destroyRef))
-        .subscribe({
-          next: (results) => resolve(results[0] ?? null),
-          error: () => resolve(null),
-        });
-    });
-  }
-
-  private resolveAddress(latitude: number, longitude: number) {
-    return new Promise<AddressSuggestion | null>((resolve) => {
-      this.addressLookup
-        .reverse(latitude, longitude)
-        .pipe(takeUntilDestroyed(this.destroyRef))
-        .subscribe({
-          next: (result) => resolve(result),
-          error: () => resolve(null),
-        });
-    });
   }
 
   private loadServices() {
@@ -513,8 +516,4 @@ export class CustomerBookingPage {
     const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
     return offsetDate.toISOString().slice(0, 10);
   }
-}
-
-function normalize(value: string): string {
-  return value.trim().replace(/\s+/g, ' ').toLowerCase();
 }

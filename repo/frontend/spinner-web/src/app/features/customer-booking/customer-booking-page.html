@@ -226,8 +226,8 @@
             <div class="section-heading">
               <span class="section-number">5</span>
               <div>
-                <h3>Pickup address</h3>
-                <p>Start typing and pick your address, or share your current location.</p>
+                <h3>Pickup location</h3>
+                <p>Write your address in your own words, then place the pin on the map.</p>
               </div>
             </div>
 
@@ -243,7 +243,7 @@
                   aria-autocomplete="list"
                   aria-controls="address-suggestions"
                   [attr.aria-expanded]="suggestionsOpen()"
-                  placeholder="House number, street, barangay, city"
+                  placeholder="Purok, barangay, road, or landmark"
                   (input)="onAddressInput($event)"
                   (keydown)="onAddressKeydown($event)"
                 ></textarea>
@@ -253,7 +253,7 @@
               </label>
 
               @if (searchingAddress()) {
-                <p class="address-hint" role="status">Looking up matching addresses…</p>
+                <p class="address-hint" role="status">Looking for nearby places…</p>
               }
 
               @if (suggestionsOpen() && suggestions().length) {
@@ -261,7 +261,7 @@
                   class="suggestion-list"
                   id="address-suggestions"
                   role="listbox"
-                  aria-label="Address suggestions"
+                  aria-label="Nearby places"
                 >
                   @for (suggestion of suggestions(); track suggestion.formattedAddress; let index = $index) {
                     <li role="presentation">
@@ -274,9 +274,7 @@
                         (click)="applySuggestion(suggestion)"
                       >
                         <svg viewBox="0 0 24 24" aria-hidden="true">
-                          <path
-                            d="M12 21s-7-5.686-7-11a7 7 0 1 1 14 0c0 5.314-7 11-7 11Z"
-                          />
+                          <path d="M12 21s-7-5.686-7-11a7 7 0 1 1 14 0c0 5.314-7 11-7 11Z" />
                           <circle cx="12" cy="10" r="2.5" />
                         </svg>
                         <span>
@@ -290,61 +288,82 @@
                   }
                 </ul>
               }
+              <p class="address-hint">
+                Suggestions list nearby known places. Choosing one only moves the map pin — your
+                written address stays exactly as you typed it.
+              </p>
             </div>
 
             <div class="location-actions">
-              <button
-                class="locate-button"
-                type="button"
-                [disabled]="locatingDevice() || !geolocationSupported"
-                (click)="markMyLocation()"
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <circle cx="12" cy="12" r="8" />
-                  <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
-                  <circle cx="12" cy="12" r="2.5" />
-                </svg>
-                <span>{{ locatingDevice() ? 'Getting your location…' : 'Mark my location' }}</span>
-              </button>
-              @if (pickupPin()) {
-                <button class="clear-pin-button" type="button" (click)="clearPin()">
-                  Remove pin
+              @if (geolocationSupported) {
+                <button
+                  class="locate-button"
+                  type="button"
+                  [disabled]="locationStatus() === 'locating'"
+                  (click)="useCurrentLocation()"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="12" cy="12" r="8" />
+                    <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+                    <circle cx="12" cy="12" r="2.5" />
+                  </svg>
+                  <span>
+                    {{
+                      locationStatus() === 'locating'
+                        ? 'Finding your location…'
+                        : 'Use my current location'
+                    }}
+                  </span>
                 </button>
+              }
+              @if (!mapVisible()) {
+                <button class="map-button" type="button" (click)="showMap()">Choose on map</button>
               }
             </div>
 
-            @if (!geolocationSupported) {
-              <p class="address-hint">
-                This browser cannot share your location. Choose a suggested address instead.
-              </p>
-            }
-
-            @if (pickupPin()) {
-              <div class="pin-card" [class.warning]="pinNeedsRecheck()" role="status">
-                <strong>
-                  {{ pinNeedsRecheck() ? 'Pin may not match your edited address' : 'Pickup pin saved' }}
-                </strong>
-                <small>{{ pinSummary() }}</small>
-                <small>
-                  {{
-                    pinNeedsRecheck()
-                      ? 'Select a suggestion or mark your location again to re-confirm the pin.'
-                      : 'The rider will navigate straight to this point.'
-                  }}
-                </small>
+            @if (mapVisible()) {
+              <div class="map-block">
+                <app-location-picker-map
+                  [centre]="mapCentre()"
+                  (pointChosen)="onMapPointChosen($event)"
+                />
               </div>
-            } @else {
-              <p class="address-hint">
-                Optional but recommended. A pinned location helps the rider find you without
-                calling.
-              </p>
             }
 
-            @if (locationMessage()) {
-              <p class="address-hint success" role="status">{{ locationMessage() }}</p>
+            @switch (locationStatus()) {
+              @case ('ready') {
+                <div class="pin-card" role="status">
+                  <strong>Pickup point set</strong>
+                  <small>{{ pinCoordinates() }} · {{ pinSourceLabel() }}</small>
+                  @if (pickupPin()?.formattedAddress) {
+                    <small>Near {{ pickupPin()!.formattedAddress }}</small>
+                  }
+                  <button class="link-button" type="button" (click)="changeLocation()">
+                    Change location
+                  </button>
+                </div>
+              }
+              @case ('locating') {
+                <p class="address-hint" role="status">
+                  Finding your current location. You can also move the map pin yourself.
+                </p>
+              }
+              @case ('failed') {
+                <div class="pin-card warning" role="alert">
+                  <strong>We could not detect your location</strong>
+                  <small>{{ locationError() }}</small>
+                </div>
+              }
+              @default {
+                <p class="address-hint">
+                  Optional but strongly recommended. A pin lets the rider navigate straight to you
+                  instead of calling for directions.
+                </p>
+              }
             }
-            @if (locationError()) {
-              <p class="address-hint error" role="alert">{{ locationError() }}</p>
+
+            @if (locationStatus() === 'ready' && locationError()) {
+              <p class="address-hint">{{ locationError() }}</p>
             }
 
             <label class="field landmark-field">

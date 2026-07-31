@@ -6,14 +6,31 @@ export interface DeviceLocation {
   longitude: number;
 }
 
+export type GeolocationFailure =
+  | 'unsupported'
+  | 'insecureContext'
+  | 'permissionDenied'
+  | 'positionUnavailable'
+  | 'timeout';
+
 export class GeolocationUnavailableError extends Error {
-  constructor(message: string) {
+  constructor(
+    public readonly reason: GeolocationFailure,
+    message: string,
+  ) {
     super(message);
     this.name = 'GeolocationUnavailableError';
   }
 }
 
-const REQUEST_TIMEOUT_MS = 12_000;
+/**
+ * A coarse network-based fix arrives in a couple of seconds; a GPS fix can take
+ * far longer and frequently never arrives at all inside an in-app browser. The
+ * coarse attempt runs first so the customer sees a pin quickly, then a GPS
+ * attempt refines it in the background.
+ */
+const COARSE_TIMEOUT_MS = 8_000;
+const PRECISE_TIMEOUT_MS = 20_000;
 
 @Injectable({ providedIn: 'root' })
 export class DeviceLocationService {
@@ -22,21 +39,83 @@ export class DeviceLocationService {
   }
 
   /**
-   * Reads the device's current position.
-   *
-   * Browsers only expose geolocation on secure origins, and the customer can
-   * always decline, so every failure is translated into a message the customer
-   * can act on instead of a raw positioning error code.
+   * True in the Facebook/Messenger/Instagram in-app browser, where geolocation
+   * is often blocked or extremely slow regardless of device settings.
    */
-  getCurrentPosition(): Promise<DeviceLocation> {
+  get isInAppBrowser(): boolean {
+    if (typeof navigator === 'undefined') return false;
+    return /FBAN|FBAV|FB_IAB|Instagram|Line\/|Twitter/i.test(navigator.userAgent);
+  }
+
+  /** Secure-origin requirement. localhost counts as secure. */
+  get isSecureContext(): boolean {
+    if (typeof window === 'undefined') return false;
+    return window.isSecureContext === true;
+  }
+
+  /**
+   * Reads the device position, preferring speed over precision.
+   *
+   * Resolves with the first usable fix. `onRefined` is invoked later if a more
+   * accurate GPS reading arrives, so the caller can upgrade a pin in place
+   * without making the customer wait for it.
+   */
+  async getCurrentPosition(
+    onRefined?: (location: DeviceLocation) => void,
+  ): Promise<DeviceLocation> {
     if (!this.isSupported) {
-      return Promise.reject(
-        new GeolocationUnavailableError(
-          'This browser cannot share your location. Type your address instead.',
-        ),
+      throw new GeolocationUnavailableError(
+        'unsupported',
+        'This browser cannot share your location. Search for a nearby place or move the map pin instead.',
       );
     }
 
+    if (!this.isSecureContext) {
+      throw new GeolocationUnavailableError(
+        'insecureContext',
+        'Location sharing needs a secure (https) connection. Move the map pin to your pickup point instead.',
+      );
+    }
+
+    const coarse = await this.read({
+      enableHighAccuracy: false,
+      maximumAge: 60_000,
+      timeout: COARSE_TIMEOUT_MS,
+    }).catch((error: GeolocationUnavailableError) => error);
+
+    if (coarse instanceof GeolocationUnavailableError) {
+      // A denied permission will not succeed on a second attempt.
+      if (coarse.reason === 'permissionDenied') throw coarse;
+
+      // No coarse fix: fall back to one patient high-accuracy attempt.
+      return this.read({
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: PRECISE_TIMEOUT_MS,
+      });
+    }
+
+    if (onRefined) {
+      // Best effort only. Failure here is silent: the customer already has a pin.
+      this.read({
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: PRECISE_TIMEOUT_MS,
+      })
+        .then((precise) => {
+          const better =
+            precise.accuracyMeters === null ||
+            coarse.accuracyMeters === null ||
+            precise.accuracyMeters < coarse.accuracyMeters;
+          if (better) onRefined(precise);
+        })
+        .catch(() => undefined);
+    }
+
+    return coarse;
+  }
+
+  private read(options: PositionOptions): Promise<DeviceLocation> {
     return new Promise<DeviceLocation>((resolve, reject) => {
       navigator.geolocation.getCurrentPosition(
         (position) =>
@@ -47,29 +126,34 @@ export class DeviceLocationService {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
           }),
-        (error) => reject(new GeolocationUnavailableError(describe(error))),
-        {
-          enableHighAccuracy: true,
-          maximumAge: 30_000,
-          timeout: REQUEST_TIMEOUT_MS,
-        },
+        (error) => reject(this.describe(error)),
+        options,
       );
     });
   }
-}
 
-function describe(error: GeolocationPositionError): string {
-  if (error.code === error.PERMISSION_DENIED) {
-    return 'Location permission was blocked. Allow location for this site, or type your address instead.';
+  private describe(error: GeolocationPositionError): GeolocationUnavailableError {
+    if (error.code === error.PERMISSION_DENIED) {
+      return new GeolocationUnavailableError(
+        'permissionDenied',
+        this.isInAppBrowser
+          ? 'This in-app browser blocked location access. Open the page in Chrome, or move the map pin to your pickup point.'
+          : 'Location permission was blocked. Allow location for this site, or move the map pin to your pickup point.',
+      );
+    }
+
+    if (error.code === error.POSITION_UNAVAILABLE) {
+      return new GeolocationUnavailableError(
+        'positionUnavailable',
+        'Your location could not be determined. Move the map pin to your pickup point instead.',
+      );
+    }
+
+    return new GeolocationUnavailableError(
+      'timeout',
+      this.isInAppBrowser
+        ? 'Finding your location is taking too long in this in-app browser. Move the map pin to your pickup point, or open the page in Chrome.'
+        : 'Finding your location took too long. Move the map pin to your pickup point, or try again.',
+    );
   }
-
-  if (error.code === error.POSITION_UNAVAILABLE) {
-    return 'Your location could not be determined right now. Try again outdoors, or type your address instead.';
-  }
-
-  if (error.code === error.TIMEOUT) {
-    return 'Finding your location took too long. Try again, or type your address instead.';
-  }
-
-  return 'Your location could not be captured. Type your address instead.';
 }

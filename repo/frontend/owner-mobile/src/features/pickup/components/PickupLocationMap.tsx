@@ -220,12 +220,17 @@ export function PickupLocationMap({
         customMapStyle={REALISTIC_MAP_STYLE}
         initialRegion={{
           latitude: latitude!,
-          latitudeDelta: 0.012,
+          // Tight enough to show the street the pin sits on. The previous 0.012
+          // span covered several kilometres of farmland, which told the rider
+          // nothing.
+          latitudeDelta: 0.0035,
           longitude: longitude!,
-          longitudeDelta: 0.012,
+          longitudeDelta: 0.0035,
         }}
         mapPadding={{ bottom: 24, left: 20, right: 20, top: 32 }}
-        mapType="hybrid"
+        // A road map names the streets a rider actually follows. Satellite
+        // imagery of rural Surigao is unreadable green texture.
+        mapType="standard"
         onMapReady={handleMapReady}
         pitchEnabled={false}
         provider={PROVIDER_GOOGLE}
