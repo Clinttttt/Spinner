@@ -48,6 +48,18 @@ module.exports = {
       "expo-secure-store",
       "expo-sqlite",
       [
+        // Used only by Settings -> Pickup Service Area, so the owner can capture
+        // the shop's coordinates by standing at the shop instead of typing them.
+        "expo-location",
+        {
+          locationAlwaysAndWhenInUsePermission:
+            "Spinner uses your location only when you tap Use my current location, to set the laundromat's pickup centre.",
+          locationWhenInUsePermission:
+            "Spinner uses your location only when you tap Use my current location, to set the laundromat's pickup centre.",
+          isAndroidBackgroundLocationEnabled: false,
+        },
+      ],
+      [
         // Without this plugin Android 12+ falls back to its system splash: a
         // small launcher icon on a black background.
         "expo-splash-screen",

@@ -55,6 +55,12 @@ export const settingsMenuSections: SettingsMenuSection[] = [
         title: "Payment Methods",
         subtitle: "Manage customer payment options",
       },
+      {
+        id: "pickupArea",
+        icon: "navigate-circle-outline",
+        title: "Pickup Service Area",
+        subtitle: "Set how far you collect laundry",
+      },
     ],
   },
   {

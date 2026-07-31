@@ -1,6 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Image,
   Platform,
   Pressable,
@@ -27,6 +28,7 @@ import { SettingsCard } from "../components/SettingsCard";
 import {
   InlineNotice,
   PrimaryButton,
+  SecondaryButton,
   SettingsSectionTitle,
   ToggleRow,
 } from "../components/SettingsControls";
@@ -54,9 +56,12 @@ import {
   updateBusinessProfile,
   updateNotificationSettings,
   updatePaymentMethods,
+  updatePickupServiceArea,
   updateSchedules,
   updateLaundryService,
+  type BusinessSettingsDto,
 } from "../services/settingsService";
+import { captureCurrentLocation } from "../services/deviceLocation";
 
 const ownerProfile = require("../../../../assets/profile/owner-profile.png");
 const logo = require("../../../../assets/branding/logo.jpg");
@@ -95,6 +100,10 @@ const pageCopy: Record<SettingsPageId, { title: string; subtitle: string }> = {
     title: "Payment Methods",
     subtitle: "Manage how customers can pay",
   },
+  pickupArea: {
+    title: "Pickup Service Area",
+    subtitle: "Set the centre and reach of your pickups",
+  },
   help: { title: "Help Center", subtitle: "Find answers and get support" },
   terms: { title: "Terms of Service", subtitle: "Effective May 1, 2025" },
   privacy: {
@@ -123,6 +132,7 @@ export function SettingsDetailScreen({
       {page === "services" ? <ServicesPricingPage /> : null}
       {page === "hours" ? <OperatingHoursPage /> : null}
       {page === "payments" ? <PaymentMethodsPage /> : null}
+      {page === "pickupArea" ? <PickupServiceAreaPage /> : null}
       {page === "help" ? <HelpCenterPage /> : null}
       {page === "terms" ? <TermsPage /> : null}
       {page === "privacy" ? <PrivacyPage /> : null}
@@ -914,6 +924,245 @@ function PaymentMethodsPage() {
   );
 }
 
+function PickupServiceAreaPage() {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
+  const [radiusKm, setRadiusKm] = useState("15");
+  const [accuracyMeters, setAccuracyMeters] = useState<number | null>(null);
+  const [isConfigured, setIsConfigured] = useState(false);
+
+  const applySettings = (settings: BusinessSettingsDto) => {
+    // Tolerates an older API that predates these fields: they arrive undefined
+    // rather than null, which would otherwise render "undefined" in the inputs.
+    const latitudeValue = settings.pickupOriginLatitude ?? null;
+    const longitudeValue = settings.pickupOriginLongitude ?? null;
+    const radiusValue = settings.pickupServiceRadiusKm ?? 15;
+
+    setLatitude(latitudeValue === null ? "" : String(latitudeValue));
+    setLongitude(longitudeValue === null ? "" : String(longitudeValue));
+    setRadiusKm(String(radiusValue));
+    setIsConfigured(Boolean(settings.hasPickupServiceArea));
+  };
+
+  useEffect(() => {
+    void getBusinessSettings()
+      .then(applySettings)
+      .catch((error: unknown) =>
+        showApiError("Unable to load pickup service area", error),
+      )
+      .finally(() => setLoading(false));
+  }, []);
+
+  // Not named "useCurrentLocation": a use* prefix marks a React hook.
+  const captureShopLocation = async () => {
+    if (locating) return;
+    setLocating(true);
+    try {
+      const position = await captureCurrentLocation();
+      // Six decimals is roughly 0.1 m, far finer than a pickup ever needs.
+      setLatitude(position.latitude.toFixed(6));
+      setLongitude(position.longitude.toFixed(6));
+      setAccuracyMeters(position.accuracyMeters);
+      showSaved("Coordinates captured. Review, then save.");
+    } catch (error) {
+      showApiError("Unable to read your location", error);
+    } finally {
+      setLocating(false);
+    }
+  };
+
+  const save = async () => {
+    if (saving) return;
+
+    const parsedRadius = Number(radiusKm.trim());
+    if (!Number.isFinite(parsedRadius) || parsedRadius <= 0) {
+      showValidation(
+        "Radius required",
+        "Enter a pickup radius in kilometres, greater than zero.",
+      );
+      return;
+    }
+
+    const hasLatitude = latitude.trim().length > 0;
+    const hasLongitude = longitude.trim().length > 0;
+
+    if (hasLatitude !== hasLongitude) {
+      showValidation(
+        "Coordinates incomplete",
+        "Enter both latitude and longitude, or clear both to turn checking off.",
+      );
+      return;
+    }
+
+    const parsedLatitude = hasLatitude ? Number(latitude.trim()) : null;
+    const parsedLongitude = hasLongitude ? Number(longitude.trim()) : null;
+
+    if (parsedLatitude !== null && !Number.isFinite(parsedLatitude)) {
+      showValidation("Invalid latitude", "Latitude must be a number.");
+      return;
+    }
+    if (parsedLongitude !== null && !Number.isFinite(parsedLongitude)) {
+      showValidation("Invalid longitude", "Longitude must be a number.");
+      return;
+    }
+    if (
+      parsedLatitude !== null &&
+      (parsedLatitude < -90 || parsedLatitude > 90)
+    ) {
+      showValidation(
+        "Invalid latitude",
+        "Latitude must be between -90 and 90.",
+      );
+      return;
+    }
+    if (
+      parsedLongitude !== null &&
+      (parsedLongitude < -180 || parsedLongitude > 180)
+    ) {
+      showValidation(
+        "Invalid longitude",
+        "Longitude must be between -180 and 180.",
+      );
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const updated = await updatePickupServiceArea({
+        originLatitude: parsedLatitude,
+        originLongitude: parsedLongitude,
+        radiusKm: parsedRadius,
+      });
+      applySettings(updated);
+      showSaved(
+        updated.hasPickupServiceArea
+          ? "Pickup service area saved."
+          : "Pickup area checking turned off.",
+      );
+    } catch (error) {
+      showApiError("Unable to save pickup service area", error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const clearArea = async () => {
+    setLatitude("");
+    setLongitude("");
+    setAccuracyMeters(null);
+    showSaved("Coordinates cleared. Save to turn checking off.");
+  };
+
+  if (loading) {
+    return (
+      <SettingsCard style={styles.formCard}>
+        <ActivityIndicator color={colors.navy} />
+      </SettingsCard>
+    );
+  }
+
+  return (
+    <>
+      <SettingsCard style={styles.statusCard}>
+        <View
+          style={[
+            styles.statusIcon,
+            isConfigured ? styles.statusIconOn : styles.statusIconOff,
+          ]}
+        >
+          <Ionicons
+            color={isConfigured ? colors.success : colors.goldText}
+            name={
+              isConfigured ? "checkmark-circle-outline" : "alert-circle-outline"
+            }
+            size={22}
+          />
+        </View>
+        <View style={styles.statusCopy}>
+          <Text style={styles.statusTitle}>
+            {isConfigured ? "Pickup area is active" : "Pickup area is off"}
+          </Text>
+          <Text style={styles.statusSubtitle}>
+            {isConfigured
+              ? `Bookings farther than ${radiusKm} km from the shop are refused.`
+              : "Every pickup location is accepted until you set the shop coordinates."}
+          </Text>
+        </View>
+      </SettingsCard>
+
+      <SettingsSectionTitle subtitle="Stand at the shop and tap the button, or type the coordinates.">
+        Shop location
+      </SettingsSectionTitle>
+      <SettingsCard style={styles.formCard}>
+        <SettingsField
+          keyboardType="numbers-and-punctuation"
+          label="Latitude"
+          onChangeText={setLatitude}
+          placeholder="9.238178"
+          value={latitude}
+        />
+        <SettingsField
+          keyboardType="numbers-and-punctuation"
+          label="Longitude"
+          onChangeText={setLongitude}
+          placeholder="125.962452"
+          value={longitude}
+        />
+        {accuracyMeters !== null ? (
+          <Text style={styles.helperText}>
+            Captured with about {accuracyMeters} m accuracy.
+          </Text>
+        ) : null}
+        <SecondaryButton
+          disabled={locating}
+          icon="locate-outline"
+          label={locating ? "Reading location..." : "Use my current location"}
+          loading={locating}
+          onPress={() => void captureShopLocation()}
+        />
+      </SettingsCard>
+
+      <SettingsSectionTitle subtitle="Straight-line distance from the shop.">
+        Pickup reach
+      </SettingsSectionTitle>
+      <SettingsCard style={styles.formCard}>
+        <SettingsField
+          keyboardType="decimal-pad"
+          label="Maximum radius (km)"
+          onChangeText={setRadiusKm}
+          placeholder="15"
+          value={radiusKm}
+        />
+      </SettingsCard>
+
+      <InlineNotice>
+        Customers are checked by map coordinates, not by their written address.
+        A booking with no map pin is always accepted so staff can confirm it by
+        phone.
+      </InlineNotice>
+
+      <PrimaryButton
+        disabled={saving}
+        icon="save-outline"
+        label={saving ? "Saving..." : "Save Pickup Service Area"}
+        loading={saving}
+        onPress={() => void save()}
+      />
+
+      {latitude.trim() || longitude.trim() ? (
+        <SecondaryButton
+          icon="close-circle-outline"
+          label="Clear shop coordinates"
+          onPress={() => void clearArea()}
+        />
+      ) : null}
+    </>
+  );
+}
+
 const frequentlyAskedQuestions = [
   {
     id: "confirm",
@@ -1218,6 +1467,39 @@ function InfoRow({
 }
 
 const styles = StyleSheet.create({
+  statusCard: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing.sm,
+    padding: spacing.md,
+  },
+  statusIcon: {
+    alignItems: "center",
+    borderRadius: 12,
+    height: 44,
+    justifyContent: "center",
+    width: 44,
+  },
+  statusIconOn: { backgroundColor: colors.greenSoft },
+  statusIconOff: { backgroundColor: colors.surfaceGoldSoft },
+  statusCopy: { flex: 1, minWidth: 0 },
+  statusTitle: {
+    color: colors.navy,
+    fontSize: 14.5,
+    fontWeight: "700",
+    lineHeight: 19,
+  },
+  statusSubtitle: {
+    color: colors.textSecondary,
+    fontSize: 12.5,
+    lineHeight: 18,
+    marginTop: 3,
+  },
+  helperText: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 17,
+  },
   aboutDescription: {
     color: colors.textSecondary,
     fontSize: 13,

@@ -69,6 +69,37 @@ export function PrimaryButton({
   );
 }
 
+export function SecondaryButton({
+  disabled,
+  icon,
+  label,
+  loading = false,
+  onPress,
+}: PrimaryButtonProps) {
+  const buttonDisabled = disabled || loading;
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ busy: loading, disabled: buttonDisabled }}
+      disabled={buttonDisabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.secondaryButton,
+        pressed && styles.pressed,
+        buttonDisabled && styles.disabled,
+      ]}
+    >
+      {loading ? (
+        <ActivityIndicator color={colors.navy} size="small" />
+      ) : icon ? (
+        <Ionicons color={colors.navy} name={icon} size={19} />
+      ) : null}
+      <Text style={styles.secondaryButtonLabel}>{label}</Text>
+    </Pressable>
+  );
+}
+
 interface ToggleRowProps {
   description: string;
   icon: keyof typeof Ionicons.glyphMap;
@@ -153,6 +184,24 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   sectionHeading: { gap: 3 },
+  secondaryButton: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.navy,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: spacing.xs,
+    justifyContent: "center",
+    minHeight: 50,
+    paddingHorizontal: spacing.lg,
+  },
+  secondaryButtonLabel: {
+    color: colors.navy,
+    fontSize: 14,
+    fontWeight: "700",
+    lineHeight: 18,
+  },
   sectionSubtitle: {
     color: colors.textSecondary,
     fontSize: 12.5,

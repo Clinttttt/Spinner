@@ -25,6 +25,10 @@ export interface BusinessSettingsDto {
   isEmailBookingConfirmedEnabled: boolean;
   isEmailReceiptEnabled: boolean;
   isEmailCompletedEnabled: boolean;
+  pickupOriginLatitude: number | null;
+  pickupOriginLongitude: number | null;
+  pickupServiceRadiusKm: number;
+  hasPickupServiceArea: boolean;
   updatedAt: string;
 }
 
@@ -169,6 +173,40 @@ export function updatePaymentMethods(input: {
     "/api/business-settings/payment-methods",
     { method: "PUT", body: input },
   );
+}
+
+export interface PickupServiceAreaInput {
+  /** Both coordinates together, or both null to switch checking off. */
+  originLatitude: number | null;
+  originLongitude: number | null;
+  radiusKm: number;
+}
+
+export function updatePickupServiceArea(input: PickupServiceAreaInput) {
+  return apiRequest<BusinessSettingsDto>(
+    "/api/business-settings/pickup-service-area",
+    { method: "PUT", body: input },
+  );
+}
+
+export interface ServiceAreaCheckDto {
+  status: "inside" | "outside" | "notConfigured";
+  allowsBooking: boolean;
+  distanceKm: number | null;
+  maxRadiusKm: number | null;
+  policy: string;
+  message: string;
+}
+
+/** Confirms the saved area behaves as expected for a given point. */
+export function checkServiceArea(latitude: number, longitude: number) {
+  const query = new URLSearchParams({
+    latitude: String(latitude),
+    longitude: String(longitude),
+  }).toString();
+  return apiRequest<ServiceAreaCheckDto>(`/api/service-area/check?${query}`, {
+    authenticated: false,
+  });
 }
 
 export async function getLaundryServices() {
