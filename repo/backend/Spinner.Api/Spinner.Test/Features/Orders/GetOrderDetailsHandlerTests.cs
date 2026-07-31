@@ -29,7 +29,7 @@ public sealed class GetOrderDetailsHandlerTests
             DateTimeOffset.UtcNow));
         await dbContext.SaveChangesAsync();
 
-        var created = await new CreateBookingHandler(dbContext).Handle(
+        var created = await new CreateBookingHandler(dbContext, new TestServiceAreaPolicyProvider()).Handle(
             new CreateBookingCommand(
                 "Maria Santos",
                 "09171234567",

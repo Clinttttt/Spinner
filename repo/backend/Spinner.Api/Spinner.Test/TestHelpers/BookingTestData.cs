@@ -47,7 +47,7 @@ public static class BookingTestData
         var slot = Interlocked.Increment(ref _sequence);
         var timeWindow = preferredTimeWindow ?? $"Slot {slot}: 6:00 AM - 8:00 AM";
 
-        return await new CreateBookingHandler(dbContext).Handle(
+        return await new CreateBookingHandler(dbContext, new TestServiceAreaPolicyProvider()).Handle(
             new CreateBookingCommand(
                 "Maria Santos",
                 "09171234567",

@@ -12,6 +12,7 @@ using Spinner.Api.Common.Validation;
 using Spinner.Api.Database;
 using Spinner.Api.Database.Seeders;
 using Spinner.Api.Features.Notifications.ProcessNotificationOutbox;
+using Spinner.Api.Features.ServiceArea;
 using Spinner.Api.Integrations.Notifications;
 using Spinner.Api.Integrations.OnlinePayments;
 using System.Text;
@@ -85,6 +86,7 @@ builder.Services.AddSingleton<IPasswordHasher, PasswordHasher>();
 builder.Services.Configure<BusinessTimeOptions>(
     builder.Configuration.GetSection(BusinessTimeOptions.SectionName));
 builder.Services.AddSingleton<IBusinessClock, BusinessClock>();
+builder.Services.AddScoped<IServiceAreaPolicyProvider, BusinessSettingsServiceAreaPolicyProvider>();
 builder.Services.AddSingleton<IAccountCodeGenerator, AccountCodeGenerator>();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddSingleton<IRefreshTokenService, RefreshTokenService>();

@@ -68,6 +68,16 @@ export interface CreateBookingPayload {
   pickupLocation: PickupLocationPayload | null;
 }
 
+export interface ServiceAreaCheckDto {
+  /** inside | outside | notConfigured */
+  status: 'inside' | 'outside' | 'notConfigured';
+  allowsBooking: boolean;
+  distanceKm: number | null;
+  maxRadiusKm: number | null;
+  policy: string;
+  message: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class SpinnerApiService {
   private readonly http = inject(HttpClient);
@@ -76,6 +86,20 @@ export class SpinnerApiService {
   getServices() {
     return this.http.get<LaundryServiceDto[]>(
       `${this.baseUrl}/api/services-pricing/services?activeOnly=true`,
+    );
+  }
+
+  /**
+   * Asks the API whether a coordinate is inside the pickup area. The rule lives
+   * on the server so the radius can change without redeploying the web app.
+   */
+  checkServiceArea(latitude: number, longitude: number) {
+    const params = new URLSearchParams({
+      latitude: String(latitude),
+      longitude: String(longitude),
+    });
+    return this.http.get<ServiceAreaCheckDto>(
+      `${this.baseUrl}/api/service-area/check?${params.toString()}`,
     );
   }
 

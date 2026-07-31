@@ -18,7 +18,7 @@ public sealed class CreateBookingHandlerTests
         dbContext.BusinessSettings.Add(CreateSettings(isSmsBookingReceivedEnabled: true));
         await dbContext.SaveChangesAsync();
 
-        var handler = new CreateBookingHandler(dbContext);
+        var handler = new CreateBookingHandler(dbContext, new TestServiceAreaPolicyProvider());
 
         var result = await handler.Handle(CreateCommand(service.Id), CancellationToken.None);
 
@@ -43,7 +43,7 @@ public sealed class CreateBookingHandlerTests
         dbContext.BusinessSettings.Add(CreateSettings(isSmsBookingReceivedEnabled: false));
         await dbContext.SaveChangesAsync();
 
-        var handler = new CreateBookingHandler(dbContext);
+        var handler = new CreateBookingHandler(dbContext, new TestServiceAreaPolicyProvider());
         await handler.Handle(CreateCommand(service.Id), CancellationToken.None);
 
         var secondResult = await handler.Handle(
@@ -74,7 +74,7 @@ public sealed class CreateBookingHandlerTests
         dbContext.BusinessSettings.Add(CreateSettings(isSmsBookingReceivedEnabled: true));
         await dbContext.SaveChangesAsync();
 
-        var handler = new CreateBookingHandler(dbContext);
+        var handler = new CreateBookingHandler(dbContext, new TestServiceAreaPolicyProvider());
         var first = await handler.Handle(CreateCommand(service.Id), CancellationToken.None);
         var replay = await handler.Handle(CreateCommand(service.Id), CancellationToken.None);
 
@@ -92,7 +92,7 @@ public sealed class CreateBookingHandlerTests
         service.Disable(DateTimeOffset.UtcNow);
         await dbContext.SaveChangesAsync();
 
-        var result = await new CreateBookingHandler(dbContext)
+        var result = await new CreateBookingHandler(dbContext, new TestServiceAreaPolicyProvider())
             .Handle(CreateCommand(service.Id), CancellationToken.None);
 
         Assert.False(result.IsSuccess);
@@ -107,7 +107,7 @@ public sealed class CreateBookingHandlerTests
         dbContext.BusinessSettings.Add(CreateSettings(isQrEnabled: false));
         await dbContext.SaveChangesAsync();
 
-        var result = await new CreateBookingHandler(dbContext)
+        var result = await new CreateBookingHandler(dbContext, new TestServiceAreaPolicyProvider())
             .Handle(CreateCommand(service.Id) with { PaymentMethod = PaymentMethod.QrCodeOnlinePayment }, CancellationToken.None);
 
         Assert.False(result.IsSuccess);
@@ -130,7 +130,7 @@ public sealed class CreateBookingHandlerTests
         dbContext.LaundryServices.Add(service);
         await dbContext.SaveChangesAsync();
 
-        var result = await new CreateBookingHandler(dbContext)
+        var result = await new CreateBookingHandler(dbContext, new TestServiceAreaPolicyProvider())
             .Handle(CreateCommand(service.Id), CancellationToken.None);
 
         Assert.False(result.IsSuccess);

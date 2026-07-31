@@ -189,31 +189,46 @@ button {
 
 .hero-benefits {
   border-top: 1px solid rgba(255, 255, 255, 0.24);
-  margin-top: 18px;
-  padding-top: 7px;
-}
-
-.benefit-art {
-  background-image: url('/assets/booking-benefit-icons.png');
-  background-position: center 47%;
-  background-repeat: no-repeat;
-  background-size: 100% auto;
-  display: block;
-  height: 34px;
-  margin-inline: -3px;
-}
-
-.benefit-labels {
   display: grid;
-  gap: 5px;
+  gap: 10px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-top: -1px;
+  margin-top: 18px;
+  padding-top: 11px;
+}
+
+.benefit-item {
+  align-items: center;
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  min-width: 0;
   text-align: center;
 }
 
-.benefit-labels span {
+.benefit-icon {
+  background-image: url('/assets/booking-benefit-icons.png');
+  background-repeat: no-repeat;
+  background-size: 150px 100px;
+  display: block;
+  height: 30px;
+  width: 30px;
+}
+
+.benefit-icon-clock {
+  background-position: -17px -33px;
+}
+
+.benefit-icon-location {
+  background-position: -60px -33px;
+}
+
+.benefit-icon-shield {
+  background-position: -103px -33px;
+}
+
+.benefit-item > span:last-child {
   color: rgba(255, 255, 255, 0.88);
-  font-size: clamp(7.5px, 2.2vw, 10px);
+  font-size: clamp(8px, 2.2vw, 9.5px);
   font-weight: 650;
   line-height: 1.2;
 }
@@ -609,6 +624,16 @@ button {
   line-height: 1.4;
 }
 
+.area-verdict {
+  color: #1f7a45;
+  font-weight: 600;
+}
+
+.area-verdict.outside {
+  color: #b42318;
+  font-weight: 700;
+}
+
 .address-hint {
   color: var(--ink-soft);
   font-size: 10.5px;
@@ -871,12 +896,21 @@ button {
 @media (max-width: 639px) {
   .header-action {
     border-radius: 50%;
+    display: grid;
+    height: 36px;
+    min-height: 36px;
     padding: 0;
-    width: 42px;
+    place-items: center;
+    width: 36px;
   }
 
   .header-action span {
     display: none;
+  }
+
+  .header-action svg {
+    height: 15px;
+    width: 15px;
   }
 }
 

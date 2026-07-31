@@ -52,6 +52,9 @@ public sealed class AppDbContext : DbContext
             entity.Property(settings => settings.Address).HasMaxLength(500).IsRequired();
             entity.Property(settings => settings.OperatingHours).HasMaxLength(1000).IsRequired();
             entity.Property(settings => settings.PickupTimeWindows).HasMaxLength(1000).IsRequired();
+            entity.Property(settings => settings.PickupOriginLatitude).HasPrecision(10, 7);
+            entity.Property(settings => settings.PickupOriginLongitude).HasPrecision(10, 7);
+            entity.Property(settings => settings.PickupServiceRadiusKm).HasPrecision(8, 2).IsRequired();
             entity.Property(settings => settings.CreatedAt).IsRequired();
             entity.Property(settings => settings.UpdatedAt).IsRequired();
         });

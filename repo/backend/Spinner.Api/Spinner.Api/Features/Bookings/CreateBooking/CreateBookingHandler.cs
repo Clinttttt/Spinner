@@ -1,5 +1,6 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Spinner.Api.Common.Geo;
 using Spinner.Api.Common.Results;
 using Spinner.Api.Database;
 using Spinner.Api.Domain.Customers;
@@ -7,16 +8,21 @@ using Spinner.Api.Domain.Notifications;
 using Spinner.Api.Domain.Orders;
 using Spinner.Api.Features.BusinessSettings;
 using Spinner.Api.Features.Orders;
+using Spinner.Api.Features.ServiceArea;
 
 namespace Spinner.Api.Features.Bookings.CreateBooking;
 
 public sealed class CreateBookingHandler : IRequestHandler<CreateBookingCommand, Result<BookingConfirmationResponse>>
 {
     private readonly AppDbContext _dbContext;
+    private readonly IServiceAreaPolicyProvider _serviceAreaPolicyProvider;
 
-    public CreateBookingHandler(AppDbContext dbContext)
+    public CreateBookingHandler(
+        AppDbContext dbContext,
+        IServiceAreaPolicyProvider serviceAreaPolicyProvider)
     {
         _dbContext = dbContext;
+        _serviceAreaPolicyProvider = serviceAreaPolicyProvider;
     }
 
     public async Task<Result<BookingConfirmationResponse>> Handle(
@@ -42,6 +48,19 @@ public sealed class CreateBookingHandler : IRequestHandler<CreateBookingCommand,
 
         if (request.PaymentMethod == PaymentMethod.QrCodeOnlinePayment && !settings.IsQrCodeOnlinePaymentEnabled)
             return Result<BookingConfirmationResponse>.Validation("QR Code Online Payment is not enabled.");
+
+        // Judge the coordinates, never the written address. A pin outside the
+        // pickup area is refused; a booking with no pin is still accepted so a
+        // failed GPS lookup or an unrecognised purok cannot lock a customer out.
+        if (request.FulfillmentType == FulfillmentType.PickupAndDelivery && request.PickupLocation is not null)
+        {
+            var policy = await _serviceAreaPolicyProvider.GetAsync(cancellationToken);
+            var decision = policy.Evaluate(
+                new GeoPoint(request.PickupLocation.Latitude, request.PickupLocation.Longitude));
+
+            if (!decision.AllowsBooking)
+                return Result<BookingConfirmationResponse>.Validation(decision.Message);
+        }
 
         var now = DateTimeOffset.UtcNow;
 

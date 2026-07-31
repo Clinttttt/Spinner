@@ -7,7 +7,10 @@ import { TestBed } from '@angular/core/testing';
 
 import { CustomerBookingPage } from './customer-booking-page';
 import { DeviceLocationService, GeolocationUnavailableError } from '../../core/device-location.service';
-import { type CreateBookingPayload } from '../../core/spinner-api.service';
+import {
+  type CreateBookingPayload,
+  type ServiceAreaCheckDto,
+} from '../../core/spinner-api.service';
 
 const service = {
   basePrice: 170,
@@ -226,5 +229,107 @@ describe('CustomerBookingPage pickup location', () => {
     expect(payload.fulfillmentType).toBe('DropOff');
     expect(payload.address).toBe('In-store');
     expect(payload.pickupLocation).toBeNull();
+  });
+
+  describe('service area', () => {
+    /** Waits past the debounce and answers the area check. */
+    async function flushAreaCheck(body: ServiceAreaCheckDto) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      http.expectOne((request) => request.url.includes('/api/service-area/check')).flush(body);
+    }
+
+    it('blocks submission when the pin is outside the pickup area', async () => {
+      const { page } = createPage();
+      page.applySuggestion(schoolSuggestion);
+
+      await flushAreaCheck({
+        allowsBooking: false,
+        distanceKm: 48.2,
+        maxRadiusKm: 15,
+        message: 'This point is about 48.2 km away, outside our 15 km pickup area.',
+        policy: 'radius',
+        status: 'outside',
+      });
+
+      expect(page.outsideServiceArea()).toBe(true);
+
+      page.submitBooking();
+
+      // No booking request at all: the customer is told before anything is sent.
+      http.expectNone((request) => request.url.endsWith('/api/bookings'));
+      expect(page.errorMessage()).toContain('outside our 15 km pickup area');
+    });
+
+    it('allows submission when the pin is inside the pickup area', async () => {
+      const { page } = createPage();
+      page.applySuggestion(schoolSuggestion);
+
+      await flushAreaCheck({
+        allowsBooking: true,
+        distanceKm: 2.4,
+        maxRadiusKm: 15,
+        message: 'This location is within our pickup area, about 2.4 km away.',
+        policy: 'radius',
+        status: 'inside',
+      });
+
+      expect(page.outsideServiceArea()).toBe(false);
+
+      page.submitBooking();
+      expect(submittedPayload().pickupLocation).not.toBeNull();
+    });
+
+    it('does not block booking when the area check itself fails', async () => {
+      const { page } = createPage();
+      page.applySuggestion(schoolSuggestion);
+
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      http
+        .expectOne((request) => request.url.includes('/api/service-area/check'))
+        .error(new ProgressEvent('network error'));
+
+      expect(page.outsideServiceArea()).toBe(false);
+
+      page.submitBooking();
+      expect(submittedPayload().pickupLocation).not.toBeNull();
+    });
+
+    it('says nothing about the area when none is configured', async () => {
+      const { page } = createPage();
+      page.applySuggestion(schoolSuggestion);
+
+      await flushAreaCheck({
+        allowsBooking: true,
+        distanceKm: null,
+        maxRadiusKm: null,
+        message: 'Pickup area checking is not set up yet.',
+        policy: 'unconfigured',
+        status: 'notConfigured',
+      });
+
+      expect(page.outsideServiceArea()).toBe(false);
+
+      page.submitBooking();
+      expect(submittedPayload().pickupLocation).not.toBeNull();
+    });
+
+    it('clears the area verdict when the customer changes location', async () => {
+      const { page } = createPage();
+      page.applySuggestion(schoolSuggestion);
+      await flushAreaCheck({
+        allowsBooking: false,
+        distanceKm: 48.2,
+        maxRadiusKm: 15,
+        message: 'Outside the pickup area.',
+        policy: 'radius',
+        status: 'outside',
+      });
+      expect(page.outsideServiceArea()).toBe(true);
+
+      page.changeLocation();
+
+      expect(page.serviceArea()).toBeNull();
+      expect(page.outsideServiceArea()).toBe(false);
+    });
   });
 });

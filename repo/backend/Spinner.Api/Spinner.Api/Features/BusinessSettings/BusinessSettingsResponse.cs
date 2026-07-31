@@ -20,6 +20,10 @@ public sealed record BusinessSettingsResponse(
     bool IsEmailBookingConfirmedEnabled,
     bool IsEmailReceiptEnabled,
     bool IsEmailCompletedEnabled,
+    decimal? PickupOriginLatitude,
+    decimal? PickupOriginLongitude,
+    decimal PickupServiceRadiusKm,
+    bool HasPickupServiceArea,
     DateTimeOffset UpdatedAt)
 {
     public static BusinessSettingsResponse FromEntity(DomainBusinessSettings settings) => new(
@@ -40,5 +44,9 @@ public sealed record BusinessSettingsResponse(
         settings.IsEmailBookingConfirmedEnabled,
         settings.IsEmailReceiptEnabled,
         settings.IsEmailCompletedEnabled,
+        settings.PickupOriginLatitude,
+        settings.PickupOriginLongitude,
+        settings.PickupServiceRadiusKm,
+        settings.HasPickupServiceArea,
         settings.UpdatedAt);
 }

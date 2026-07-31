@@ -70,7 +70,7 @@ public sealed class OperationsHandlerTests
         Guid serviceId,
         string fullName,
         string mobileNumber) =>
-        new CreateBookingHandler(dbContext).Handle(
+        new CreateBookingHandler(dbContext, new TestServiceAreaPolicyProvider()).Handle(
             new CreateBookingCommand(
                 fullName,
                 mobileNumber,

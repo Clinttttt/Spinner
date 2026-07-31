@@ -7,6 +7,7 @@ using Spinner.Api.Features.BusinessSettings.UpdateBusinessProfile;
 using Spinner.Api.Features.BusinessSettings.UpdateNotificationSettings;
 using Spinner.Api.Features.BusinessSettings.UpdateOperatingHours;
 using Spinner.Api.Features.BusinessSettings.UpdatePaymentMethods;
+using Spinner.Api.Features.BusinessSettings.UpdatePickupServiceArea;
 using Spinner.Api.Features.BusinessSettings.UpdatePickupTimes;
 
 namespace Spinner.Api.Controllers;
@@ -59,6 +60,25 @@ public sealed class BusinessSettingsController : ApiControllerBase
         CancellationToken ct)
     {
         var result = await Sender.Send(new UpdatePickupTimesCommand(request.PickupTimeWindows), ct);
+        return HandleResponse(result);
+    }
+
+    /// <summary>
+    /// Sets the centre and radius of the pickup area. Omitting the coordinates
+    /// clears the area and disables enforcement.
+    /// </summary>
+    [HttpPut("pickup-service-area")]
+    public async Task<ActionResult<BusinessSettingsResponse>> UpdatePickupServiceArea(
+        [FromBody] UpdatePickupServiceAreaRequest request,
+        CancellationToken ct)
+    {
+        var result = await Sender.Send(
+            new UpdatePickupServiceAreaCommand(
+                request.OriginLatitude,
+                request.OriginLongitude,
+                request.RadiusKm),
+            ct);
+
         return HandleResponse(result);
     }
 

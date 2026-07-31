@@ -126,7 +126,7 @@ public sealed class DuplicateOrderGuardTests
         AppDbContext dbContext,
         Guid serviceId,
         string timeWindow = "08:00-10:00") =>
-        new CreateBookingHandler(dbContext).Handle(
+        new CreateBookingHandler(dbContext, new TestServiceAreaPolicyProvider()).Handle(
             new CreateBookingCommand(
                 "Maria Santos",
                 "09171234567",

@@ -32,11 +32,17 @@
         <span class="eyebrow light">Doorstep laundry care</span>
         <h1 id="hero-title">Fresh laundry,<br />made easy.</h1>
         <p>Tell us when and where.<br />We’ll handle the rest.</p>
-        <div class="hero-benefits" aria-label="Quick booking, doorstep service, reliable care">
-          <span class="benefit-art" aria-hidden="true"></span>
-          <div class="benefit-labels" aria-hidden="true">
+        <div class="hero-benefits" aria-label="Service benefits">
+          <div class="benefit-item">
+            <span class="benefit-icon benefit-icon-clock" aria-hidden="true"></span>
             <span>Quick booking</span>
+          </div>
+          <div class="benefit-item">
+            <span class="benefit-icon benefit-icon-location" aria-hidden="true"></span>
             <span>Doorstep service</span>
+          </div>
+          <div class="benefit-item">
+            <span class="benefit-icon benefit-icon-shield" aria-hidden="true"></span>
             <span>Reliable care</span>
           </div>
         </div>
@@ -337,11 +343,20 @@
 
             @switch (locationStatus()) {
               @case ('ready') {
-                <div class="pin-card" role="status">
+                <div class="pin-card" [class.warning]="outsideServiceArea()" role="status">
                   <strong>Pickup point set</strong>
                   <small>{{ pinCoordinates() }} · {{ pinSourceLabel() }}</small>
                   @if (pickupPin()?.formattedAddress) {
                     <small>Near {{ pickupPin()!.formattedAddress }}</small>
+                  }
+                  @if (checkingServiceArea()) {
+                    <small>Checking whether we deliver here…</small>
+                  } @else if (serviceArea(); as area) {
+                    @if (area.status !== 'notConfigured') {
+                      <small class="area-verdict" [class.outside]="area.status === 'outside'">
+                        {{ area.message }}
+                      </small>
+                    }
                   }
                   <button class="link-button" type="button" (click)="changeLocation()">
                     Change location
@@ -442,7 +457,9 @@
           <button
             class="primary-button"
             type="submit"
-            [disabled]="submitting() || loadingServices() || !services().length"
+            [disabled]="
+              submitting() || loadingServices() || !services().length || outsideServiceArea()
+            "
           >
             <span>{{ submitting() ? 'Submitting…' : 'Confirm booking request' }}</span>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>

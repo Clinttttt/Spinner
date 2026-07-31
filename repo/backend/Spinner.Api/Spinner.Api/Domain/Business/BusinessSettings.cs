@@ -4,6 +4,13 @@ namespace Spinner.Api.Domain.Business;
 
 public sealed class BusinessSettings
 {
+    /// <summary>
+    /// Seed value for a new business. The effective radius is always read from
+    /// the stored setting, never from this constant, so it can be changed by the
+    /// owner without a deployment.
+    /// </summary>
+    public const decimal DefaultPickupServiceRadiusKm = 15m;
+
     private BusinessSettings()
     {
     }
@@ -30,6 +37,7 @@ public sealed class BusinessSettings
         IsEmailBookingConfirmedEnabled = true;
         IsEmailReceiptEnabled = true;
         IsEmailCompletedEnabled = true;
+        PickupServiceRadiusKm = DefaultPickupServiceRadiusKm;
         CreatedAt = now;
         UpdatedAt = now;
     }
@@ -51,8 +59,59 @@ public sealed class BusinessSettings
     public bool IsEmailBookingConfirmedEnabled { get; private set; }
     public bool IsEmailReceiptEnabled { get; private set; }
     public bool IsEmailCompletedEnabled { get; private set; }
+
+    /// <summary>Shop latitude used as the centre of the pickup area.</summary>
+    public decimal? PickupOriginLatitude { get; private set; }
+
+    /// <summary>Shop longitude used as the centre of the pickup area.</summary>
+    public decimal? PickupOriginLongitude { get; private set; }
+
+    /// <summary>Maximum straight-line pickup distance from the shop, in kilometres.</summary>
+    public decimal PickupServiceRadiusKm { get; private set; } = DefaultPickupServiceRadiusKm;
+
+    /// <summary>
+    /// The area can only be enforced once the shop's own coordinates are known.
+    /// </summary>
+    public bool HasPickupServiceArea =>
+        PickupOriginLatitude is not null &&
+        PickupOriginLongitude is not null &&
+        PickupServiceRadiusKm > 0m;
+
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
+
+    /// <summary>
+    /// Sets the centre and size of the pickup area. Passing null coordinates
+    /// clears the area, which disables enforcement.
+    /// </summary>
+    public Result UpdatePickupServiceArea(
+        decimal? originLatitude,
+        decimal? originLongitude,
+        decimal radiusKm,
+        DateTimeOffset now)
+    {
+        if (originLatitude is null != originLongitude is null)
+            return Result.Validation("Provide both a latitude and a longitude, or neither.");
+
+        if (originLatitude is < -90m or > 90m)
+            return Result.Validation("Latitude must be between -90 and 90.");
+
+        if (originLongitude is < -180m or > 180m)
+            return Result.Validation("Longitude must be between -180 and 180.");
+
+        if (radiusKm <= 0m)
+            return Result.Validation("Pickup radius must be greater than zero.");
+
+        if (radiusKm > 500m)
+            return Result.Validation("Pickup radius must be 500 km or less.");
+
+        PickupOriginLatitude = originLatitude;
+        PickupOriginLongitude = originLongitude;
+        PickupServiceRadiusKm = radiusKm;
+        UpdatedAt = now;
+
+        return Result.Success();
+    }
 
     public void UpdateProfile(
         string businessName,

@@ -8,7 +8,15 @@ import {
   signal,
 } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Subject, debounceTime, distinctUntilChanged, finalize, switchMap } from 'rxjs';
+import {
+  Subject,
+  catchError,
+  debounceTime,
+  distinctUntilChanged,
+  finalize,
+  of,
+  switchMap,
+} from 'rxjs';
 
 import {
   type AddressSuggestion,
@@ -22,6 +30,7 @@ import {
   type BookingConfirmationDto,
   type LaundryServiceDto,
   type PickupLocationPayload,
+  type ServiceAreaCheckDto,
   SpinnerApiService,
 } from '../../core/spinner-api.service';
 import { LocationPickerMap, type MapPoint } from './location-picker-map';
@@ -56,6 +65,7 @@ interface PickupPin {
 }
 
 const SUGGESTION_DEBOUNCE_MS = 320;
+const SERVICE_AREA_DEBOUNCE_MS = 400;
 
 /** Laundromat service area centre, used as the map's starting view. */
 const SERVICE_AREA_CENTRE: MapPoint = { latitude: 9.2381784, longitude: 125.9624521 };
@@ -74,6 +84,7 @@ export class CustomerBookingPage {
   private readonly addressLookup = inject(AddressLookupService);
   private readonly deviceLocation = inject(DeviceLocationService);
   private readonly addressQuery = new Subject<string>();
+  private readonly serviceAreaQuery = new Subject<PickupPin>();
 
   readonly bookingComplete = signal(false);
   readonly trackingNoticeVisible = signal(false);
@@ -95,6 +106,12 @@ export class CustomerBookingPage {
   // The map is the primary way to set a rural pickup point, so it is shown from
   // the start rather than hidden behind a button.
   readonly mapVisible = signal(true);
+
+  readonly serviceArea = signal<ServiceAreaCheckDto | null>(null);
+  readonly checkingServiceArea = signal(false);
+
+  /** True only when the API has positively judged the pin out of range. */
+  readonly outsideServiceArea = computed(() => this.serviceArea()?.status === 'outside');
 
   readonly geolocationSupported = this.deviceLocation.isSupported;
   readonly inAppBrowser = this.deviceLocation.isInAppBrowser;
@@ -164,6 +181,7 @@ export class CustomerBookingPage {
 
   constructor() {
     this.loadServices();
+    this.watchServiceArea();
     this.bookingForm.controls.orderMethod.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((method) => {
@@ -377,6 +395,8 @@ export class CustomerBookingPage {
     this.pickupPin.set(null);
     this.locationStatus.set('idle');
     this.locationError.set('');
+    this.serviceArea.set(null);
+    this.checkingServiceArea.set(false);
     this.mapVisible.set(true);
   }
 
@@ -391,11 +411,22 @@ export class CustomerBookingPage {
       return;
     }
 
+    const isPickup = this.bookingForm.controls.orderMethod.value === 'pickupDelivery';
+
+    // Refuse locally for a fast answer. The API enforces the same rule, so a
+    // stale page cannot slip an out-of-area booking through.
+    if (isPickup && this.outsideServiceArea()) {
+      this.errorMessage.set(
+        this.serviceArea()?.message ??
+          'That pickup point is outside our service area. Move the pin closer or contact us.',
+      );
+      return;
+    }
+
     this.errorMessage.set('');
     this.submitting.set(true);
     this.closeSuggestions();
     const value = this.bookingForm.getRawValue();
-    const isPickup = value.orderMethod === 'pickupDelivery';
 
     this.api
       .createBooking({
@@ -454,6 +485,29 @@ export class CustomerBookingPage {
     this.pickupPin.set(pin);
     this.locationStatus.set('ready');
     this.locationError.set('');
+    this.checkingServiceArea.set(true);
+    this.serviceAreaQuery.next(pin);
+  }
+
+  /**
+   * Debounced because dragging the map emits a point on every gesture end.
+   * A failed check leaves the area unknown rather than blocking the booking.
+   */
+  private watchServiceArea(): void {
+    this.serviceAreaQuery
+      .pipe(
+        debounceTime(SERVICE_AREA_DEBOUNCE_MS),
+        switchMap((pin) =>
+          this.api.checkServiceArea(pin.latitude, pin.longitude).pipe(
+            catchError(() => of(null)),
+          ),
+        ),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((result) => {
+        this.checkingServiceArea.set(false);
+        this.serviceArea.set(result);
+      });
   }
 
   private toPickupLocationPayload(): PickupLocationPayload | null {
