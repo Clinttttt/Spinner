@@ -15,3 +15,7 @@ node_modules/
 .angular/
 .expo/
 dist/
+
+# Local dev server logs
+*.out.log
+*.err.log
