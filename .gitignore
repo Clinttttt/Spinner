@@ -5,3 +5,13 @@ node_modules/
 
 /agents/
 /docs/
+
+# Scratch space: screenshots, metro logs, one-off exports.
+/tmp/
+/artifacts/
+
+# Tooling caches that must never be committed.
+.vs/
+.angular/
+.expo/
+dist/

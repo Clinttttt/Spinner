@@ -227,20 +227,133 @@
               <span class="section-number">5</span>
               <div>
                 <h3>Pickup address</h3>
-                <p>Include your street, barangay, and city.</p>
+                <p>Start typing and pick your address, or share your current location.</p>
               </div>
             </div>
-            <label class="field">
-              <span>Complete address</span>
-              <textarea
-                class="field-control textarea"
-                formControlName="address"
-                autocomplete="street-address"
-                placeholder="House number, street, barangay, city"
-              ></textarea>
-              @if (hasError('address')) {
-                <small class="field-error">Pickup address is required.</small>
+
+            <div class="address-field">
+              <label class="field" for="pickup-address">
+                <span>Complete address</span>
+                <textarea
+                  id="pickup-address"
+                  class="field-control textarea"
+                  formControlName="address"
+                  autocomplete="street-address"
+                  role="combobox"
+                  aria-autocomplete="list"
+                  aria-controls="address-suggestions"
+                  [attr.aria-expanded]="suggestionsOpen()"
+                  placeholder="House number, street, barangay, city"
+                  (input)="onAddressInput($event)"
+                  (keydown)="onAddressKeydown($event)"
+                ></textarea>
+                @if (hasError('address')) {
+                  <small class="field-error">Pickup address is required.</small>
+                }
+              </label>
+
+              @if (searchingAddress()) {
+                <p class="address-hint" role="status">Looking up matching addresses…</p>
               }
+
+              @if (suggestionsOpen() && suggestions().length) {
+                <ul
+                  class="suggestion-list"
+                  id="address-suggestions"
+                  role="listbox"
+                  aria-label="Address suggestions"
+                >
+                  @for (suggestion of suggestions(); track suggestion.formattedAddress; let index = $index) {
+                    <li role="presentation">
+                      <button
+                        class="suggestion"
+                        type="button"
+                        role="option"
+                        [class.active]="activeSuggestionIndex() === index"
+                        [attr.aria-selected]="activeSuggestionIndex() === index"
+                        (click)="applySuggestion(suggestion)"
+                      >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path
+                            d="M12 21s-7-5.686-7-11a7 7 0 1 1 14 0c0 5.314-7 11-7 11Z"
+                          />
+                          <circle cx="12" cy="10" r="2.5" />
+                        </svg>
+                        <span>
+                          <strong>{{ suggestion.primaryText }}</strong>
+                          @if (suggestion.secondaryText) {
+                            <small>{{ suggestion.secondaryText }}</small>
+                          }
+                        </span>
+                      </button>
+                    </li>
+                  }
+                </ul>
+              }
+            </div>
+
+            <div class="location-actions">
+              <button
+                class="locate-button"
+                type="button"
+                [disabled]="locatingDevice() || !geolocationSupported"
+                (click)="markMyLocation()"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="8" />
+                  <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+                  <circle cx="12" cy="12" r="2.5" />
+                </svg>
+                <span>{{ locatingDevice() ? 'Getting your location…' : 'Mark my location' }}</span>
+              </button>
+              @if (pickupPin()) {
+                <button class="clear-pin-button" type="button" (click)="clearPin()">
+                  Remove pin
+                </button>
+              }
+            </div>
+
+            @if (!geolocationSupported) {
+              <p class="address-hint">
+                This browser cannot share your location. Choose a suggested address instead.
+              </p>
+            }
+
+            @if (pickupPin()) {
+              <div class="pin-card" [class.warning]="pinNeedsRecheck()" role="status">
+                <strong>
+                  {{ pinNeedsRecheck() ? 'Pin may not match your edited address' : 'Pickup pin saved' }}
+                </strong>
+                <small>{{ pinSummary() }}</small>
+                <small>
+                  {{
+                    pinNeedsRecheck()
+                      ? 'Select a suggestion or mark your location again to re-confirm the pin.'
+                      : 'The rider will navigate straight to this point.'
+                  }}
+                </small>
+              </div>
+            } @else {
+              <p class="address-hint">
+                Optional but recommended. A pinned location helps the rider find you without
+                calling.
+              </p>
+            }
+
+            @if (locationMessage()) {
+              <p class="address-hint success" role="status">{{ locationMessage() }}</p>
+            }
+            @if (locationError()) {
+              <p class="address-hint error" role="alert">{{ locationError() }}</p>
+            }
+
+            <label class="field landmark-field">
+              <span>Landmark <em>Optional</em></span>
+              <input
+                class="field-control"
+                formControlName="landmark"
+                placeholder="Beside the blue gate, near the basketball court"
+              />
             </label>
           </section>
         }

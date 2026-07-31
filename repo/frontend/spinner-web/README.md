@@ -1,13 +1,36 @@
-# SpinnerWeb
+# Spinner Customer Web
 
 This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 22.0.6.
+
+## API configuration
+
+During local development, the app calls `http://localhost:5235`. On a
+non-local host it uses relative `/api` requests so a reverse proxy can route
+traffic to the backend.
+
+If the API is hosted on a separate origin, set `SPINNER_API_URL` before the
+production build. The prebuild script safely writes the public API origin to
+`public/runtime-config.js`:
+
+```powershell
+$env:SPINNER_API_URL = "https://api.example.com"
+npm run build
+```
+
+Add that web origin to the backend `Cors:AllowedOrigins` configuration.
+
+For Vercel, configure `SPINNER_API_URL` as a Preview and Production
+environment variable. Vercel deployments reject a non-HTTPS API URL. The
+runtime configuration contains only a public API origin and must never contain
+credentials or secrets.
 
 ## Development server
 
 To start a local development server, run:
 
-```bash
-ng serve
+```powershell
+npm install
+npm start
 ```
 
 Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
@@ -30,8 +53,8 @@ ng generate --help
 
 To build the project run:
 
-```bash
-ng build
+```powershell
+npm run build
 ```
 
 This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
@@ -40,8 +63,8 @@ This will compile your project and store the build artifacts in the `dist/` dire
 
 To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
 
-```bash
-ng test
+```powershell
+npm test
 ```
 
 ## Running end-to-end tests

@@ -1,6 +1,23 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 
+declare global {
+  interface Window {
+    __SPINNER_API_URL__?: string;
+  }
+}
+
+function resolveApiBaseUrl(): string {
+  const configuredUrl = window.__SPINNER_API_URL__?.trim();
+  if (configuredUrl) {
+    return configuredUrl.replace(/\/+$/, '');
+  }
+
+  return ['localhost', '127.0.0.1'].includes(window.location.hostname)
+    ? 'http://localhost:5235'
+    : '';
+}
+
 export interface LaundryServiceDto {
   id: string;
   name: string;
@@ -20,6 +37,22 @@ export interface BookingConfirmationDto {
   estimatedTotalAmount: number;
 }
 
+export interface PickupLocationPayload {
+  barangay: string | null;
+  cityOrMunicipality: string | null;
+  confirmedAt: string | null;
+  formattedAddress: string;
+  landmark: string | null;
+  latitude: number;
+  locationConfirmed: boolean;
+  /** currentLocation | addressSearch | manualPin */
+  locationSource: string;
+  longitude: number;
+  pickupInstructions: string | null;
+  placeId: string | null;
+  plusCode: string | null;
+}
+
 export interface CreateBookingPayload {
   fullName: string;
   mobileNumber: string;
@@ -32,14 +65,13 @@ export interface CreateBookingPayload {
   paymentMethod: 'CashOnDelivery' | 'QrCodeOnlinePayment';
   loadCount: number;
   additionalNotes: string | null;
+  pickupLocation: PickupLocationPayload | null;
 }
 
 @Injectable({ providedIn: 'root' })
 export class SpinnerApiService {
   private readonly http = inject(HttpClient);
-  private readonly baseUrl =
-    (window as Window & { __SPINNER_API_URL__?: string }).__SPINNER_API_URL__ ??
-    'http://localhost:5235';
+  private readonly baseUrl = resolveApiBaseUrl();
 
   getServices() {
     return this.http.get<LaundryServiceDto[]>(

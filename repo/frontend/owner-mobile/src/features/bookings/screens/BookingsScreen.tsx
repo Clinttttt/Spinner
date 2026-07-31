@@ -1,0 +1,338 @@
+import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
+import { useFocusEffect } from "@react-navigation/native";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  FlatList,
+  Keyboard,
+  RefreshControl,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { describeApiError } from "../../../api/apiClient";
+import { useDialog } from "../../../components/common/DialogProvider";
+import type { RootTabParamList } from "../../../navigation/types";
+import { colors } from "../../../theme/colors";
+import { BookingCard } from "../components/BookingCard";
+import { BookingsEmptyState } from "../components/BookingsEmptyState";
+import { BookingsErrorState } from "../components/BookingsErrorState";
+import { BookingsFilterModal } from "../components/BookingsFilterModal";
+import { BookingsHeader } from "../components/BookingsHeader";
+import { BookingsSkeleton } from "../components/BookingsSkeleton";
+import { defaultBookingAdvancedFilters } from "../data/bookingFilters";
+import type {
+  BookingAdvancedFilters,
+  BookingListItem,
+  BookingStatusFilter,
+  BookingsViewState,
+} from "../models/booking";
+import { clearBooking, getBookings } from "../services/bookingsService";
+
+interface BookingsScreenProps {
+  navigation: BottomTabNavigationProp<RootTabParamList, "Orders">;
+  onViewBooking: (bookingId: string) => void;
+}
+
+function advancedFiltersAreActive(filters: BookingAdvancedFilters) {
+  return Object.values(filters).some((value) => value !== "all");
+}
+
+export function BookingsScreen({
+  navigation,
+  onViewBooking,
+}: BookingsScreenProps) {
+  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const dialog = useDialog();
+  const compact = width <= 360;
+  const pageHorizontalPadding = compact ? 12 : 14;
+  const [viewState, setViewState] = useState<BookingsViewState>("loading");
+  const [bookings, setBookings] = useState<BookingListItem[]>([]);
+  const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<BookingStatusFilter>("all");
+  const [advancedFilters, setAdvancedFilters] = useState(
+    defaultBookingAdvancedFilters,
+  );
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    const debounceTimer = setTimeout(() => setDebouncedQuery(query), 300);
+    return () => clearTimeout(debounceTimer);
+  }, [query]);
+
+  const loadBookings = useCallback(async () => {
+    try {
+      const response = await getBookings();
+      setBookings(response);
+      setViewState("ready");
+    } catch {
+      setViewState("error");
+    }
+  }, []);
+
+  // Statuses change from the details screen and from the pickup tab, so the list
+  // is refetched whenever it becomes visible again.
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      getBookings()
+        .then((response) => {
+          if (!active) return;
+          setBookings(response);
+          setViewState("ready");
+        })
+        .catch(() => {
+          if (!active) return;
+          setViewState((current) => (current === "ready" ? "ready" : "error"));
+        });
+      return () => {
+        active = false;
+      };
+    }, []),
+  );
+
+  const handleClearBooking = useCallback(
+    async (booking: BookingListItem) => {
+      const accepted = await dialog.confirm({
+        bullets: [`${booking.bookingCode} · ${booking.customerName}`],
+        confirmLabel: "Clear",
+        message:
+          "This finished booking is removed from the list. Sales, receipts, and history keep the record.",
+        title: "Clear this booking?",
+        tone: "warning",
+      });
+      if (!accepted) return;
+
+      try {
+        await clearBooking(booking.id);
+        setBookings((current) =>
+          current.filter((item) => item.id !== booking.id),
+        );
+      } catch (error) {
+        await dialog.notify({
+          message: describeApiError(error, "Please try again."),
+          title: "Unable to clear booking",
+          tone: "danger",
+        });
+      }
+    },
+    [dialog],
+  );
+
+  const hasActiveAdvancedFilters = advancedFiltersAreActive(advancedFilters);
+  const isFiltered =
+    query.trim().length > 0 ||
+    statusFilter !== "all" ||
+    hasActiveAdvancedFilters;
+
+  const filteredBookings = useMemo(() => {
+    const normalizedQuery = debouncedQuery.trim().toLowerCase();
+
+    return bookings
+      .filter(
+        (booking) =>
+          statusFilter === "all" || booking.bookingStatus === statusFilter,
+      )
+      .filter((booking) => {
+        if (!normalizedQuery) return true;
+
+        return [
+          booking.customerName,
+          booking.bookingCode,
+          booking.address,
+          booking.phoneNumber ?? "",
+        ].some((value) => value.toLowerCase().includes(normalizedQuery));
+      })
+      .filter(
+        (booking) =>
+          advancedFilters.service === "all" ||
+          booking.serviceTags.includes(advancedFilters.service),
+      )
+      .filter(
+        (booking) =>
+          advancedFilters.paymentStatus === "all" ||
+          booking.paymentStatus === advancedFilters.paymentStatus,
+      )
+      .filter(
+        (booking) =>
+          advancedFilters.fulfillmentType === "all" ||
+          booking.fulfillmentType === advancedFilters.fulfillmentType,
+      )
+      .filter(
+        (booking) =>
+          advancedFilters.dateBucket === "all" ||
+          booking.dateBucket === advancedFilters.dateBucket,
+      )
+      .sort((left, right) => left.sortOrder - right.sortOrder);
+  }, [advancedFilters, bookings, debouncedQuery, statusFilter]);
+
+  const clearFilters = useCallback(() => {
+    setQuery("");
+    setDebouncedQuery("");
+    setStatusFilter("all");
+    setAdvancedFilters(defaultBookingAdvancedFilters);
+  }, []);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadBookings();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadBookings]);
+
+  const handleRetry = useCallback(() => {
+    setViewState("loading");
+    void loadBookings();
+  }, [loadBookings]);
+
+  const handleApplyFilters = useCallback(
+    (
+      nextAdvancedFilters: BookingAdvancedFilters,
+      nextStatusFilter: BookingStatusFilter,
+    ) => {
+      setAdvancedFilters(nextAdvancedFilters);
+      setStatusFilter(nextStatusFilter);
+      setFilterModalVisible(false);
+    },
+    [],
+  );
+
+  const handleViewBooking = useCallback(
+    (bookingId: string) => {
+      onViewBooking(bookingId);
+    },
+    [onViewBooking],
+  );
+
+  const renderBooking = useCallback(
+    ({ item }: { item: BookingListItem }) => (
+      <View
+        style={[
+          styles.cardWrapper,
+          { marginHorizontal: pageHorizontalPadding },
+        ]}
+      >
+        <BookingCard
+          booking={item}
+          onClearPress={(booking) => void handleClearBooking(booking)}
+          onViewPress={handleViewBooking}
+        />
+      </View>
+    ),
+    [handleClearBooking, handleViewBooking, pageHorizontalPadding],
+  );
+
+  const listHeader = useMemo(
+    () => (
+      <BookingsHeader
+        compact={compact}
+        hasActiveFilters={hasActiveAdvancedFilters}
+        onFilterPress={() => {
+          Keyboard.dismiss();
+          setFilterModalVisible(true);
+        }}
+        onNotificationsPress={() => undefined}
+        onProfilePress={() => navigation.navigate("Settings")}
+        onQueryChange={setQuery}
+        onStatusChange={setStatusFilter}
+        pageHorizontalPadding={pageHorizontalPadding}
+        query={query}
+        safeAreaTop={insets.top}
+        statusFilter={statusFilter}
+        width={width}
+      />
+    ),
+    [
+      compact,
+      hasActiveAdvancedFilters,
+      insets.top,
+      navigation,
+      pageHorizontalPadding,
+      query,
+      statusFilter,
+      width,
+    ],
+  );
+
+  const listEmpty = useMemo(() => {
+    if (viewState === "loading") {
+      return (
+        <View style={{ marginHorizontal: pageHorizontalPadding }}>
+          <BookingsSkeleton />
+        </View>
+      );
+    }
+
+    if (viewState === "error") {
+      return (
+        <View style={{ marginHorizontal: pageHorizontalPadding }}>
+          <BookingsErrorState onRetry={handleRetry} />
+        </View>
+      );
+    }
+
+    return (
+      <View style={{ marginHorizontal: pageHorizontalPadding }}>
+        <BookingsEmptyState
+          filtered={isFiltered}
+          onClearFilters={clearFilters}
+        />
+      </View>
+    );
+  }, [clearFilters, handleRetry, isFiltered, pageHorizontalPadding, viewState]);
+
+  return (
+    <View style={styles.screen}>
+      <FlatList
+        automaticallyAdjustKeyboardInsets
+        contentContainerStyle={styles.listContent}
+        contentInsetAdjustmentBehavior="never"
+        data={viewState === "ready" ? filteredBookings : []}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+        keyExtractor={(item) => item.id}
+        ListEmptyComponent={listEmpty}
+        ListHeaderComponent={listHeader}
+        onScrollBeginDrag={Keyboard.dismiss}
+        refreshControl={
+          <RefreshControl
+            colors={[colors.navy]}
+            onRefresh={handleRefresh}
+            refreshing={refreshing}
+            tintColor={colors.navy}
+          />
+        }
+        renderItem={renderBooking}
+        showsVerticalScrollIndicator={false}
+      />
+
+      {filterModalVisible ? (
+        <BookingsFilterModal
+          advancedFilters={advancedFilters}
+          onApply={handleApplyFilters}
+          onClose={() => setFilterModalVisible(false)}
+          statusFilter={statusFilter}
+        />
+      ) : null}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: {
+    backgroundColor: colors.background,
+    flex: 1,
+  },
+  cardWrapper: {
+    marginBottom: 12,
+  },
+  listContent: {
+    paddingBottom: 16,
+  },
+});
