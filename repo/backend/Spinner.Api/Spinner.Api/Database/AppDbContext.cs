@@ -35,6 +35,8 @@ public sealed class AppDbContext : DbContext
 
     public DbSet<RefreshTokenSession> RefreshTokenSessions => Set<RefreshTokenSession>();
 
+    public DbSet<AccountActionCode> AccountActionCodes => Set<AccountActionCode>();
+
     public DbSet<ActivityLogEntry> ActivityLogEntries => Set<ActivityLogEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -124,6 +126,7 @@ public sealed class AppDbContext : DbContext
             entity.HasIndex(order => order.DeliveryStatus);
             entity.HasIndex(order => order.PreferredDate);
             entity.HasIndex(order => order.CreatedAt);
+            entity.HasIndex(order => order.ArchivedAt);
 
             entity.HasOne(order => order.Customer)
                 .WithMany()
@@ -232,7 +235,7 @@ public sealed class AppDbContext : DbContext
             entity.HasOne(message => message.Order)
                 .WithMany()
                 .HasForeignKey(message => message.OrderId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<StaffUser>(entity =>
@@ -250,6 +253,7 @@ public sealed class AppDbContext : DbContext
             entity.HasIndex(user => user.EmailAddress).IsUnique();
             entity.HasIndex(user => user.MobileNumber).IsUnique();
             entity.HasIndex(user => user.IsActive);
+            entity.HasIndex(user => user.IsEmailVerified);
         });
 
         modelBuilder.Entity<RefreshTokenSession>(entity =>
@@ -271,6 +275,25 @@ public sealed class AppDbContext : DbContext
             entity.HasOne(session => session.User)
                 .WithMany()
                 .HasForeignKey(session => session.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<AccountActionCode>(entity =>
+        {
+            entity.ToTable("AccountActionCodes");
+            entity.HasKey(code => code.Id);
+
+            entity.Property(code => code.CodeHash).HasMaxLength(500).IsRequired();
+            entity.Property(code => code.ExpiresAt).IsRequired();
+            entity.Property(code => code.CreatedAt).IsRequired();
+
+            entity.HasIndex(code => code.UserId);
+            entity.HasIndex(code => new { code.UserId, code.Purpose, code.ConsumedAt });
+            entity.HasIndex(code => code.ExpiresAt);
+
+            entity.HasOne(code => code.User)
+                .WithMany()
+                .HasForeignKey(code => code.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

@@ -31,12 +31,13 @@ public sealed class GetActivityLogsHandler
             query = query.Where(entry => entry.Action == action);
         }
 
-        var page = PageRequest.Normalize(request.Page, request.PageSize);
+        var page = PageRequest.NormalizePage(request.Page);
+        var pageSize = PageRequest.NormalizePageSize(request.PageSize);
         var totalCount = await query.CountAsync(cancellationToken);
         var logs = await query
             .OrderByDescending(entry => entry.CreatedAt)
-            .Skip(page.Offset)
-            .Take(page.PageSize)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(entry => new ActivityLogResponse(
                 entry.Id,
                 entry.Actor,
@@ -50,8 +51,8 @@ public sealed class GetActivityLogsHandler
         return Result<PagedResponse<ActivityLogResponse>>.Success(
             new PagedResponse<ActivityLogResponse>(
                 logs,
-                page.Page,
-                page.PageSize,
+                page,
+                pageSize,
                 totalCount));
     }
 }

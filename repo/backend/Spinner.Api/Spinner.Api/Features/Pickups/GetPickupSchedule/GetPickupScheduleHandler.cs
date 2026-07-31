@@ -21,15 +21,27 @@ public sealed class GetPickupScheduleHandler
         GetPickupScheduleQuery request,
         CancellationToken cancellationToken)
     {
+        // The pickup schedule is a day view of every pickup job the rider may
+        // touch, not only the ones already confirmed. Previously bookings still
+        // awaiting confirmation, completed jobs, and jobs already collected were
+        // filtered out server-side, which left the whole screen empty and gave
+        // the owner no way to see a real customer booking. Only rejected and
+        // cleared (archived) orders are hidden now; the client buckets the rest.
         var query = _dbContext.LaundryOrders
             .AsNoTracking()
             .Include(order => order.Customer)
+            .Include(order => order.ServiceItems)
             .Where(order => order.FulfillmentType == FulfillmentType.PickupAndDelivery)
             .Where(order => order.PreferredDate == request.Date)
-            .Where(order => order.Status != OrderStatus.BookingReceived)
             .Where(order => order.Status != OrderStatus.Rejected)
-            .Where(order => order.Status != OrderStatus.Completed)
-            .Where(order => order.PickupStatus != PickupStatus.PickedUp);
+            .Where(order => order.ArchivedAt == null);
+
+        if (!request.IncludeCollected)
+        {
+            query = query.Where(order =>
+                order.PickupStatus != Domain.Orders.PickupStatus.PickedUp &&
+                order.Status != OrderStatus.Completed);
+        }
 
         var page = PageRequest.NormalizePage(request.Page);
         var pageSize = PageRequest.NormalizePageSize(request.PageSize);

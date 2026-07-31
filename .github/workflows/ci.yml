@@ -1,0 +1,129 @@
+name: CI
+
+# Verification only. Deployment lives in deploy-staging-api.yml so that a failing
+# check can never ship a revision.
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (build + test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: repo/backend/Spinner.Api
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore Spinner.Api.slnx
+
+      - name: Build
+        run: dotnet build Spinner.Api.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: >-
+          dotnet test Spinner.Api.slnx --configuration Release --no-build
+          --no-restore --logger "trx;LogFileName=backend-tests.trx"
+          --results-directory ../../../artifacts/test-results
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: artifacts/test-results
+          if-no-files-found: ignore
+
+  customer-web:
+    name: Customer web (build + test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: repo/frontend/spinner-web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: repo/frontend/spinner-web/package-lock.json
+
+      - run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test -- --watch=false
+
+  owner-mobile:
+    name: Owner mobile (typecheck + lint + format)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # `repo/frontend/owner-mobile` is recorded in the parent repository as a
+      # gitlink (mode 160000) with no matching .gitmodules entry, so a fresh
+      # checkout leaves the directory empty. Detect that instead of failing with
+      # a confusing "package.json not found", and say how to fix it.
+      - name: Check that mobile sources are present
+        id: sources
+        run: |
+          if [ -f repo/frontend/owner-mobile/package.json ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Owner mobile checks skipped"
+              echo ""
+              echo "\`repo/frontend/owner-mobile\` is tracked as a submodule pointer"
+              echo "but the repository has no \`.gitmodules\` entry, so its sources"
+              echo "are not part of this checkout."
+              echo ""
+              echo "Fix by either committing the app into this repository or"
+              echo "registering it properly with \`git submodule add\`."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.sources.outputs.present == 'true'
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: repo/frontend/owner-mobile/package-lock.json
+
+      - name: Install
+        if: steps.sources.outputs.present == 'true'
+        run: npm ci
+        working-directory: repo/frontend/owner-mobile
+
+      - name: Type-check
+        if: steps.sources.outputs.present == 'true'
+        run: npm run typecheck
+        working-directory: repo/frontend/owner-mobile
+
+      - name: Lint
+        if: steps.sources.outputs.present == 'true'
+        run: npm run lint
+        working-directory: repo/frontend/owner-mobile
+
+      - name: Check formatting
+        if: steps.sources.outputs.present == 'true'
+        run: npm run format:check
+        working-directory: repo/frontend/owner-mobile

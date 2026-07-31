@@ -170,8 +170,42 @@ public sealed class LaundryOrder
     public string? SpecialInstructions { get; private set; }
     public PreferredNotificationChannel PreferredNotificationChannel { get; private set; }
     public PickupLocationSnapshot? PickupLocation { get; private set; }
+    public DateTimeOffset? ArchivedAt { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
+
+    public bool IsArchived => ArchivedAt is not null;
+
+    public bool IsClosed => Status is OrderStatus.Completed or OrderStatus.Rejected;
+
+    /// <summary>
+    /// Removes a finished order from the owner's active work lists without
+    /// deleting it. Financial history, receipts, and reports keep the record.
+    /// </summary>
+    public Result Archive(DateTimeOffset now)
+    {
+        if (!IsClosed)
+            return Result.Conflict("Only completed or rejected orders can be cleared from the list.");
+
+        if (IsArchived)
+            return Result.Success();
+
+        ArchivedAt = now;
+        UpdatedAt = now;
+
+        return Result.Success();
+    }
+
+    public Result Restore(DateTimeOffset now)
+    {
+        if (!IsArchived)
+            return Result.Success();
+
+        ArchivedAt = null;
+        UpdatedAt = now;
+
+        return Result.Success();
+    }
 
     public Result Confirm(DateTimeOffset now)
     {

@@ -10,25 +10,20 @@ namespace Spinner.Api.Database.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<string>(
-                name: "OnlinePaymentCheckoutUrl",
-                table: "LaundryOrders",
-                type: "character varying(500)",
-                maxLength: 500,
-                nullable: true);
+            migrationBuilder.Sql(
+                """
+                DELETE FROM "__EFMigrationsHistory"
+                WHERE "MigrationId" = '20260709182625_Phase13OnlinePayment';
 
-            migrationBuilder.AddColumn<string>(
-                name: "OnlinePaymentReference",
-                table: "LaundryOrders",
-                type: "character varying(120)",
-                maxLength: 120,
-                nullable: true);
+                ALTER TABLE "LaundryOrders"
+                    ADD COLUMN IF NOT EXISTS "OnlinePaymentCheckoutUrl" character varying(500);
 
-            migrationBuilder.CreateIndex(
-                name: "IX_LaundryOrders_OnlinePaymentReference",
-                table: "LaundryOrders",
-                column: "OnlinePaymentReference",
-                unique: true);
+                ALTER TABLE "LaundryOrders"
+                    ADD COLUMN IF NOT EXISTS "OnlinePaymentReference" character varying(120);
+
+                CREATE UNIQUE INDEX IF NOT EXISTS "IX_LaundryOrders_OnlinePaymentReference"
+                    ON "LaundryOrders" ("OnlinePaymentReference");
+                """);
         }
 
         /// <inheritdoc />

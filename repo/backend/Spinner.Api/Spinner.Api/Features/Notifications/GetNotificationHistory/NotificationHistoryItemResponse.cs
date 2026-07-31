@@ -4,7 +4,7 @@ namespace Spinner.Api.Features.Notifications.GetNotificationHistory;
 
 public sealed record NotificationHistoryItemResponse(
     Guid NotificationId,
-    Guid OrderId,
+    Guid? OrderId,
     string? OrderCode,
     NotificationChannel Channel,
     string Recipient,

@@ -20,6 +20,8 @@ public sealed class OwnerAccountSeederTests
         var user = await dbContext.StaffUsers.SingleAsync();
         Assert.Equal(OwnerAccountSeeder.DefaultEmail, user.EmailAddress);
         Assert.Equal(StaffRole.Owner, user.Role);
+        Assert.True(user.IsEmailVerified);
+        Assert.NotNull(user.EmailVerifiedAt);
         Assert.True(hasher.Verify(OwnerAccountSeeder.DefaultPassword, user.PasswordHash));
     }
 

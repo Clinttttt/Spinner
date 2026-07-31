@@ -22,4 +22,5 @@ public sealed record CreateManualOrderCommand(
     string? Notes,
     string? SpecialInstructions,
     PreferredNotificationChannel PreferredNotificationChannel,
-    PickupLocationRequest? PickupLocation) : IRequest<Result<OrderDetailsResponse>>;
+    PickupLocationRequest? PickupLocation,
+    bool AllowDuplicate = false) : IRequest<Result<OrderDetailsResponse>>;

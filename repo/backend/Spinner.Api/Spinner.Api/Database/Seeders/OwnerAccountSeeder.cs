@@ -25,13 +25,16 @@ public sealed class OwnerAccountSeeder
         if (exists)
             return;
 
-        _dbContext.StaffUsers.Add(new StaffUser(
+        var now = DateTimeOffset.UtcNow;
+        var user = new StaffUser(
             "Spinner Owner",
             DefaultEmail,
             "09170000000",
             _passwordHasher.Hash(DefaultPassword),
             StaffRole.Owner,
-            DateTimeOffset.UtcNow));
+            now);
+        user.MarkEmailVerifiedForBootstrap(now);
+        _dbContext.StaffUsers.Add(user);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
     }

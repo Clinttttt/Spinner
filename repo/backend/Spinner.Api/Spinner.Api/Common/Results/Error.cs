@@ -16,6 +16,13 @@ public sealed record Error(string Code, string Title, string Message, string Typ
     public static Error Conflict(string message) =>
         new("resource.conflict", "Conflict", message, "https://httpstatuses.com/409");
 
+    /// <summary>
+    /// A near-identical order already exists. Clients may offer an explicit
+    /// "create anyway" override instead of failing outright.
+    /// </summary>
+    public static Error PossibleDuplicateOrder(string message) =>
+        new("order.possible_duplicate", "Possible duplicate order", message, "https://httpstatuses.com/409");
+
     public static Error Unauthorized(string message) =>
         new("auth.unauthorized", "Unauthorized", message, "https://httpstatuses.com/401");
 

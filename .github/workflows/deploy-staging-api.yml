@@ -1,0 +1,198 @@
+name: Deploy staging API
+
+# Order matters and is deliberate:
+#   1. test        - never ship a red build
+#   2. build image - immutable tag from the commit SHA
+#   3. migrate     - schema first, so the new revision never queries a column
+#                    that does not exist yet. Migrations are additive, so the
+#                    currently running revision keeps working meanwhile.
+#   4. release     - point the container app at the new image
+#   5. verify      - health probes, and roll back to the previous image on failure
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'repo/backend/**'
+      - '.github/workflows/deploy-staging-api.yml'
+  workflow_dispatch:
+    inputs:
+      skip_migrations:
+        description: 'Skip the database migration step'
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy-staging-api
+  cancel-in-progress: false
+
+env:
+  RESOURCE_GROUP: spinner-staging-rg
+  REGISTRY_NAME: spinnerstga4d4bd
+  CONTAINER_APP: spinner-api-stg
+  MIGRATION_JOB: spinner-api-migrate
+  IMAGE_REPOSITORY: spinner-api
+  API_ORIGIN: https://spinner-api-stg.blueisland-43b2f2d0.southeastasia.azurecontainerapps.io
+  BACKEND_DIR: repo/backend/Spinner.Api
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore Spinner.Api.slnx
+        working-directory: ${{ env.BACKEND_DIR }}
+
+      - name: Build
+        run: dotnet build Spinner.Api.slnx --configuration Release --no-restore
+        working-directory: ${{ env.BACKEND_DIR }}
+
+      - name: Test
+        run: dotnet test Spinner.Api.slnx --configuration Release --no-build --no-restore
+        working-directory: ${{ env.BACKEND_DIR }}
+
+  deploy:
+    name: Build, migrate and release
+    needs: test
+    runs-on: ubuntu-latest
+    # Add required reviewers to this environment in GitHub to gate deployments.
+    environment: staging
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve image tag
+        id: tag
+        run: echo "value=staging-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Record the currently deployed image for rollback
+        id: current
+        run: |
+          set -euo pipefail
+          image=$(az containerapp show \
+            --name "$CONTAINER_APP" \
+            --resource-group "$RESOURCE_GROUP" \
+            --query "properties.template.containers[0].image" -o tsv)
+          echo "Current image: $image"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push image
+        run: |
+          set -euo pipefail
+          # The build context is the solution folder because the Dockerfile
+          # copies "Spinner.Api/Spinner.Api.csproj".
+          az acr build \
+            --registry "$REGISTRY_NAME" \
+            --image "$IMAGE_REPOSITORY:${{ steps.tag.outputs.value }}" \
+            --image "$IMAGE_REPOSITORY:staging" \
+            --file Spinner.Api/Dockerfile \
+            .
+        working-directory: ${{ env.BACKEND_DIR }}
+
+      - name: Apply database migrations
+        if: ${{ inputs.skip_migrations != true }}
+        run: |
+          set -euo pipefail
+          image="$REGISTRY_NAME.azurecr.io/$IMAGE_REPOSITORY:${{ steps.tag.outputs.value }}"
+
+          # The job runs inside the Container Apps environment, so the database
+          # stays closed to public IPs: no temporary firewall rule is needed.
+          az containerapp job update \
+            --name "$MIGRATION_JOB" \
+            --resource-group "$RESOURCE_GROUP" \
+            --image "$image" \
+            --output none
+
+          execution=$(az containerapp job start \
+            --name "$MIGRATION_JOB" \
+            --resource-group "$RESOURCE_GROUP" \
+            --query name -o tsv)
+          echo "Migration execution: $execution"
+
+          for _ in $(seq 1 60); do
+            status=$(az containerapp job execution show \
+              --name "$MIGRATION_JOB" \
+              --resource-group "$RESOURCE_GROUP" \
+              --job-execution-name "$execution" \
+              --query properties.status -o tsv)
+            echo "status=$status"
+            case "$status" in
+              Succeeded) exit 0 ;;
+              Failed|Cancelled)
+                echo "::error::Migration job $execution finished with status $status"
+                exit 1
+                ;;
+            esac
+            sleep 10
+          done
+
+          echo "::error::Migration job $execution did not finish within 10 minutes"
+          exit 1
+
+      - name: Release new revision
+        run: |
+          set -euo pipefail
+          az containerapp update \
+            --name "$CONTAINER_APP" \
+            --resource-group "$RESOURCE_GROUP" \
+            --image "$REGISTRY_NAME.azurecr.io/$IMAGE_REPOSITORY:${{ steps.tag.outputs.value }}" \
+            --output none
+
+      - name: Verify health
+        id: verify
+        run: |
+          set -euo pipefail
+          for endpoint in health health/ready; do
+            ok=false
+            for attempt in $(seq 1 20); do
+              code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 \
+                "$API_ORIGIN/$endpoint" || echo 000)
+              echo "$endpoint attempt $attempt -> $code"
+              if [ "$code" = "200" ]; then ok=true; break; fi
+              sleep 10
+            done
+            if [ "$ok" != "true" ]; then
+              echo "::error::$endpoint did not become healthy"
+              exit 1
+            fi
+          done
+
+      - name: Roll back on failure
+        if: failure() && steps.current.outputs.image != ''
+        run: |
+          set -euo pipefail
+          echo "::warning::Deployment failed. Restoring ${{ steps.current.outputs.image }}"
+          az containerapp update \
+            --name "$CONTAINER_APP" \
+            --resource-group "$RESOURCE_GROUP" \
+            --image "${{ steps.current.outputs.image }}" \
+            --output none
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Staging API deployment"
+            echo ""
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Commit | \`${{ github.sha }}\` |"
+            echo "| Image tag | \`${{ steps.tag.outputs.value }}\` |"
+            echo "| Previous image | \`${{ steps.current.outputs.image }}\` |"
+            echo "| Result | ${{ job.status }} |"
+          } >> "$GITHUB_STEP_SUMMARY"

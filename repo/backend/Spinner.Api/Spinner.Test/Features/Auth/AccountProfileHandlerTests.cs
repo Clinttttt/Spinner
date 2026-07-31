@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Spinner.Api.Common.Results;
 using Spinner.Api.Common.Security;
 using Spinner.Api.Domain.Users;
@@ -37,7 +38,7 @@ public sealed class AccountProfileHandlerTests
         dbContext.StaffUsers.Add(user);
         await dbContext.SaveChangesAsync();
 
-        var handler = new UpdateAccountProfileHandler(dbContext);
+        var handler = CreateUpdateHandler(dbContext);
         var result = await handler.Handle(
             new UpdateAccountProfileCommand(
                 user.Id,
@@ -50,10 +51,13 @@ public sealed class AccountProfileHandlerTests
         Assert.Equal("Clint Owner", result.Value!.FullName);
         Assert.Equal("clint@example.com", result.Value.EmailAddress);
         Assert.Equal("09171234567", result.Value.MobileNumber);
+        Assert.False(result.Value.IsEmailVerified);
 
         var persisted = await dbContext.StaffUsers.SingleAsync();
         Assert.Equal("Clint Owner", persisted.FullName);
         Assert.Equal("clint@example.com", persisted.EmailAddress);
+        Assert.Single(await dbContext.AccountActionCodes.ToListAsync());
+        Assert.Single(await dbContext.NotificationOutboxMessages.ToListAsync());
     }
 
     [Fact]
@@ -71,7 +75,7 @@ public sealed class AccountProfileHandlerTests
         dbContext.StaffUsers.AddRange(user, otherUser);
         await dbContext.SaveChangesAsync();
 
-        var handler = new UpdateAccountProfileHandler(dbContext);
+        var handler = CreateUpdateHandler(dbContext);
         var result = await handler.Handle(
             new UpdateAccountProfileCommand(
                 user.Id,
@@ -157,5 +161,18 @@ public sealed class AccountProfileHandlerTests
             hasher.Hash("Owner@12345"),
             StaffRole.Owner,
             DateTimeOffset.UtcNow);
+    }
+
+    private static UpdateAccountProfileHandler CreateUpdateHandler(
+        Spinner.Api.Database.AppDbContext dbContext) =>
+        new(
+            dbContext,
+            new PasswordHasher(),
+            new StubAccountCodeGenerator(),
+            Options.Create(new AccountSecurityOptions()));
+
+    private sealed class StubAccountCodeGenerator : IAccountCodeGenerator
+    {
+        public string Generate() => "123456";
     }
 }

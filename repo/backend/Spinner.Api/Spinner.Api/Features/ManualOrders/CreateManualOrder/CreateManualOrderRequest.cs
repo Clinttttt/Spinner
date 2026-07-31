@@ -22,4 +22,5 @@ public sealed record CreateManualOrderRequest(
     string? Notes,
     string? SpecialInstructions,
     PreferredNotificationChannel PreferredNotificationChannel,
-    PickupLocationRequest? PickupLocation);
+    PickupLocationRequest? PickupLocation,
+    bool AllowDuplicate = false);

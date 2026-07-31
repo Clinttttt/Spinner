@@ -39,6 +39,10 @@ public sealed class LoginHandler : IRequestHandler<LoginCommand, Result<LoginRes
         if (user is null || !user.IsActive || !_passwordHasher.Verify(request.Password, user.PasswordHash))
             return Result<LoginResponse>.Unauthorized("Invalid login credentials.");
 
+        if (!user.IsEmailVerified)
+            return Result<LoginResponse>.Forbidden(
+                "Verify your email address before signing in.");
+
         var now = DateTimeOffset.UtcNow;
         var accessToken = _jwtTokenService.CreateToken(user);
         var generatedRefreshToken = _refreshTokenService.Generate();

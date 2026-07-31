@@ -44,6 +44,7 @@ public sealed record OrderDetailsResponse(
     string? SpecialInstructions,
     PreferredNotificationChannel PreferredNotificationChannel,
     PickupLocationResponse? PickupLocation,
+    DateTimeOffset? ArchivedAt,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt)
 {
@@ -97,6 +98,7 @@ public sealed record OrderDetailsResponse(
         order.SpecialInstructions,
         order.PreferredNotificationChannel,
         PickupLocationResponse.FromEntity(order.PickupLocation),
+        order.ArchivedAt,
         order.CreatedAt,
         order.UpdatedAt);
 }

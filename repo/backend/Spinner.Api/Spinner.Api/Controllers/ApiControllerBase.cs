@@ -89,6 +89,9 @@ public abstract class ApiControllerBase : ControllerBase
 
         problem.Extensions["traceId"] = HttpContext.TraceIdentifier;
 
+        if (!string.IsNullOrEmpty(result.Error.Code))
+            problem.Extensions["code"] = result.Error.Code;
+
         if (result.Errors.Count > 0)
             problem.Extensions["errors"] = result.Errors;
 

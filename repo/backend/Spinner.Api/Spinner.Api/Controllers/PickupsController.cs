@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Spinner.Api.Common.Pagination;
+using Spinner.Api.Common.Time;
 using Spinner.Api.Features.Pickups;
 using Spinner.Api.Features.Pickups.FailPickup;
 using Spinner.Api.Features.Pickups.GetPickupDetails;
@@ -15,31 +16,39 @@ namespace Spinner.Api.Controllers;
 [Authorize]
 public sealed class PickupsController : ApiControllerBase
 {
-    public PickupsController(ISender sender)
+    private readonly IBusinessClock _clock;
+
+    public PickupsController(ISender sender, IBusinessClock clock)
         : base(sender)
     {
+        _clock = clock;
     }
 
     [HttpGet("today")]
     public async Task<ActionResult<PagedResponse<PickupScheduleItemResponse>>> GetToday(
+        [FromQuery] bool includeCollected = true,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = PageRequest.DefaultPageSize,
         CancellationToken ct = default)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow.Date);
-        var result = await Sender.Send(new GetPickupScheduleQuery(today, page, pageSize), ct);
+        var result = await Sender.Send(
+            new GetPickupScheduleQuery(_clock.Today, includeCollected, page, pageSize),
+            ct);
         return HandleResponse(result);
     }
 
     [HttpGet]
     public async Task<ActionResult<PagedResponse<PickupScheduleItemResponse>>> GetByDate(
         [FromQuery] DateOnly? date,
+        [FromQuery] bool includeCollected = true,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = PageRequest.DefaultPageSize,
         CancellationToken ct = default)
     {
-        var scheduleDate = date ?? DateOnly.FromDateTime(DateTime.UtcNow.Date);
-        var result = await Sender.Send(new GetPickupScheduleQuery(scheduleDate, page, pageSize), ct);
+        var scheduleDate = date ?? _clock.Today;
+        var result = await Sender.Send(
+            new GetPickupScheduleQuery(scheduleDate, includeCollected, page, pageSize),
+            ct);
         return HandleResponse(result);
     }
 

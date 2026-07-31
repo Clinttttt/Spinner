@@ -60,6 +60,13 @@ public sealed class Result<T> : ResultBase
         Error = Error.Conflict(message)
     };
 
+    public static Result<T> PossibleDuplicate(string message) => new()
+    {
+        IsSuccess = false,
+        Status = ResultStatus.Conflict,
+        Error = Error.PossibleDuplicateOrder(message)
+    };
+
     public static Result<T> Unauthorized(string message) => new()
     {
         IsSuccess = false,

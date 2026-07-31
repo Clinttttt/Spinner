@@ -50,7 +50,10 @@ public sealed class CreateBookingHandlerTests
             CreateCommand(service.Id) with
             {
                 FullName = "Maria S.",
-                EmailAddress = "maria@example.com"
+                EmailAddress = "maria@example.com",
+                // A different slot, so this is a genuine second booking rather
+                // than a replayed submit.
+                PreferredTimeWindow = "1:00 PM - 3:00 PM"
             },
             CancellationToken.None);
 
@@ -61,6 +64,24 @@ public sealed class CreateBookingHandlerTests
         Assert.Equal("Maria S.", customer.FullName);
         Assert.Equal("maria@example.com", customer.EmailAddress);
         Assert.Equal(2, dbContext.LaundryOrders.Count());
+    }
+
+    [Fact]
+    public async Task CreateBooking_Should_Not_Duplicate_A_Replayed_Submit()
+    {
+        await using var dbContext = AppDbContextFactory.Create();
+        var service = SeedService(dbContext);
+        dbContext.BusinessSettings.Add(CreateSettings(isSmsBookingReceivedEnabled: true));
+        await dbContext.SaveChangesAsync();
+
+        var handler = new CreateBookingHandler(dbContext);
+        var first = await handler.Handle(CreateCommand(service.Id), CancellationToken.None);
+        var replay = await handler.Handle(CreateCommand(service.Id), CancellationToken.None);
+
+        Assert.True(replay.IsSuccess);
+        Assert.Equal(first.Value!.OrderCode, replay.Value!.OrderCode);
+        Assert.Single(dbContext.LaundryOrders);
+        Assert.Single(dbContext.NotificationOutboxMessages);
     }
 
     [Fact]

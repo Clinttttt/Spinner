@@ -6,6 +6,7 @@ namespace Spinner.Api.Features.Pickups.GetPickupSchedule;
 
 public sealed record GetPickupScheduleQuery(
     DateOnly Date,
+    bool IncludeCollected = true,
     int Page = 1,
     int PageSize = PageRequest.DefaultPageSize)
     : IRequest<Result<PagedResponse<PickupScheduleItemResponse>>>;

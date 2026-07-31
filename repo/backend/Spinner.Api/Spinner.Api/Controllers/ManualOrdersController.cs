@@ -41,7 +41,8 @@ public sealed class ManualOrdersController : ApiControllerBase
             request.Notes,
             request.SpecialInstructions,
             request.PreferredNotificationChannel,
-            request.PickupLocation), ct);
+            request.PickupLocation,
+            request.AllowDuplicate), ct);
 
         return HandleCreatedResponse(result, nameof(GetById), new { id = result.Value?.OrderId });
     }
@@ -53,9 +54,12 @@ public sealed class ManualOrdersController : ApiControllerBase
         [FromQuery] OrderStatus? status,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = PageRequest.DefaultPageSize,
+        [FromQuery] bool includeCleared = false,
         CancellationToken ct = default)
     {
-        var result = await Sender.Send(new GetManualOrdersQuery(search, method, status, page, pageSize), ct);
+        var result = await Sender.Send(
+            new GetManualOrdersQuery(search, method, status, page, pageSize, includeCleared),
+            ct);
         return HandleResponse(result);
     }
 

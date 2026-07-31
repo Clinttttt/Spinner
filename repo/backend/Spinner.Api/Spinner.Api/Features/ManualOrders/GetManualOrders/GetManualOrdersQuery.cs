@@ -10,5 +10,6 @@ public sealed record GetManualOrdersQuery(
     FulfillmentType? Method,
     OrderStatus? Status,
     int Page = 1,
-    int PageSize = PageRequest.DefaultPageSize)
+    int PageSize = PageRequest.DefaultPageSize,
+    bool IncludeCleared = false)
     : IRequest<Result<PagedResponse<ManualOrderListItemResponse>>>;

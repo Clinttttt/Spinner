@@ -37,16 +37,17 @@ public sealed class GetNotificationHistoryHandler
             query = query.Where(message => message.Status == status);
         }
 
-        var page = PageRequest.Normalize(request.Page, request.PageSize);
+        var page = PageRequest.NormalizePage(request.Page);
+        var pageSize = PageRequest.NormalizePageSize(request.PageSize);
         var totalCount = await query.CountAsync(cancellationToken);
         var history = await query
             .OrderByDescending(message => message.CreatedAt)
-            .Skip(page.Offset)
-            .Take(page.PageSize)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(message => new NotificationHistoryItemResponse(
                 message.Id,
                 message.OrderId,
-                message.Order.OrderCode,
+                message.Order == null ? null : message.Order.OrderCode,
                 message.Channel,
                 message.Recipient,
                 message.Subject,
@@ -61,8 +62,8 @@ public sealed class GetNotificationHistoryHandler
         return Result<PagedResponse<NotificationHistoryItemResponse>>.Success(
             new PagedResponse<NotificationHistoryItemResponse>(
                 history,
-                page.Page,
-                page.PageSize,
+                page,
+                pageSize,
                 totalCount));
     }
 }

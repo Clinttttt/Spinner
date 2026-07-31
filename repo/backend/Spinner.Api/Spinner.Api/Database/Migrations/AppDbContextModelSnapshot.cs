@@ -199,7 +199,7 @@ namespace Spinner.Api.Database.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
-                    b.Property<Guid>("OrderId")
+                    b.Property<Guid?>("OrderId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("Recipient")
@@ -250,6 +250,9 @@ namespace Spinner.Api.Database.Migrations
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset?>("ArchivedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -372,6 +375,8 @@ namespace Spinner.Api.Database.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ArchivedAt");
 
                     b.HasIndex("CreatedAt");
 
@@ -530,6 +535,46 @@ namespace Spinner.Api.Database.Migrations
                     b.ToTable("FinancialTransactions", (string)null);
                 });
 
+            modelBuilder.Entity("Spinner.Api.Domain.Users.AccountActionCode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset?>("ConsumedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("FailedAttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Purpose")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("UserId", "Purpose", "ConsumedAt");
+
+                    b.ToTable("AccountActionCodes", (string)null);
+                });
+
             modelBuilder.Entity("Spinner.Api.Domain.Users.RefreshTokenSession", b =>
                 {
                     b.Property<Guid>("Id")
@@ -589,12 +634,18 @@ namespace Spinner.Api.Database.Migrations
                         .HasMaxLength(254)
                         .HasColumnType("character varying(254)");
 
+                    b.Property<DateTimeOffset?>("EmailVerifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)");
 
                     b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEmailVerified")
                         .HasColumnType("boolean");
 
                     b.Property<string>("MobileNumber")
@@ -619,6 +670,8 @@ namespace Spinner.Api.Database.Migrations
 
                     b.HasIndex("IsActive");
 
+                    b.HasIndex("IsEmailVerified");
+
                     b.HasIndex("MobileNumber")
                         .IsUnique();
 
@@ -630,8 +683,7 @@ namespace Spinner.Api.Database.Migrations
                     b.HasOne("Spinner.Api.Domain.Orders.LaundryOrder", "Order")
                         .WithMany()
                         .HasForeignKey("OrderId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Order");
                 });
@@ -747,6 +799,17 @@ namespace Spinner.Api.Database.Migrations
                     b.Navigation("Order");
 
                     b.Navigation("Service");
+                });
+
+            modelBuilder.Entity("Spinner.Api.Domain.Users.AccountActionCode", b =>
+                {
+                    b.HasOne("Spinner.Api.Domain.Users.StaffUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Spinner.Api.Domain.Users.RefreshTokenSession", b =>

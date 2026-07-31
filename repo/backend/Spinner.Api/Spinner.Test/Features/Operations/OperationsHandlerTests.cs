@@ -18,7 +18,7 @@ public sealed class OperationsHandlerTests
         await CreateBookingAsync(dbContext, service.Id, "Maria Santos", "09171234567");
         await CreateBookingAsync(dbContext, service.Id, "Ana Cruz", "09170001111");
 
-        var result = await new GetOperationsDashboardHandler(dbContext)
+        var result = await new GetOperationsDashboardHandler(dbContext, new TestBusinessClock())
             .Handle(new GetOperationsDashboardQuery(), CancellationToken.None);
 
         Assert.True(result.IsSuccess);

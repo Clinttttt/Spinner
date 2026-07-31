@@ -27,9 +27,26 @@ public sealed class NotificationOutboxMessage
         CreatedAt = now;
     }
 
+    public NotificationOutboxMessage(
+        NotificationChannel channel,
+        string recipient,
+        string? subject,
+        string message,
+        DateTimeOffset now)
+    {
+        Id = Guid.NewGuid();
+        Channel = channel;
+        Recipient = recipient.Trim();
+        Subject = string.IsNullOrWhiteSpace(subject) ? null : subject.Trim();
+        Message = message.Trim();
+        Status = NotificationStatus.Pending;
+        AttemptCount = 0;
+        CreatedAt = now;
+    }
+
     public Guid Id { get; private set; }
-    public Guid OrderId { get; private set; }
-    public LaundryOrder Order { get; private set; } = null!;
+    public Guid? OrderId { get; private set; }
+    public LaundryOrder? Order { get; private set; }
     public NotificationChannel Channel { get; private set; }
     public string Recipient { get; private set; } = string.Empty;
     public string? Subject { get; private set; }

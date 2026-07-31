@@ -21,6 +21,7 @@ public sealed class LoginHandlerTests
             hasher.Hash("Owner@12345"),
             StaffRole.Owner,
             DateTimeOffset.UtcNow);
+        user.MarkEmailVerifiedForBootstrap(DateTimeOffset.UtcNow);
         dbContext.StaffUsers.Add(user);
         await dbContext.SaveChangesAsync();
 
@@ -41,6 +42,30 @@ public sealed class LoginHandlerTests
     {
         await using var dbContext = AppDbContextFactory.Create();
         var hasher = new PasswordHasher();
+        var user = new StaffUser(
+            "Spinner Owner",
+            "owner@spinner.local",
+            null,
+            hasher.Hash("Owner@12345"),
+            StaffRole.Owner,
+            DateTimeOffset.UtcNow);
+        user.MarkEmailVerifiedForBootstrap(DateTimeOffset.UtcNow);
+        dbContext.StaffUsers.Add(user);
+        await dbContext.SaveChangesAsync();
+
+        var handler = CreateHandler(dbContext, hasher);
+
+        var result = await handler.Handle(new LoginCommand("owner@spinner.local", "bad-password"), CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(Spinner.Api.Common.Results.ResultStatus.Unauthorized, result.Status);
+    }
+
+    [Fact]
+    public async Task Login_Should_Return_Forbidden_When_Email_Is_Not_Verified()
+    {
+        await using var dbContext = AppDbContextFactory.Create();
+        var hasher = new PasswordHasher();
         dbContext.StaffUsers.Add(new StaffUser(
             "Spinner Owner",
             "owner@spinner.local",
@@ -51,11 +76,13 @@ public sealed class LoginHandlerTests
         await dbContext.SaveChangesAsync();
 
         var handler = CreateHandler(dbContext, hasher);
-
-        var result = await handler.Handle(new LoginCommand("owner@spinner.local", "bad-password"), CancellationToken.None);
+        var result = await handler.Handle(
+            new LoginCommand("owner@spinner.local", "Owner@12345"),
+            CancellationToken.None);
 
         Assert.False(result.IsSuccess);
-        Assert.Equal(Spinner.Api.Common.Results.ResultStatus.Unauthorized, result.Status);
+        Assert.Equal(Spinner.Api.Common.Results.ResultStatus.Forbidden, result.Status);
+        Assert.Empty(await dbContext.RefreshTokenSessions.ToListAsync());
     }
 
     private sealed class StubJwtTokenService : IJwtTokenService

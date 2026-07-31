@@ -27,6 +27,9 @@ public sealed class GetManualOrdersHandler
             .Include(order => order.ServiceItems)
             .Where(order => order.Source == OrderSource.OwnerManual);
 
+        if (!request.IncludeCleared)
+            query = query.Where(order => order.ArchivedAt == null);
+
         if (request.Method is not null)
             query = query.Where(order => order.FulfillmentType == request.Method);
 

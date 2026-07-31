@@ -1,3 +1,6 @@
+using System.Net.Mail;
+using Spinner.Api.Features.Notifications.ProcessNotificationOutbox;
+using Spinner.Api.Integrations.Notifications;
 using Spinner.Api.Integrations.OnlinePayments;
 
 namespace Spinner.Api.Common.Configuration;
@@ -8,9 +11,21 @@ public static class StartupConfigurationValidator
 
     public static void Validate(IConfiguration configuration, IHostEnvironment environment)
     {
+        var connectionString = configuration.GetConnectionString("DefaultConnection");
+        if (string.IsNullOrWhiteSpace(connectionString))
+            throw new InvalidOperationException("ConnectionStrings:DefaultConnection must be configured.");
+
         var jwtKey = configuration["Jwt:Key"];
         if (string.IsNullOrWhiteSpace(jwtKey) || jwtKey.Length < 32)
             throw new InvalidOperationException("Jwt:Key must be configured and at least 32 characters long.");
+
+        if (string.IsNullOrWhiteSpace(configuration["Jwt:Issuer"]))
+            throw new InvalidOperationException("Jwt:Issuer must be configured.");
+
+        if (string.IsNullOrWhiteSpace(configuration["Jwt:Audience"]))
+            throw new InvalidOperationException("Jwt:Audience must be configured.");
+
+        ValidateNotificationDelivery(configuration, environment);
 
         if (environment.IsDevelopment())
             return;
@@ -24,5 +39,107 @@ public static class StartupConfigurationValidator
 
         if (string.Equals(webhookSecret, DevelopmentWebhookSecret, StringComparison.Ordinal))
             throw new InvalidOperationException("Production OnlinePayments:WebhookSecret must not use the development secret.");
+
+        var publicPaymentBaseUrl =
+            configuration[$"{OnlinePaymentOptions.SectionName}:PublicPaymentBaseUrl"];
+        if (!Uri.TryCreate(publicPaymentBaseUrl, UriKind.Absolute, out var paymentUri) ||
+            !string.Equals(paymentUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "Production OnlinePayments:PublicPaymentBaseUrl must be an absolute HTTPS URL.");
+        }
+    }
+
+    private static void ValidateNotificationDelivery(
+        IConfiguration configuration,
+        IHostEnvironment environment)
+    {
+        var outboxEnabled =
+            configuration.GetValue<bool?>($"{NotificationOutboxOptions.SectionName}:Enabled") ?? true;
+        if (!outboxEnabled)
+            return;
+
+        var emailProvider =
+            configuration[
+                $"{NotificationDeliveryOptions.SectionName}:EmailProvider"] ??
+            (environment.IsDevelopment()
+                ? NotificationDeliveryOptions.LoggingProvider
+                : NotificationDeliveryOptions.ResendProvider);
+        var smsProvider =
+            configuration[
+                $"{NotificationDeliveryOptions.SectionName}:SmsProvider"] ??
+            NotificationDeliveryOptions.LoggingProvider;
+
+        if (!string.Equals(
+                emailProvider,
+                NotificationDeliveryOptions.LoggingProvider,
+                StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(
+                emailProvider,
+                NotificationDeliveryOptions.ResendProvider,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "NotificationDelivery:EmailProvider must be Logging or Resend.");
+        }
+
+        if (!string.Equals(
+                smsProvider,
+                NotificationDeliveryOptions.LoggingProvider,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "NotificationDelivery:SmsProvider must be Logging until an SMS provider is configured.");
+        }
+
+        if (!environment.IsDevelopment() &&
+            !string.Equals(
+                emailProvider,
+                NotificationDeliveryOptions.ResendProvider,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "Production NotificationDelivery:EmailProvider must be Resend.");
+        }
+
+        if (!string.Equals(
+                emailProvider,
+                NotificationDeliveryOptions.ResendProvider,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var apiKey = configuration[$"{ResendOptions.SectionName}:ApiKey"];
+        if (string.IsNullOrWhiteSpace(apiKey))
+            throw new InvalidOperationException("Resend:ApiKey must be configured.");
+
+        var fromEmail = configuration[$"{ResendOptions.SectionName}:FromEmail"];
+        if (string.IsNullOrWhiteSpace(fromEmail) || !IsValidEmailAddress(fromEmail))
+            throw new InvalidOperationException("Resend:FromEmail must be a valid email address.");
+
+        if (string.IsNullOrWhiteSpace(configuration[$"{ResendOptions.SectionName}:FromName"]))
+            throw new InvalidOperationException("Resend:FromName must be configured.");
+
+        var baseUrl = configuration[$"{ResendOptions.SectionName}:BaseUrl"];
+        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var resendUri) ||
+            !string.Equals(resendUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "Resend:BaseUrl must be an absolute HTTPS URL.");
+        }
+    }
+
+    private static bool IsValidEmailAddress(string value)
+    {
+        try
+        {
+            var address = new MailAddress(value);
+            return string.Equals(address.Address, value.Trim(), StringComparison.OrdinalIgnoreCase);
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
     }
 }

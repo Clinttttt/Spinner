@@ -6,6 +6,7 @@ using Spinner.Api.Domain.Customers;
 using Spinner.Api.Domain.Notifications;
 using Spinner.Api.Domain.Orders;
 using Spinner.Api.Features.BusinessSettings;
+using Spinner.Api.Features.Orders;
 
 namespace Spinner.Api.Features.Bookings.CreateBooking;
 
@@ -43,6 +44,25 @@ public sealed class CreateBookingHandler : IRequestHandler<CreateBookingCommand,
             return Result<BookingConfirmationResponse>.Validation("QR Code Online Payment is not enabled.");
 
         var now = DateTimeOffset.UtcNow;
+
+        // A replayed submit must not create a second booking. This covers double
+        // taps and client retries where the first request reached the server but
+        // the response never made it back to the customer's phone.
+        var replay = await DuplicateOrderGuard.FindRecentIdenticalAsync(
+            _dbContext,
+            OrderSource.CustomerWeb,
+            request.MobileNumber,
+            request.FulfillmentType,
+            request.PreferredDate,
+            request.PreferredTimeWindow,
+            (service.BasePrice * request.LoadCount) +
+                (request.FulfillmentType == FulfillmentType.PickupAndDelivery ? service.DeliveryFee ?? 0m : 0m),
+            now,
+            cancellationToken);
+
+        if (replay is not null)
+            return Result<BookingConfirmationResponse>.Success(ToResponse(replay));
+
         var customer = await GetOrCreateCustomerAsync(request, now, cancellationToken);
         var order = new LaundryOrder(
             BookingCodeGenerator.NewOrderCode(now),

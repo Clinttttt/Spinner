@@ -7,9 +7,14 @@ using Spinner.Api.Features.Auth.Login;
 using Spinner.Api.Features.Auth.ChangePassword;
 using Spinner.Api.Features.Auth.GetCurrentAccount;
 using Spinner.Api.Features.Auth.RefreshSession;
+using Spinner.Api.Features.Auth.Register;
 using Spinner.Api.Features.Auth.RevokeAllSessions;
 using Spinner.Api.Features.Auth.RevokeSession;
+using Spinner.Api.Features.Auth.ResendVerification;
+using Spinner.Api.Features.Auth.ForgotPassword;
+using Spinner.Api.Features.Auth.ResetPassword;
 using Spinner.Api.Features.Auth.UpdateAccountProfile;
+using Spinner.Api.Features.Auth.VerifyEmail;
 
 namespace Spinner.Api.Controllers;
 
@@ -28,6 +33,71 @@ public sealed class AuthController : ApiControllerBase
         CancellationToken ct)
     {
         var result = await Sender.Send(new LoginCommand(request.Login, request.Password), ct);
+        return HandleResponse(result);
+    }
+
+    [HttpPost("register")]
+    [AllowAnonymous]
+    public async Task<ActionResult<RegisterResponse>> Register(
+        [FromBody] RegisterRequest request,
+        CancellationToken ct)
+    {
+        var result = await Sender.Send(new RegisterCommand(
+            request.FullName,
+            request.EmailAddress,
+            request.MobileNumber,
+            request.Password,
+            request.ConfirmPassword), ct);
+        return HandleResponse(result);
+    }
+
+    [HttpPost("verify-email")]
+    [AllowAnonymous]
+    public async Task<ActionResult<LoginResponse>> VerifyEmail(
+        [FromBody] VerifyEmailRequest request,
+        CancellationToken ct)
+    {
+        var result = await Sender.Send(
+            new VerifyEmailCommand(request.EmailAddress, request.Code),
+            ct);
+        return HandleResponse(result);
+    }
+
+    [HttpPost("resend-verification")]
+    [AllowAnonymous]
+    public async Task<ActionResult<AccountCodeDeliveryResponse>> ResendVerification(
+        [FromBody] ResendVerificationRequest request,
+        CancellationToken ct)
+    {
+        var result = await Sender.Send(
+            new ResendVerificationCommand(request.EmailAddress),
+            ct);
+        return HandleResponse(result);
+    }
+
+    [HttpPost("forgot-password")]
+    [AllowAnonymous]
+    public async Task<ActionResult<AccountCodeDeliveryResponse>> ForgotPassword(
+        [FromBody] ForgotPasswordRequest request,
+        CancellationToken ct)
+    {
+        var result = await Sender.Send(
+            new ForgotPasswordCommand(request.Login),
+            ct);
+        return HandleResponse(result);
+    }
+
+    [HttpPost("reset-password")]
+    [AllowAnonymous]
+    public async Task<ActionResult> ResetPassword(
+        [FromBody] ResetPasswordRequest request,
+        CancellationToken ct)
+    {
+        var result = await Sender.Send(new ResetPasswordCommand(
+            request.Login,
+            request.Code,
+            request.NewPassword,
+            request.ConfirmPassword), ct);
         return HandleResponse(result);
     }
 

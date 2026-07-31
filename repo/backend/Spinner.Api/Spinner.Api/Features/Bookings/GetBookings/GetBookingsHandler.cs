@@ -27,6 +27,9 @@ public sealed class GetBookingsHandler
             .Include(order => order.ServiceItems)
             .Where(order => order.Source == OrderSource.CustomerWeb);
 
+        if (!request.IncludeCleared)
+            query = query.Where(order => order.ArchivedAt == null);
+
         if (request.Status is not null)
             query = query.Where(order => order.Status == request.Status);
 

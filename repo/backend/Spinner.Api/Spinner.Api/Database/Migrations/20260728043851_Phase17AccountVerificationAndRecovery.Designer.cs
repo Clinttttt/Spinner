@@ -12,8 +12,8 @@ using Spinner.Api.Database;
 namespace Spinner.Api.Database.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260709182625_Phase13OnlinePayment")]
-    partial class Phase13OnlinePayment
+    [Migration("20260728043851_Phase17AccountVerificationAndRecovery")]
+    partial class Phase17AccountVerificationAndRecovery
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -24,6 +24,49 @@ namespace Spinner.Api.Database.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+
+            modelBuilder.Entity("Spinner.Api.Domain.ActivityLogs.ActivityLogEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid?>("EntityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Action");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("EntityId");
+
+                    b.ToTable("ActivityLogs", (string)null);
+                });
 
             modelBuilder.Entity("Spinner.Api.Domain.Business.BusinessSettings", b =>
                 {
@@ -159,7 +202,7 @@ namespace Spinner.Api.Database.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
-                    b.Property<Guid>("OrderId")
+                    b.Property<Guid?>("OrderId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("Recipient")
@@ -194,6 +237,14 @@ namespace Spinner.Api.Database.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<decimal>("AdditionalCharge")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<string>("AdditionalChargeReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<string>("AdditionalNotes")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
@@ -218,6 +269,14 @@ namespace Spinner.Api.Database.Migrations
 
                     b.Property<DateTimeOffset?>("DeliveryUpdatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("Discount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<string>("DiscountReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<decimal>("EstimatedDeliveryFee")
                         .HasPrecision(12, 2)
@@ -272,6 +331,9 @@ namespace Spinner.Api.Database.Migrations
                     b.Property<DateOnly>("PreferredDate")
                         .HasColumnType("date");
 
+                    b.Property<int>("PreferredNotificationChannel")
+                        .HasColumnType("integer");
+
                     b.Property<string>("PreferredTimeWindow")
                         .IsRequired()
                         .HasMaxLength(120)
@@ -288,6 +350,13 @@ namespace Spinner.Api.Database.Migrations
                         .IsRequired()
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)");
+
+                    b.Property<int>("Source")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SpecialInstructions")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
@@ -330,12 +399,56 @@ namespace Spinner.Api.Database.Migrations
 
                     b.HasIndex("ServiceId");
 
+                    b.HasIndex("Source");
+
                     b.HasIndex("Status");
 
                     b.HasIndex("TrackingCode")
                         .IsUnique();
 
                     b.ToTable("LaundryOrders", (string)null);
+                });
+
+            modelBuilder.Entity("Spinner.Api.Domain.Orders.OrderServiceItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ServiceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ServiceName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<decimal>("Subtotal")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<string>("UnitLabel")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId");
+
+                    b.HasIndex("ServiceId");
+
+                    b.ToTable("OrderServiceItems", (string)null);
                 });
 
             modelBuilder.Entity("Spinner.Api.Domain.Services.LaundryService", b =>
@@ -388,6 +501,123 @@ namespace Spinner.Api.Database.Migrations
                     b.ToTable("LaundryServices", (string)null);
                 });
 
+            modelBuilder.Entity("Spinner.Api.Domain.Transactions.FinancialTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Kind");
+
+                    b.HasIndex("OccurredAt");
+
+                    b.ToTable("FinancialTransactions", (string)null);
+                });
+
+            modelBuilder.Entity("Spinner.Api.Domain.Users.AccountActionCode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset?>("ConsumedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("FailedAttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Purpose")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("UserId", "Purpose", "ConsumedAt");
+
+                    b.ToTable("AccountActionCodes", (string)null);
+                });
+
+            modelBuilder.Entity("Spinner.Api.Domain.Users.RefreshTokenSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("FamilyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ReplacedByTokenId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("FamilyId")
+                        .IsUnique()
+                        .HasFilter("\"RevokedAt\" IS NULL");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("RefreshTokenSessions", (string)null);
+                });
+
             modelBuilder.Entity("Spinner.Api.Domain.Users.StaffUser", b =>
                 {
                     b.Property<Guid>("Id")
@@ -402,12 +632,18 @@ namespace Spinner.Api.Database.Migrations
                         .HasMaxLength(254)
                         .HasColumnType("character varying(254)");
 
+                    b.Property<DateTimeOffset?>("EmailVerifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)");
 
                     b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEmailVerified")
                         .HasColumnType("boolean");
 
                     b.Property<string>("MobileNumber")
@@ -432,6 +668,8 @@ namespace Spinner.Api.Database.Migrations
 
                     b.HasIndex("IsActive");
 
+                    b.HasIndex("IsEmailVerified");
+
                     b.HasIndex("MobileNumber")
                         .IsUnique();
 
@@ -443,8 +681,7 @@ namespace Spinner.Api.Database.Migrations
                     b.HasOne("Spinner.Api.Domain.Orders.LaundryOrder", "Order")
                         .WithMany()
                         .HasForeignKey("OrderId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Order");
                 });
@@ -463,9 +700,130 @@ namespace Spinner.Api.Database.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.OwnsOne("Spinner.Api.Domain.Orders.PickupLocationSnapshot", "PickupLocation", b1 =>
+                        {
+                            b1.Property<Guid>("LaundryOrderId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<string>("Barangay")
+                                .HasMaxLength(160)
+                                .HasColumnType("character varying(160)")
+                                .HasColumnName("PickupBarangay");
+
+                            b1.Property<string>("CityOrMunicipality")
+                                .HasMaxLength(160)
+                                .HasColumnType("character varying(160)")
+                                .HasColumnName("PickupCityOrMunicipality");
+
+                            b1.Property<DateTimeOffset?>("ConfirmedAt")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("PickupLocationConfirmedAt");
+
+                            b1.Property<string>("FormattedAddress")
+                                .IsRequired()
+                                .HasMaxLength(500)
+                                .HasColumnType("character varying(500)")
+                                .HasColumnName("PickupFormattedAddress");
+
+                            b1.Property<string>("Landmark")
+                                .HasMaxLength(300)
+                                .HasColumnType("character varying(300)")
+                                .HasColumnName("PickupLandmark");
+
+                            b1.Property<decimal>("Latitude")
+                                .HasPrecision(10, 7)
+                                .HasColumnType("numeric(10,7)")
+                                .HasColumnName("PickupLatitude");
+
+                            b1.Property<bool>("LocationConfirmed")
+                                .HasColumnType("boolean")
+                                .HasColumnName("PickupLocationConfirmed");
+
+                            b1.Property<string>("LocationSource")
+                                .IsRequired()
+                                .HasMaxLength(80)
+                                .HasColumnType("character varying(80)")
+                                .HasColumnName("PickupLocationSource");
+
+                            b1.Property<decimal>("Longitude")
+                                .HasPrecision(10, 7)
+                                .HasColumnType("numeric(10,7)")
+                                .HasColumnName("PickupLongitude");
+
+                            b1.Property<string>("PickupInstructions")
+                                .HasMaxLength(500)
+                                .HasColumnType("character varying(500)")
+                                .HasColumnName("PickupInstructions");
+
+                            b1.Property<string>("PlaceId")
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)")
+                                .HasColumnName("PickupPlaceId");
+
+                            b1.Property<string>("PlusCode")
+                                .HasMaxLength(100)
+                                .HasColumnType("character varying(100)")
+                                .HasColumnName("PickupPlusCode");
+
+                            b1.HasKey("LaundryOrderId");
+
+                            b1.ToTable("LaundryOrders");
+
+                            b1.WithOwner()
+                                .HasForeignKey("LaundryOrderId");
+                        });
+
                     b.Navigation("Customer");
 
+                    b.Navigation("PickupLocation");
+
                     b.Navigation("Service");
+                });
+
+            modelBuilder.Entity("Spinner.Api.Domain.Orders.OrderServiceItem", b =>
+                {
+                    b.HasOne("Spinner.Api.Domain.Orders.LaundryOrder", "Order")
+                        .WithMany("ServiceItems")
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Spinner.Api.Domain.Services.LaundryService", "Service")
+                        .WithMany()
+                        .HasForeignKey("ServiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Order");
+
+                    b.Navigation("Service");
+                });
+
+            modelBuilder.Entity("Spinner.Api.Domain.Users.AccountActionCode", b =>
+                {
+                    b.HasOne("Spinner.Api.Domain.Users.StaffUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Spinner.Api.Domain.Users.RefreshTokenSession", b =>
+                {
+                    b.HasOne("Spinner.Api.Domain.Users.StaffUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Spinner.Api.Domain.Orders.LaundryOrder", b =>
+                {
+                    b.Navigation("ServiceItems");
                 });
 #pragma warning restore 612, 618
         }

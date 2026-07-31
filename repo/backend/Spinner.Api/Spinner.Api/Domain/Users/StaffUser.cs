@@ -21,6 +21,7 @@ public sealed class StaffUser
         PasswordHash = passwordHash;
         Role = role;
         IsActive = true;
+        IsEmailVerified = false;
         CreatedAt = now;
         UpdatedAt = now;
     }
@@ -32,6 +33,8 @@ public sealed class StaffUser
     public string PasswordHash { get; private set; } = string.Empty;
     public StaffRole Role { get; private set; }
     public bool IsActive { get; private set; }
+    public bool IsEmailVerified { get; private set; }
+    public DateTimeOffset? EmailVerifiedAt { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -41,8 +44,15 @@ public sealed class StaffUser
         string? mobileNumber,
         DateTimeOffset now)
     {
+        var normalizedEmail = emailAddress.Trim().ToLowerInvariant();
+        if (!string.Equals(EmailAddress, normalizedEmail, StringComparison.Ordinal))
+        {
+            IsEmailVerified = false;
+            EmailVerifiedAt = null;
+        }
+
         FullName = fullName.Trim();
-        EmailAddress = emailAddress.Trim().ToLowerInvariant();
+        EmailAddress = normalizedEmail;
         MobileNumber = string.IsNullOrWhiteSpace(mobileNumber) ? null : mobileNumber.Trim();
         UpdatedAt = now;
     }
@@ -52,4 +62,14 @@ public sealed class StaffUser
         PasswordHash = passwordHash;
         UpdatedAt = now;
     }
+
+    public void VerifyEmail(DateTimeOffset now)
+    {
+        IsEmailVerified = true;
+        EmailVerifiedAt = now;
+        UpdatedAt = now;
+    }
+
+    public void MarkEmailVerifiedForBootstrap(DateTimeOffset now) =>
+        VerifyEmail(now);
 }

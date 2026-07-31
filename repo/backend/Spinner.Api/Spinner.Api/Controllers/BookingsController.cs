@@ -29,9 +29,12 @@ public sealed class BookingsController : ApiControllerBase
         [FromQuery] OrderStatus? status,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = PageRequest.DefaultPageSize,
+        [FromQuery] bool includeCleared = false,
         CancellationToken ct = default)
     {
-        var result = await Sender.Send(new GetBookingsQuery(search, status, page, pageSize), ct);
+        var result = await Sender.Send(
+            new GetBookingsQuery(search, status, page, pageSize, includeCleared),
+            ct);
         return HandleResponse(result);
     }
 
