@@ -7,7 +7,12 @@
         <small>LAUNDROMAT</small>
       </span>
     </a>
-    <button class="header-action" type="button" (click)="showTrackingNotice()">
+    <button
+      class="header-action"
+      type="button"
+      aria-label="Track an existing order"
+      (click)="showTrackingNotice()"
+    >
       <span>Track order</span>
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="m9 18 6-6-6-6" />
@@ -25,11 +30,15 @@
       <div class="hero-shade"></div>
       <div class="hero-content">
         <span class="eyebrow light">Doorstep laundry care</span>
-        <h1 id="hero-title">Fresh laundry without the back-and-forth.</h1>
-        <p>Book in minutes. We’ll confirm your schedule and keep you updated.</p>
-        <div class="hero-points" aria-label="Service benefits">
-          <span><b>✓</b> Professional care</span>
-          <span><b>✓</b> Easy tracking</span>
+        <h1 id="hero-title">Fresh laundry,<br />made easy.</h1>
+        <p>Tell us when and where.<br />We’ll handle the rest.</p>
+        <div class="hero-benefits" aria-label="Quick booking, doorstep service, reliable care">
+          <span class="benefit-art" aria-hidden="true"></span>
+          <div class="benefit-labels" aria-hidden="true">
+            <span>Quick booking</span>
+            <span>Doorstep service</span>
+            <span>Reliable care</span>
+          </div>
         </div>
       </div>
     </section>
@@ -37,11 +46,10 @@
     <section class="booking-card" aria-labelledby="booking-title">
       <div class="booking-intro">
         <div>
-          <span class="eyebrow">Quick booking</span>
-          <h2 id="booking-title">Book your laundry</h2>
+          <span class="eyebrow">Book your laundry</span>
+          <h2 id="booking-title">Simple. Fast. Hassle-free.</h2>
           <p>No account needed. We’ll confirm your request shortly.</p>
         </div>
-        <div class="secure-chip"><span>✓</span> Secure</div>
       </div>
 
       @if (errorMessage()) {
@@ -316,9 +324,6 @@
                   </span>
                 </button>
               }
-              @if (!mapVisible()) {
-                <button class="map-button" type="button" (click)="showMap()">Choose on map</button>
-              }
             </div>
 
             @if (mapVisible()) {
@@ -445,38 +450,10 @@
           <button class="secondary-button" type="button" (click)="showTrackingNotice()">
             Track an existing order
           </button>
-          <p><span>✓</span> Secure booking · Trusted service · Quality care</p>
         </div>
       </form>
     </section>
   </div>
-
-  <section class="how-it-works page-width" aria-labelledby="how-title">
-    <div class="how-heading">
-      <span class="eyebrow">Simple from start to finish</span>
-      <h2 id="how-title">How it works</h2>
-    </div>
-    <ol>
-      <li>
-        <span>1</span>
-        <div><strong>Book</strong><small>Choose your service and schedule.</small></div>
-      </li>
-      <li>
-        <span>2</span>
-        <div><strong>Confirm</strong><small>Our team reviews your request.</small></div>
-      </li>
-      <li>
-        <span>3</span>
-        <div><strong>Track</strong><small>Follow your laundry status online.</small></div>
-      </li>
-    </ol>
-  </section>
-
-  <footer class="page-width">
-    <img src="/assets/logo.jpg" alt="" />
-    <p>Engr. Spin Laundromat</p>
-    <span>Fast. Clean. Convenient.</span>
-  </footer>
 
   @if (bookingComplete()) {
     <div class="modal-backdrop" role="presentation">

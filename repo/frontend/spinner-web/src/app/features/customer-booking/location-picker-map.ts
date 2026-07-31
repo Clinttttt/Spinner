@@ -119,6 +119,8 @@ export class LocationPickerMap implements AfterViewInit, OnDestroy {
   private leaflet?: typeof LeafletNamespace;
   /** Suppresses the move event caused by our own programmatic recentre. */
   private applyingExternalCentre = false;
+  /** True once the customer has actually dragged or zoomed the map. */
+  private userHasMoved = false;
 
   constructor() {
     effect(() => {
@@ -160,9 +162,19 @@ export class LocationPickerMap implements AfterViewInit, OnDestroy {
 
     map.on('moveend', () => {
       if (this.applyingExternalCentre) return;
+      // Leaflet also fires moveend for programmatic recentres and for the
+      // invalidateSize() call below. Only a real gesture counts, otherwise the
+      // customer gets a pin at the default centre they never chose.
+      if (!this.userHasMoved) return;
       const centre = map.getCenter();
       this.pointChosen.emit({ latitude: centre.lat, longitude: centre.lng });
     });
+
+    const markMoved = () => {
+      if (!this.applyingExternalCentre) this.userHasMoved = true;
+    };
+    map.on('dragstart', markMoved);
+    map.on('zoomstart', markMoved);
 
     this.map = map;
 

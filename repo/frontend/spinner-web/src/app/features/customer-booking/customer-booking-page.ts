@@ -92,7 +92,9 @@ export class CustomerBookingPage {
   readonly locationStatus = signal<LocationStatus>('idle');
   readonly locationError = signal('');
   readonly pickupPin = signal<PickupPin | null>(null);
-  readonly mapVisible = signal(false);
+  // The map is the primary way to set a rural pickup point, so it is shown from
+  // the start rather than hidden behind a button.
+  readonly mapVisible = signal(true);
 
   readonly geolocationSupported = this.deviceLocation.isSupported;
   readonly inAppBrowser = this.deviceLocation.isInAppBrowser;
@@ -286,21 +288,6 @@ export class CustomerBookingPage {
   closeSuggestions(): void {
     this.suggestionsOpen.set(false);
     this.activeSuggestionIndex.set(-1);
-  }
-
-  showMap(): void {
-    this.mapVisible.set(true);
-    if (!this.pickupPin()) {
-      // Seed the pin at the service-area centre so dragging has a starting point.
-      this.setPin({
-        accuracyMeters: null,
-        formattedAddress: null,
-        latitude: SERVICE_AREA_CENTRE.latitude,
-        longitude: SERVICE_AREA_CENTRE.longitude,
-        placeId: null,
-        source: 'manualPin',
-      });
-    }
   }
 
   /** The customer dragged the map; the centre is now the pickup point. */

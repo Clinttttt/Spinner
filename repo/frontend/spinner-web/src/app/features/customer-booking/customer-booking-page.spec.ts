@@ -128,8 +128,9 @@ describe('CustomerBookingPage pickup location', () => {
   it('records a point the customer chose by moving the map', () => {
     const { page } = createPage();
 
-    page.showMap();
-    expect(page.pickupPin()).not.toBeNull();
+    // The map is visible from the start; dragging it sets the point.
+    expect(page.mapVisible()).toBe(true);
+    expect(page.pickupPin()).toBeNull();
 
     page.onMapPointChosen({ latitude: 9.24101, longitude: 125.96712 });
     flushReverseIfAny();

@@ -1,11 +1,11 @@
 :host {
-  --navy: #0d2a52;
-  --navy-strong: #082347;
-  --gold: #c98a00;
-  --gold-soft: #fff6dc;
-  --ink-soft: #667085;
-  --line: #e7ebf0;
-  --surface-soft: #f7f9fc;
+  --navy: #0b2d55;
+  --navy-strong: #072745;
+  --gold: #c78b12;
+  --gold-soft: #fbf5e7;
+  --ink-soft: #68717f;
+  --line: #e4e8ed;
+  --surface-soft: #f7f8fa;
   display: block;
 }
 
@@ -22,49 +22,21 @@ button {
 
 .customer-page {
   min-height: 100dvh;
-  overflow: hidden;
-  padding-bottom: 32px;
-  position: relative;
-}
-
-.customer-page::before,
-.customer-page::after {
-  border-radius: 50%;
-  content: '';
-  pointer-events: none;
-  position: absolute;
-  z-index: -1;
-}
-
-.customer-page::before {
-  background: rgba(201, 138, 0, 0.08);
-  filter: blur(2px);
-  height: 360px;
-  right: -180px;
-  top: -180px;
-  width: 360px;
-}
-
-.customer-page::after {
-  background: rgba(13, 42, 82, 0.05);
-  height: 280px;
-  left: -180px;
-  top: 520px;
-  width: 280px;
+  padding-bottom: 24px;
 }
 
 .page-width {
   margin-inline: auto;
   max-width: 1180px;
   min-width: 0;
-  width: min(calc(100% - 28px), 1180px);
+  width: min(calc(100% - 32px), 1180px);
 }
 
 .site-header {
   align-items: center;
   display: flex;
   justify-content: space-between;
-  min-height: 82px;
+  min-height: 74px;
 }
 
 .brand {
@@ -77,11 +49,11 @@ button {
 }
 
 .brand img {
-  border: 1px solid rgba(201, 138, 0, 0.22);
+  border: 1px solid rgba(199, 139, 18, 0.2);
   border-radius: 50%;
-  height: 52px;
+  height: 46px;
   object-fit: cover;
-  width: 52px;
+  width: 46px;
 }
 
 .brand-copy {
@@ -92,31 +64,39 @@ button {
 
 .brand-copy strong {
   color: var(--navy);
-  font-size: 15px;
-  letter-spacing: 0.02em;
+  font-size: 15.5px;
+  letter-spacing: 0.025em;
   white-space: nowrap;
 }
 
 .brand-copy small {
-  color: #a96f00;
-  font-size: 8px;
-  font-weight: 700;
-  letter-spacing: 0.25em;
-  margin-top: 7px;
+  color: #a86f08;
+  font-size: 7.5px;
+  font-weight: 750;
+  letter-spacing: 0.27em;
+  margin-top: 6px;
 }
 
 .header-action {
   align-items: center;
-  background: rgba(255, 255, 255, 0.8);
+  background: #fff;
   border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--navy);
   display: flex;
   font-size: 12px;
   font-weight: 700;
-  gap: 5px;
+  gap: 6px;
   min-height: 42px;
-  padding: 0 13px;
+  padding: 0 12px 0 14px;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.header-action:hover {
+  border-color: #cad1da;
+  box-shadow: 0 4px 14px rgba(7, 39, 69, 0.06);
 }
 
 .header-action svg,
@@ -132,22 +112,21 @@ button {
 
 .page-layout {
   display: grid;
-  gap: 18px;
+  gap: 14px;
   min-width: 0;
 }
 
 .hero-card,
-.booking-card,
-.how-it-works {
+.booking-card {
   background: #fff;
-  border: 1px solid rgba(221, 227, 234, 0.9);
-  box-shadow: 0 18px 50px rgba(8, 35, 71, 0.08);
+  border: 1px solid rgba(218, 224, 231, 0.9);
+  box-shadow: 0 12px 36px rgba(7, 39, 69, 0.06);
   min-width: 0;
 }
 
 .hero-card {
-  border-radius: 28px;
-  min-height: 390px;
+  border-radius: 22px;
+  height: clamp(330px, 88vw, 390px);
   overflow: hidden;
   position: relative;
 }
@@ -162,26 +141,29 @@ button {
 
 .hero-image {
   object-fit: cover;
+  object-position: 53% center;
 }
 
 .hero-shade {
-  background: linear-gradient(180deg, rgba(5, 21, 42, 0.04) 18%, rgba(5, 25, 50, 0.9) 100%);
+  background:
+    linear-gradient(90deg, rgba(4, 20, 38, 0.76) 0%, rgba(4, 20, 38, 0.3) 64%, rgba(4, 20, 38, 0.08) 100%),
+    linear-gradient(180deg, rgba(4, 20, 38, 0.02) 20%, rgba(4, 20, 38, 0.88) 100%);
 }
 
 .hero-content {
   bottom: 0;
   color: white;
   left: 0;
-  padding: 26px 22px;
+  padding: 25px 21px 18px;
   position: absolute;
   right: 0;
 }
 
 .eyebrow {
   color: var(--gold);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 800;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.17em;
   text-transform: uppercase;
 }
 
@@ -190,42 +172,55 @@ button {
 }
 
 .hero-content h1 {
-  font-size: clamp(30px, 9vw, 46px);
+  font-size: clamp(31px, 8.5vw, 44px);
   letter-spacing: -0.035em;
   line-height: 1.02;
-  margin: 10px 0 10px;
+  margin: 8px 0 10px;
   max-width: 620px;
 }
 
 .hero-content > p {
   color: rgba(255, 255, 255, 0.82);
-  font-size: 14px;
-  line-height: 1.55;
+  font-size: 12.5px;
+  line-height: 1.45;
   margin: 0;
   max-width: 500px;
 }
 
-.hero-points {
-  display: flex;
-  flex-wrap: wrap;
-  font-size: 12px;
-  gap: 14px;
-  margin-top: 16px;
+.hero-benefits {
+  border-top: 1px solid rgba(255, 255, 255, 0.24);
+  margin-top: 18px;
+  padding-top: 7px;
 }
 
-.hero-points span {
-  align-items: center;
-  display: flex;
-  gap: 6px;
+.benefit-art {
+  background-image: url('/assets/booking-benefit-icons.png');
+  background-position: center 47%;
+  background-repeat: no-repeat;
+  background-size: 100% auto;
+  display: block;
+  height: 34px;
+  margin-inline: -3px;
 }
 
-.hero-points b {
-  color: #ffd879;
+.benefit-labels {
+  display: grid;
+  gap: 5px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: -1px;
+  text-align: center;
+}
+
+.benefit-labels span {
+  color: rgba(255, 255, 255, 0.88);
+  font-size: clamp(7.5px, 2.2vw, 10px);
+  font-weight: 650;
+  line-height: 1.2;
 }
 
 .booking-card {
-  border-radius: 28px;
-  padding: 22px 18px 18px;
+  border-radius: 22px;
+  padding: 21px 17px 17px;
 }
 
 .booking-intro,
@@ -236,7 +231,6 @@ button {
 }
 
 .booking-intro h2,
-.how-heading h2,
 .confirmation-modal h2 {
   color: var(--navy);
   letter-spacing: -0.025em;
@@ -244,19 +238,18 @@ button {
 }
 
 .booking-intro h2 {
-  font-size: 27px;
+  font-size: clamp(23px, 6.6vw, 29px);
   line-height: 1.1;
 }
 
 .booking-intro p,
 .section-heading p {
   color: var(--ink-soft);
-  font-size: 12.5px;
+  font-size: 12px;
   line-height: 1.5;
   margin: 6px 0 0;
 }
 
-.secure-chip,
 .estimate-badge {
   align-items: center;
   background: #eef5ff;
@@ -268,16 +261,6 @@ button {
   font-weight: 700;
   gap: 4px;
   padding: 7px 9px;
-}
-
-.secure-chip span {
-  background: #175cd3;
-  border-radius: 50%;
-  color: #fff;
-  display: grid;
-  height: 14px;
-  place-items: center;
-  width: 14px;
 }
 
 .inline-notice {
@@ -293,15 +276,15 @@ button {
 
 .form-section {
   border-top: 1px solid var(--line);
-  margin-top: 22px;
-  padding-top: 22px;
+  margin-top: 24px;
+  padding-top: 24px;
 }
 
 .section-heading {
   align-items: flex-start;
   display: flex;
-  gap: 11px;
-  margin-bottom: 14px;
+  gap: 10px;
+  margin-bottom: 15px;
 }
 
 .section-heading h3,
@@ -313,22 +296,23 @@ button {
 }
 
 .section-number {
-  background: var(--gold);
+  background: var(--gold-soft);
+  border: 1px solid #ead39d;
   border-radius: 50%;
-  color: white;
+  color: #996608;
   display: grid;
   flex: 0 0 auto;
   font-size: 11px;
   font-weight: 800;
-  height: 25px;
+  height: 26px;
   place-items: center;
-  width: 25px;
+  width: 26px;
 }
 
 .choice-grid,
 .field-grid {
   display: grid;
-  gap: 10px;
+  gap: 9px;
 }
 
 .choice-grid {
@@ -342,13 +326,13 @@ button {
 .choice-card {
   align-items: flex-start;
   background: #fff;
-  border: 1px solid #dfe4ea;
-  border-radius: 16px;
+  border: 1px solid #dde2e8;
+  border-radius: 14px;
   color: var(--navy);
   display: flex;
   gap: 9px;
-  min-height: 82px;
-  padding: 13px 11px;
+  min-height: 74px;
+  padding: 12px 11px;
   text-align: left;
   transition:
     border-color 160ms ease,
@@ -357,13 +341,14 @@ button {
 }
 
 .choice-card:hover {
+  border-color: #c9d0d9;
   transform: translateY(-1px);
 }
 
 .choice-card.selected {
-  background: #f5f8fc;
+  background: #fff;
   border-color: var(--navy);
-  box-shadow: inset 0 0 0 1px rgba(13, 42, 82, 0.08);
+  box-shadow: inset 0 0 0 1px var(--navy);
 }
 
 .radio-dot {
@@ -430,11 +415,11 @@ button {
 .field-control {
   background: #fff;
   border: 1px solid #dfe4ea;
-  border-radius: 14px;
+  border-radius: 12px;
   color: #0b1f3a;
   font-size: 13px;
   font-weight: 500;
-  min-height: 50px;
+  min-height: 48px;
   outline: none;
   padding: 0 13px;
   width: 100%;
@@ -646,9 +631,9 @@ button {
 }
 
 .estimate-card {
-  background: linear-gradient(145deg, #f8fafc, #fffaf0);
-  border: 1px solid #e7e2d7;
-  border-radius: 20px;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: 16px;
   margin-top: 24px;
   padding: 17px;
 }
@@ -716,7 +701,7 @@ button {
 .primary-button,
 .secondary-button {
   align-items: center;
-  border-radius: 15px;
+  border-radius: 13px;
   display: flex;
   font-size: 13.5px;
   font-weight: 750;
@@ -727,7 +712,7 @@ button {
 }
 
 .primary-button {
-  background: linear-gradient(120deg, var(--navy-strong), #0b3b73);
+  background: var(--navy-strong);
   border: 1px solid var(--navy-strong);
   color: white;
   gap: 9px;
@@ -739,106 +724,8 @@ button {
 
 .secondary-button {
   background: #fff;
-  border: 1px solid var(--navy);
+  border: 1px solid #cbd2da;
   color: var(--navy);
-}
-
-.booking-actions > p {
-  color: #8a6a25;
-  font-size: 10px;
-  margin: 2px 0 0;
-  text-align: center;
-}
-
-.booking-actions > p span {
-  color: var(--gold);
-  font-weight: 900;
-}
-
-.how-it-works {
-  border-radius: 24px;
-  margin-top: 20px;
-  padding: 21px 18px;
-}
-
-.how-heading h2 {
-  font-size: 22px;
-}
-
-.how-it-works ol {
-  display: grid;
-  gap: 12px;
-  list-style: none;
-  margin: 18px 0 0;
-  padding: 0;
-}
-
-.how-it-works li {
-  align-items: center;
-  background: var(--surface-soft);
-  border-radius: 15px;
-  display: flex;
-  gap: 11px;
-  padding: 13px;
-}
-
-.how-it-works li > span {
-  background: var(--gold);
-  border-radius: 50%;
-  color: #fff;
-  display: grid;
-  flex: 0 0 auto;
-  font-size: 11px;
-  font-weight: 800;
-  height: 25px;
-  place-items: center;
-  width: 25px;
-}
-
-.how-it-works li div {
-  display: grid;
-  gap: 2px;
-}
-
-.how-it-works strong {
-  color: var(--navy);
-  font-size: 12.5px;
-}
-
-.how-it-works small {
-  color: var(--ink-soft);
-  font-size: 10.5px;
-}
-
-footer {
-  align-items: center;
-  color: var(--navy);
-  display: grid;
-  grid-template-columns: auto 1fr;
-  margin-top: 24px;
-}
-
-footer img {
-  border-radius: 50%;
-  grid-row: 1 / 3;
-  height: 38px;
-  margin-right: 9px;
-  width: 38px;
-}
-
-footer p,
-footer span {
-  margin: 0;
-}
-
-footer p {
-  font-size: 11px;
-  font-weight: 800;
-}
-
-footer span {
-  color: var(--ink-soft);
-  font-size: 9px;
 }
 
 .modal-backdrop {
@@ -918,10 +805,6 @@ footer span {
     padding: 28px;
   }
 
-  .how-it-works ol {
-    grid-template-columns: repeat(3, 1fr);
-  }
-
   .modal-backdrop {
     align-items: center;
   }
@@ -951,6 +834,7 @@ footer span {
   }
 
   .hero-card {
+    height: auto;
     min-height: 620px;
     position: sticky;
     top: 20px;
@@ -980,6 +864,15 @@ footer span {
 
   .brand-copy strong {
     font-size: 13px;
+  }
+
+}
+
+@media (max-width: 639px) {
+  .header-action {
+    border-radius: 50%;
+    padding: 0;
+    width: 42px;
   }
 
   .header-action span {
