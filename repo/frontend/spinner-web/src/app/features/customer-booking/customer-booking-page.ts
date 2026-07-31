@@ -34,6 +34,12 @@ interface ChoiceOption<T extends string> {
 
 interface PickupPin {
   accuracyMeters: number | null;
+  /**
+   * True when the pin was resolved from the typed address on submit rather than
+   * chosen or captured by the customer. Such a pin is sent as unconfirmed so the
+   * owner treats it as an approximation.
+   */
+  autoResolved: boolean;
   barangay: string | null;
   cityOrMunicipality: string | null;
   /** Address text at the moment the pin was captured. */
@@ -253,6 +259,7 @@ export class CustomerBookingPage {
     this.setAddress(suggestion.formattedAddress);
     this.pickupPin.set({
       accuracyMeters: null,
+      autoResolved: false,
       barangay: suggestion.barangay,
       capturedAddress: suggestion.formattedAddress,
       cityOrMunicipality: suggestion.cityOrMunicipality,
@@ -300,6 +307,7 @@ export class CustomerBookingPage {
 
       this.pickupPin.set({
         accuracyMeters: position.accuracyMeters,
+        autoResolved: false,
         barangay: resolved?.barangay ?? null,
         capturedAddress: addressText,
         cityOrMunicipality: resolved?.cityOrMunicipality ?? null,
@@ -340,7 +348,7 @@ export class CustomerBookingPage {
       : coordinates;
   }
 
-  submitBooking(): void {
+  async submitBooking(): Promise<void> {
     if (this.submitting()) return;
 
     this.bookingForm.markAllAsTouched();
@@ -356,6 +364,28 @@ export class CustomerBookingPage {
     this.closeSuggestions();
     const value = this.bookingForm.getRawValue();
     const isPickup = value.orderMethod === 'pickupDelivery';
+
+    // Most customers type an address and submit without ever opening the
+    // suggestion list, which previously meant the owner received no map pin at
+    // all. Resolve the typed text once, as a best effort, and send it as an
+    // unconfirmed pin. A lookup failure must never block the booking.
+    if (isPickup && !this.pickupPin() && value.address.trim().length >= 3) {
+      const resolved = await this.resolveFirstSuggestion(value.address.trim());
+      if (resolved) {
+        this.pickupPin.set({
+          accuracyMeters: null,
+          autoResolved: true,
+          barangay: resolved.barangay,
+          capturedAddress: value.address.trim(),
+          cityOrMunicipality: resolved.cityOrMunicipality,
+          latitude: resolved.latitude,
+          longitude: resolved.longitude,
+          placeId: resolved.placeId,
+          source: 'addressSearch',
+        });
+      }
+    }
+
     this.api
       .createBooking({
         additionalNotes: value.notes.trim() || null,
@@ -414,7 +444,9 @@ export class CustomerBookingPage {
     if (!pin) return null;
 
     const landmark = this.bookingForm.controls.landmark.value.trim();
-    const confirmed = !this.pinNeedsRecheck();
+    // An auto-resolved pin is an approximation from typed text, so it is never
+    // reported as confirmed even though the address still matches.
+    const confirmed = !pin.autoResolved && !this.pinNeedsRecheck();
 
     return {
       barangay: pin.barangay,
@@ -431,6 +463,19 @@ export class CustomerBookingPage {
       placeId: pin.placeId,
       plusCode: null,
     };
+  }
+
+  /** Best-effort single lookup. Resolves to null on any failure. */
+  private resolveFirstSuggestion(query: string) {
+    return new Promise<AddressSuggestion | null>((resolve) => {
+      this.addressLookup
+        .search(query)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (results) => resolve(results[0] ?? null),
+          error: () => resolve(null),
+        });
+    });
   }
 
   private resolveAddress(latitude: number, longitude: number) {
