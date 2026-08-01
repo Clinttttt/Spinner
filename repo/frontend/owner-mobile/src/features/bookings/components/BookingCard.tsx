@@ -35,6 +35,14 @@ function BookingCardComponent({
     bookingServicePalettes[
       getBookingServicePaletteVariant(booking.serviceTags.length)
     ];
+  const showClear = booking.canClear && Boolean(onClearPress);
+  // Clear and View together need most of the row, so a clearable card shows one
+  // tag plus a "+N" chip instead of two full tags.
+  const visibleTagCount = showClear ? 1 : 2;
+  const hiddenTagCount = Math.max(
+    0,
+    booking.serviceTags.length - visibleTagCount,
+  );
 
   return (
     <View style={styles.card}>
@@ -84,14 +92,14 @@ function BookingCardComponent({
 
       <View style={[styles.footerRow, compact && styles.compactFooterRow]}>
         <View style={styles.serviceTags}>
-          {booking.serviceTags.slice(0, 2).map((service) => (
+          {booking.serviceTags.slice(0, visibleTagCount).map((service) => (
             <ServiceTag
               key={service}
               service={service}
               serviceCount={booking.serviceTags.length}
             />
           ))}
-          {booking.serviceTags.length > 2 ? (
+          {hiddenTagCount > 0 ? (
             <View
               style={[
                 styles.moreTag,
@@ -104,36 +112,17 @@ function BookingCardComponent({
               <Text
                 style={[styles.moreTagText, { color: servicePalette.text }]}
               >
-                +{booking.serviceTags.length - 2} more
+                +{hiddenTagCount}
               </Text>
             </View>
           ) : null}
         </View>
 
-        {booking.canClear && onClearPress ? (
+        {showClear ? (
           <Pressable
             accessibilityLabel={`Clear booking ${booking.bookingCode} from the list`}
             accessibilityRole="button"
-            onPress={() => onClearPress(booking)}
-            style={({ pressed }) => [
-              styles.clearButton,
-              pressed && styles.pressed,
-            ]}
-          >
-            <Ionicons
-              color={colors.textSecondary}
-              name="trash-outline"
-              size={16}
-            />
-            <Text style={styles.clearButtonText}>Clear</Text>
-          </Pressable>
-        ) : null}
-
-        {booking.canClear && onClearPress ? (
-          <Pressable
-            accessibilityLabel={`Clear booking ${booking.bookingCode} from the list`}
-            accessibilityRole="button"
-            onPress={() => onClearPress(booking)}
+            onPress={() => onClearPress?.(booking)}
             style={({ pressed }) => [
               styles.clearButton,
               pressed && styles.pressed,
@@ -257,8 +246,9 @@ const styles = StyleSheet.create({
   serviceTags: {
     flex: 1,
     flexDirection: "row",
-    flexWrap: "wrap",
+    flexWrap: "nowrap",
     gap: 7,
+    minWidth: 0,
   },
   moreTag: {
     alignItems: "center",

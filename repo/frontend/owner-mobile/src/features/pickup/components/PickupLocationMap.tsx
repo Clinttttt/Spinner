@@ -7,12 +7,7 @@ import {
   Text,
   View,
 } from "react-native";
-import MapView, {
-  Marker,
-  Polyline,
-  PROVIDER_GOOGLE,
-  type MapStyleElement,
-} from "react-native-maps";
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
 
 import { mapsConfig } from "../../../api/mapsConfig";
 import { colors } from "../../../theme/colors";
@@ -22,113 +17,14 @@ import type { PickupLocationDetails } from "../models/pickupLocation";
 // physical Android devices, where custom marker views are bitmap snapshots.
 const businessHomeMarker = require("../../../../assets/branding/business-home-marker.png");
 
-const REALISTIC_MAP_STYLE: MapStyleElement[] = [
-  { elementType: "geometry", stylers: [{ color: "#F4F1EA" }] },
-  {
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#4B5565" }],
-  },
-  {
-    elementType: "labels.text.stroke",
-    stylers: [{ color: "#FFFFFF" }, { weight: 3 }],
-  },
-  {
-    featureType: "administrative",
-    elementType: "geometry.stroke",
-    stylers: [{ color: "#C8CED7" }],
-  },
-  {
-    featureType: "administrative.locality",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#243B53" }],
-  },
-  {
-    featureType: "administrative.neighborhood",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#52606D" }],
-  },
-  {
-    featureType: "poi",
-    elementType: "geometry",
-    stylers: [{ color: "#E9EFE4" }],
-  },
-  {
-    featureType: "poi",
-    elementType: "labels",
-    stylers: [{ visibility: "on" }],
-  },
-  {
-    featureType: "poi.business",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#5B6573" }],
-  },
-  {
-    featureType: "poi.park",
-    elementType: "geometry",
-    stylers: [{ color: "#DDEBD5" }],
-  },
-  {
-    featureType: "poi.park",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#56704D" }],
-  },
-  {
-    featureType: "road",
-    elementType: "geometry",
-    stylers: [{ color: "#FFFFFF" }],
-  },
-  {
-    featureType: "road",
-    elementType: "geometry.stroke",
-    stylers: [{ color: "#D2D7DE" }],
-  },
-  {
-    featureType: "road.arterial",
-    elementType: "geometry",
-    stylers: [{ color: "#FFF8E9" }],
-  },
-  {
-    featureType: "road.arterial",
-    elementType: "geometry.stroke",
-    stylers: [{ color: "#E6D9BA" }],
-  },
-  {
-    featureType: "road.highway",
-    elementType: "geometry",
-    stylers: [{ color: "#F5D7A1" }],
-  },
-  {
-    featureType: "road.highway",
-    elementType: "geometry.stroke",
-    stylers: [{ color: "#DDBA7D" }],
-  },
-  {
-    featureType: "road",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#536170" }],
-  },
-  {
-    featureType: "transit",
-    elementType: "geometry",
-    stylers: [{ color: "#E1E5EA" }],
-  },
-  {
-    featureType: "transit",
-    elementType: "labels",
-    stylers: [{ visibility: "on" }],
-  },
-  {
-    featureType: "water",
-    elementType: "geometry",
-    stylers: [{ color: "#BFDDEA" }],
-  },
-  {
-    featureType: "water",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#4E7485" }],
-  },
-];
-
+/**
+ * No `customMapStyle` is applied on purpose.
+ *
+ * The previous hand-written palette flattened roads, buildings, and land to
+ * near-white, which read as fog and hid exactly the detail a rider needs. Google's
+ * default road map already renders named streets, buildings, and points of
+ * interest at high contrast, so the most legible option is to leave it alone.
+ */
 interface PickupLocationMapProps {
   compact: boolean;
   details: PickupLocationDetails;
@@ -217,7 +113,6 @@ export function PickupLocationMap({
       style={[styles.card, compact ? styles.compactCard : styles.regularCard]}
     >
       <MapView
-        customMapStyle={REALISTIC_MAP_STYLE}
         initialRegion={{
           latitude: latitude!,
           // Tight enough to show the street the pin sits on. The previous 0.012

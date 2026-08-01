@@ -57,7 +57,8 @@ public sealed class BookingsController : ApiControllerBase
                 request.PaymentMethod,
                 request.LoadCount,
                 request.AdditionalNotes,
-                request.PickupLocation),
+                request.PickupLocation,
+                request.Services),
             ct);
 
         return HandleResponse(result);

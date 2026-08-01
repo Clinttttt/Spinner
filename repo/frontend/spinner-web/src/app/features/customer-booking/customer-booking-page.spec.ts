@@ -29,6 +29,7 @@ const schoolSuggestion = {
   latitude: 9.2381784,
   longitude: 125.9624521,
   placeId: 'W999',
+  distanceKm: 0,
   primaryText: 'San Vicente Elementary School',
   secondaryText: 'Purok 1, Madrid, Surigao del Sur',
 };
@@ -68,6 +69,16 @@ describe('CustomerBookingPage pickup location', () => {
     http
       .expectOne((request) => request.url.includes('/api/services-pricing/services'))
       .flush([service]);
+    // The page also reads public settings to bias address search.
+    http
+      .expectOne((request) => request.url.endsWith('/api/business-settings'))
+      .flush({
+        businessName: 'Engr. Spin Laundry',
+        hasPickupServiceArea: false,
+        pickupOriginLatitude: null,
+        pickupOriginLongitude: null,
+        pickupServiceRadiusKm: 15,
+      });
     fixture.detectChanges();
 
     const page = fixture.componentInstance;
@@ -78,7 +89,6 @@ describe('CustomerBookingPage pickup location', () => {
       mobileNumber: '09171234567',
       preferredDate: '2026-08-05',
       preferredTime: '15:00-17:00',
-      service: service.id,
     });
 
     return { fixture, page };

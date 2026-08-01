@@ -53,6 +53,11 @@ export interface PickupLocationPayload {
   plusCode: string | null;
 }
 
+export interface BookingServicePayload {
+  serviceId: string;
+  quantity: number;
+}
+
 export interface CreateBookingPayload {
   fullName: string;
   mobileNumber: string;
@@ -66,6 +71,8 @@ export interface CreateBookingPayload {
   loadCount: number;
   additionalNotes: string | null;
   pickupLocation: PickupLocationPayload | null;
+  /** Every chosen service. Replaces serviceId/loadCount when present. */
+  services: BookingServicePayload[];
 }
 
 export interface ServiceAreaCheckDto {
@@ -78,6 +85,14 @@ export interface ServiceAreaCheckDto {
   message: string;
 }
 
+export interface PublicBusinessSettingsDto {
+  businessName: string;
+  pickupOriginLatitude: number | null;
+  pickupOriginLongitude: number | null;
+  pickupServiceRadiusKm: number;
+  hasPickupServiceArea: boolean;
+}
+
 @Injectable({ providedIn: 'root' })
 export class SpinnerApiService {
   private readonly http = inject(HttpClient);
@@ -87,6 +102,11 @@ export class SpinnerApiService {
     return this.http.get<LaundryServiceDto[]>(
       `${this.baseUrl}/api/services-pricing/services?activeOnly=true`,
     );
+  }
+
+  /** Public settings, used to bias address search towards the service area. */
+  getBusinessSettings() {
+    return this.http.get<PublicBusinessSettingsDto>(`${this.baseUrl}/api/business-settings`);
   }
 
   /**

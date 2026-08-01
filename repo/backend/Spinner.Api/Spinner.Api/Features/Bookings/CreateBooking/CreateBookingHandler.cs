@@ -6,6 +6,7 @@ using Spinner.Api.Database;
 using Spinner.Api.Domain.Customers;
 using Spinner.Api.Domain.Notifications;
 using Spinner.Api.Domain.Orders;
+using Spinner.Api.Domain.Services;
 using Spinner.Api.Features.BusinessSettings;
 using Spinner.Api.Features.Orders;
 using Spinner.Api.Features.ServiceArea;
@@ -29,17 +30,28 @@ public sealed class CreateBookingHandler : IRequestHandler<CreateBookingCommand,
         CreateBookingCommand request,
         CancellationToken cancellationToken)
     {
-        var service = await _dbContext.LaundryServices
-            .FirstOrDefaultAsync(service => service.Id == request.ServiceId, cancellationToken);
+        var selections = request.ServiceSelections;
+        var requestedIds = selections.Select(item => item.ServiceId).Distinct().ToList();
 
-        if (service is null)
-            return Result<BookingConfirmationResponse>.NotFound("Selected service was not found.");
+        if (requestedIds.Count != selections.Count)
+            return Result<BookingConfirmationResponse>.Validation("A service can only be selected once.");
 
-        if (!service.IsActive)
-            return Result<BookingConfirmationResponse>.Conflict("Selected service is not active.");
+        var services = await _dbContext.LaundryServices
+            .Where(service => requestedIds.Contains(service.Id))
+            .ToListAsync(cancellationToken);
 
-        if (request.FulfillmentType == FulfillmentType.PickupAndDelivery && !service.SupportsPickupAndDelivery)
-            return Result<BookingConfirmationResponse>.Validation("Selected service does not support pickup and delivery.");
+        if (services.Count != requestedIds.Count)
+            return Result<BookingConfirmationResponse>.NotFound("One or more selected services were not found.");
+
+        if (services.Any(service => !service.IsActive))
+            return Result<BookingConfirmationResponse>.Conflict("One or more selected services are not active.");
+
+        if (request.FulfillmentType == FulfillmentType.PickupAndDelivery &&
+            services.Any(service => !service.SupportsPickupAndDelivery))
+        {
+            return Result<BookingConfirmationResponse>.Validation(
+                "Every selected service must support pickup and delivery.");
+        }
 
         var settings = await BusinessSettingsDefaults.GetOrCreateAsync(_dbContext, cancellationToken);
 
@@ -62,6 +74,12 @@ public sealed class CreateBookingHandler : IRequestHandler<CreateBookingCommand,
                 return Result<BookingConfirmationResponse>.Validation(decision.Message);
         }
 
+        var orderedSelections = selections
+            .Select(item => (
+                Service: services.Single(service => service.Id == item.ServiceId),
+                item.Quantity))
+            .ToList();
+
         var now = DateTimeOffset.UtcNow;
 
         // A replayed submit must not create a second booking. This covers double
@@ -74,8 +92,7 @@ public sealed class CreateBookingHandler : IRequestHandler<CreateBookingCommand,
             request.FulfillmentType,
             request.PreferredDate,
             request.PreferredTimeWindow,
-            (service.BasePrice * request.LoadCount) +
-                (request.FulfillmentType == FulfillmentType.PickupAndDelivery ? service.DeliveryFee ?? 0m : 0m),
+            ExpectedTotal(orderedSelections, request.FulfillmentType),
             now,
             cancellationToken);
 
@@ -83,17 +100,16 @@ public sealed class CreateBookingHandler : IRequestHandler<CreateBookingCommand,
             return Result<BookingConfirmationResponse>.Success(ToResponse(replay));
 
         var customer = await GetOrCreateCustomerAsync(request, now, cancellationToken);
-        var order = new LaundryOrder(
+        var order = LaundryOrder.CreateCustomerBooking(
             BookingCodeGenerator.NewOrderCode(now),
             BookingCodeGenerator.NewTrackingCode(),
             customer,
-            service,
+            orderedSelections,
             request.FulfillmentType,
             request.Address,
             request.PreferredDate,
             request.PreferredTimeWindow,
             request.PaymentMethod,
-            request.LoadCount,
             request.AdditionalNotes,
             now,
             request.PickupLocation?.ToSnapshot());
@@ -106,6 +122,18 @@ public sealed class CreateBookingHandler : IRequestHandler<CreateBookingCommand,
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Result<BookingConfirmationResponse>.Success(ToResponse(order));
+    }
+
+    private static decimal ExpectedTotal(
+        IReadOnlyList<(LaundryService Service, int Quantity)> selections,
+        FulfillmentType fulfillmentType)
+    {
+        var serviceAmount = selections.Sum(selection => selection.Service.BasePrice * selection.Quantity);
+        var deliveryFee = fulfillmentType == FulfillmentType.PickupAndDelivery
+            ? selections.Max(selection => selection.Service.DeliveryFee ?? 0m)
+            : 0m;
+
+        return serviceAmount + deliveryFee;
     }
 
     private async Task<Customer> GetOrCreateCustomerAsync(

@@ -74,32 +74,39 @@
           <div class="section-heading">
             <span class="section-number">1</span>
             <div>
-              <h3>Choose your service</h3>
-              <p>Select the care that fits your laundry.</p>
+              <h3>Choose your services</h3>
+              <p>Pick one or more. Prices come from the shop's current price list.</p>
             </div>
           </div>
           @if (loadingServices()) {
             <div class="inline-notice" role="status">Loading available services…</div>
+          } @else if (!services().length) {
+            <div class="inline-notice" role="status">
+              No services are published right now. Please contact the shop.
+            </div>
           } @else {
-          <div class="choice-grid">
-            @for (option of services(); track option.id) {
-              <button
-                class="choice-card"
-                type="button"
-                [class.selected]="bookingForm.controls.service.value === option.id"
-                [attr.aria-pressed]="bookingForm.controls.service.value === option.id"
-                (click)="selectService(option.id)"
-              >
-                <span class="radio-dot"></span>
-                <span class="choice-copy">
-                  <strong>{{ option.name }}</strong>
-                  <small>
-                    {{ option.description || ('₱' + option.basePrice + ' ' + option.unitLabel) }}
-                  </small>
-                </span>
-              </button>
-            }
-          </div>
+            <div class="choice-grid">
+              @for (option of services(); track option.id) {
+                <button
+                  class="choice-card"
+                  type="button"
+                  [class.selected]="isServiceSelected(option.id)"
+                  [attr.aria-pressed]="isServiceSelected(option.id)"
+                  (click)="toggleService(option.id)"
+                >
+                  <span class="check-box" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d="m5 13 4 4L19 7" /></svg>
+                  </span>
+                  <span class="choice-copy">
+                    <strong>{{ option.name }}</strong>
+                    <small>₱{{ option.basePrice }} {{ option.unitLabel }}</small>
+                    @if (option.description) {
+                      <small>{{ option.description }}</small>
+                    }
+                  </span>
+                </button>
+              }
+            </div>
           }
         </section>
 
@@ -297,6 +304,9 @@
                             <small>{{ suggestion.secondaryText }}</small>
                           }
                         </span>
+                        @if (suggestion.distanceKm !== null) {
+                          <em class="suggestion-distance">{{ suggestion.distanceKm }} km</em>
+                        }
                       </button>
                     </li>
                   }
@@ -435,12 +445,20 @@
             <span class="estimate-badge">No payment yet</span>
           </div>
           <dl>
+            @for (line of serviceLines(); track line.id) {
+              <div>
+                <dt>{{ line.name }} · {{ line.loads }} {{ line.unitLabel }}</dt>
+                <dd>₱{{ line.amount }}.00</dd>
+              </div>
+            }
+            @if (!serviceLines().length) {
+              <div>
+                <dt>No service selected yet</dt>
+                <dd>₱0.00</dd>
+              </div>
+            }
             <div>
-              <dt>Service estimate</dt>
-              <dd>₱{{ serviceAmount }}.00</dd>
-            </div>
-            <div>
-              <dt>Pickup & delivery</dt>
+              <dt>Pickup &amp; delivery</dt>
               <dd>{{ deliveryFee ? '₱' + deliveryFee + '.00' : 'Free' }}</dd>
             </div>
             <div class="total">
@@ -480,19 +498,87 @@
         aria-modal="true"
         aria-labelledby="confirmation-title"
       >
-        <div class="success-icon">✓</div>
-        <span class="eyebrow">Request received</span>
-        <h2 id="confirmation-title">Your laundry booking is in!</h2>
-        <p>Our team will review your schedule and contact you using the mobile number provided.</p>
-        <div class="reference-row">
-          <span>Order reference</span>
-          <strong>{{ confirmation()?.orderCode }}</strong>
+        <header class="confirmation-header">
+          <div class="success-icon">✓</div>
+          <span class="eyebrow">Request received</span>
+          <h2 id="confirmation-title">Your laundry booking is in!</h2>
+          <p>Our team will review your schedule and contact you on the number you gave us.</p>
+        </header>
+
+        <div class="confirmation-body">
+          <div class="reference-row">
+            <span>Order reference</span>
+            <strong>{{ confirmation()?.orderCode }}</strong>
+          </div>
+          <div class="reference-row">
+            <span>Tracking code</span>
+            <strong>{{ confirmation()?.trackingCode }}</strong>
+          </div>
+
+          @if (submittedSummary(); as summary) {
+            <h3 class="confirmation-section">Services</h3>
+            <ul class="summary-list">
+              @for (line of summary.serviceLines; track line.id) {
+                <li>
+                  <span>
+                    <strong>{{ line.name }}</strong>
+                    <small>{{ line.loads }} {{ line.unitLabel }} · ₱{{ line.unitPrice }} each</small>
+                  </span>
+                  <b>₱{{ line.amount }}.00</b>
+                </li>
+              }
+            </ul>
+
+            <h3 class="confirmation-section">Schedule</h3>
+            <dl class="summary-grid">
+              <div><dt>Method</dt><dd>{{ summary.orderMethodLabel }}</dd></div>
+              <div><dt>Date</dt><dd>{{ summary.preferredDate }}</dd></div>
+              <div><dt>Time</dt><dd>{{ summary.preferredTime }}</dd></div>
+              <div><dt>Payment</dt><dd>{{ summary.paymentLabel }}</dd></div>
+            </dl>
+
+            <h3 class="confirmation-section">Contact &amp; location</h3>
+            <dl class="summary-grid">
+              <div><dt>Name</dt><dd>{{ summary.customerName }}</dd></div>
+              <div><dt>Mobile</dt><dd>{{ summary.mobileNumber }}</dd></div>
+              @if (summary.email) {
+                <div><dt>Email</dt><dd>{{ summary.email }}</dd></div>
+              }
+              <div class="wide"><dt>Address</dt><dd>{{ summary.address }}</dd></div>
+              @if (summary.landmark) {
+                <div class="wide"><dt>Landmark</dt><dd>{{ summary.landmark }}</dd></div>
+              }
+              @if (summary.pinCoordinates) {
+                <div class="wide"><dt>Map pin</dt><dd>{{ summary.pinCoordinates }}</dd></div>
+              }
+              @if (summary.notes) {
+                <div class="wide"><dt>Notes</dt><dd>{{ summary.notes }}</dd></div>
+              }
+            </dl>
+
+            <dl class="summary-totals">
+              <div>
+                <dt>Services</dt>
+                <dd>₱{{ summary.serviceAmount }}.00</dd>
+              </div>
+              <div>
+                <dt>Pickup &amp; delivery</dt>
+                <dd>{{ summary.deliveryFee ? '₱' + summary.deliveryFee + '.00' : 'Free' }}</dd>
+              </div>
+              <div class="total">
+                <dt>Total estimate</dt>
+                <dd>₱{{ summary.total }}.00</dd>
+              </div>
+            </dl>
+            <p class="estimate-note">
+              Final price is confirmed after staff review the actual laundry volume.
+            </p>
+          }
         </div>
-        <div class="reference-row">
-          <span>Tracking code</span>
-          <strong>{{ confirmation()?.trackingCode }}</strong>
-        </div>
-        <button class="primary-button" type="button" (click)="closeConfirmation()">Done</button>
+
+        <footer class="confirmation-footer">
+          <button class="primary-button" type="button" (click)="closeConfirmation()">Done</button>
+        </footer>
       </section>
     </div>
   }

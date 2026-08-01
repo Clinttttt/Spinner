@@ -20,7 +20,16 @@ public sealed class CreateBookingValidator : AbstractValidator<CreateBookingComm
             .When(command => !string.IsNullOrWhiteSpace(command.EmailAddress));
 
         RuleFor(command => command.ServiceId)
-            .NotEmpty();
+            .NotEmpty()
+            .When(command => command.Services is null or { Count: 0 });
+
+        RuleForEach(command => command.Services!)
+            .ChildRules(service =>
+            {
+                service.RuleFor(item => item.ServiceId).NotEmpty();
+                service.RuleFor(item => item.Quantity).GreaterThan(0);
+            })
+            .When(command => command.Services is { Count: > 0 });
 
         RuleFor(command => command.Address)
             .NotEmpty()
@@ -34,7 +43,8 @@ public sealed class CreateBookingValidator : AbstractValidator<CreateBookingComm
             .MaximumLength(120);
 
         RuleFor(command => command.LoadCount)
-            .GreaterThan(0);
+            .GreaterThan(0)
+            .When(command => command.Services is null or { Count: 0 });
 
         RuleFor(command => command.AdditionalNotes)
             .MaximumLength(1000);

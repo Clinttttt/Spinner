@@ -61,6 +61,67 @@ public sealed class LaundryOrder
         UpdatedAt = now;
     }
 
+    /// <summary>
+    /// Creates a customer web booking that covers more than one service.
+    /// </summary>
+    /// <remarks>
+    /// The single-service constructor stays for the common case. This overload
+    /// exists because the booking form lets a customer pick, say, Wash Dry Fold
+    /// and Dry Only in one request, and each selection must survive as its own
+    /// <see cref="OrderServiceItem"/> so pricing and receipts stay itemised.
+    /// </remarks>
+    public static LaundryOrder CreateCustomerBooking(
+        string orderCode,
+        string trackingCode,
+        Customer customer,
+        IReadOnlyList<(LaundryService Service, int Quantity)> serviceSelections,
+        FulfillmentType fulfillmentType,
+        string address,
+        DateOnly preferredDate,
+        string preferredTimeWindow,
+        PaymentMethod paymentMethod,
+        string? additionalNotes,
+        DateTimeOffset now,
+        PickupLocationSnapshot? pickupLocation = null)
+    {
+        if (serviceSelections.Count == 0)
+            throw new ArgumentException("At least one service is required.", nameof(serviceSelections));
+
+        var primary = serviceSelections[0];
+        var order = new LaundryOrder(
+            orderCode,
+            trackingCode,
+            customer,
+            primary.Service,
+            fulfillmentType,
+            address,
+            preferredDate,
+            preferredTimeWindow,
+            paymentMethod,
+            primary.Quantity,
+            additionalNotes,
+            now,
+            pickupLocation);
+
+        if (serviceSelections.Count == 1)
+            return order;
+
+        order._serviceItems.Clear();
+
+        foreach (var selection in serviceSelections)
+            order._serviceItems.Add(new OrderServiceItem(selection.Service, selection.Quantity));
+
+        order.LoadCount = serviceSelections.Sum(selection => selection.Quantity);
+        order.EstimatedServiceAmount = order._serviceItems.Sum(item => item.Subtotal);
+        // The delivery fee is charged once per trip, not once per service.
+        order.EstimatedDeliveryFee = fulfillmentType == FulfillmentType.PickupAndDelivery
+            ? serviceSelections.Max(selection => selection.Service.DeliveryFee ?? 0m)
+            : 0m;
+        order.EstimatedTotalAmount = order.EstimatedServiceAmount + order.EstimatedDeliveryFee;
+
+        return order;
+    }
+
     public static LaundryOrder CreateManual(
         string orderCode,
         string trackingCode,

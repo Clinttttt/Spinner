@@ -21,6 +21,7 @@ import {
 import {
   type AddressSuggestion,
   AddressLookupService,
+  type GeoBias,
 } from '../../core/address-lookup.service';
 import {
   DeviceLocationService,
@@ -64,6 +65,34 @@ interface PickupPin {
   source: PinSource;
 }
 
+interface ServiceLine {
+  amount: number;
+  id: string;
+  loads: number;
+  name: string;
+  unitLabel: string;
+  unitPrice: number;
+}
+
+/** Everything the confirmation modal needs, frozen at submit time. */
+interface SubmittedSummary {
+  address: string;
+  customerName: string;
+  deliveryFee: number;
+  email: string | null;
+  landmark: string | null;
+  mobileNumber: string;
+  notes: string | null;
+  orderMethodLabel: string;
+  paymentLabel: string;
+  pinCoordinates: string | null;
+  preferredDate: string;
+  preferredTime: string;
+  serviceAmount: number;
+  serviceLines: ServiceLine[];
+  total: number;
+}
+
 const SUGGESTION_DEBOUNCE_MS = 320;
 const SERVICE_AREA_DEBOUNCE_MS = 400;
 
@@ -93,6 +122,8 @@ export class CustomerBookingPage {
   readonly submitting = signal(false);
   readonly errorMessage = signal('');
   readonly confirmation = signal<BookingConfirmationDto | null>(null);
+  /** Full snapshot of what was submitted, shown in the confirmation modal. */
+  readonly submittedSummary = signal<SubmittedSummary | null>(null);
   readonly minimumDate = this.toDateInputValue(new Date());
 
   readonly suggestions = signal<readonly AddressSuggestion[]>([]);
@@ -165,7 +196,6 @@ export class CustomerBookingPage {
   ];
 
   readonly bookingForm = this.formBuilder.nonNullable.group({
-    service: this.formBuilder.nonNullable.control('', Validators.required),
     orderMethod: this.formBuilder.nonNullable.control<OrderMethod>('pickupDelivery'),
     fullName: ['', [Validators.required, Validators.minLength(2)]],
     mobileNumber: ['', [Validators.required, Validators.pattern(/^(09|\+639)\d{9}$/)]],
@@ -179,8 +209,39 @@ export class CustomerBookingPage {
     landmark: [''],
   });
 
+  /**
+   * Chosen service ids. A set rather than a single control because a customer can
+   * book, say, Wash Dry Fold and Dry Only in one visit.
+   */
+  readonly selectedServiceIds = signal<readonly string[]>([]);
+
+  /** Bias for address search, taken from the configured pickup area. */
+  private readonly searchBias = signal<GeoBias>({
+    latitude: 9.2381784,
+    longitude: 125.9624521,
+    radiusKm: 25,
+  });
+
+  readonly selectedServices = computed(() =>
+    this.services().filter((service) => this.selectedServiceIds().includes(service.id)),
+  );
+
+  readonly loadCount = computed(() => Number(this.bookingForm.controls.loadCount.value) || 1);
+
+  readonly serviceLines = computed(() =>
+    this.selectedServices().map((service) => ({
+      amount: service.basePrice * this.loadCount(),
+      id: service.id,
+      loads: this.loadCount(),
+      name: service.name,
+      unitLabel: service.unitLabel,
+      unitPrice: service.basePrice,
+    })),
+  );
+
   constructor() {
     this.loadServices();
+    this.loadSearchBias();
     this.watchServiceArea();
     this.bookingForm.controls.orderMethod.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -196,7 +257,7 @@ export class CustomerBookingPage {
       .pipe(
         debounceTime(SUGGESTION_DEBOUNCE_MS),
         distinctUntilChanged(),
-        switchMap((query) => this.addressLookup.search(query)),
+        switchMap((query) => this.addressLookup.search(query, this.searchBias())),
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe((results) => {
@@ -207,26 +268,33 @@ export class CustomerBookingPage {
       });
   }
 
-  get selectedService() {
-    return this.services().find((service) => service.id === this.bookingForm.controls.service.value);
-  }
-
   get serviceAmount(): number {
-    return (this.selectedService?.basePrice ?? 0) * Number(this.bookingForm.controls.loadCount.value);
+    return this.serviceLines().reduce((total, line) => total + line.amount, 0);
   }
 
   get deliveryFee(): number {
-    return this.bookingForm.controls.orderMethod.value === 'pickupDelivery'
-      ? (this.selectedService?.deliveryFee ?? 0)
-      : 0;
+    if (this.bookingForm.controls.orderMethod.value !== 'pickupDelivery') return 0;
+    // One trip, so the fee is charged once at the highest configured rate.
+    return this.selectedServices().reduce(
+      (highest, service) => Math.max(highest, service.deliveryFee ?? 0),
+      0,
+    );
   }
 
   get estimatedTotal(): number {
     return this.serviceAmount + this.deliveryFee;
   }
 
-  selectService(value: string): void {
-    this.bookingForm.controls.service.setValue(value);
+  isServiceSelected(serviceId: string): boolean {
+    return this.selectedServiceIds().includes(serviceId);
+  }
+
+  toggleService(serviceId: string): void {
+    this.selectedServiceIds.update((current) =>
+      current.includes(serviceId)
+        ? current.filter((id) => id !== serviceId)
+        : [...current, serviceId],
+    );
   }
 
   selectOrderMethod(value: OrderMethod): void {
@@ -404,6 +472,12 @@ export class CustomerBookingPage {
     if (this.submitting()) return;
 
     this.bookingForm.markAllAsTouched();
+
+    if (this.selectedServiceIds().length === 0) {
+      this.errorMessage.set('Choose at least one service.');
+      return;
+    }
+
     if (this.bookingForm.invalid) {
       requestAnimationFrame(() =>
         document.querySelector<HTMLElement>('.field-control.ng-invalid')?.focus(),
@@ -427,6 +501,7 @@ export class CustomerBookingPage {
     this.submitting.set(true);
     this.closeSuggestions();
     const value = this.bookingForm.getRawValue();
+    const selected = this.selectedServices();
 
     this.api
       .createBooking({
@@ -441,7 +516,11 @@ export class CustomerBookingPage {
         pickupLocation: isPickup ? this.toPickupLocationPayload() : null,
         preferredDate: value.preferredDate,
         preferredTimeWindow: value.preferredTime,
-        serviceId: value.service,
+        serviceId: selected[0].id,
+        services: selected.map((service) => ({
+          quantity: Number(value.loadCount),
+          serviceId: service.id,
+        })),
       })
       .pipe(
         takeUntilDestroyed(this.destroyRef),
@@ -449,6 +528,24 @@ export class CustomerBookingPage {
       )
       .subscribe({
         next: (confirmation) => {
+          this.submittedSummary.set({
+            address: isPickup ? value.address.trim() : 'Drop-off at the shop',
+            customerName: value.fullName.trim(),
+            deliveryFee: this.deliveryFee,
+            email: value.email.trim() || null,
+            landmark: isPickup ? value.landmark.trim() || null : null,
+            mobileNumber: value.mobileNumber.replace(/\s+/g, ''),
+            notes: value.notes.trim() || null,
+            orderMethodLabel: isPickup ? 'Pickup & Delivery' : 'Drop-off',
+            paymentLabel:
+              value.paymentMethod === 'qr' ? 'QR Online Payment' : 'Cash on Delivery',
+            pinCoordinates: isPickup ? this.pinCoordinates() || null : null,
+            preferredDate: value.preferredDate,
+            preferredTime: value.preferredTime,
+            serviceAmount: this.serviceAmount,
+            serviceLines: this.serviceLines(),
+            total: this.estimatedTotal,
+          });
           this.confirmation.set(confirmation);
           this.bookingComplete.set(true);
         },
@@ -544,12 +641,38 @@ export class CustomerBookingPage {
       .subscribe({
         next: (services) => {
           this.services.set(services);
-          if (services.length) this.bookingForm.controls.service.setValue(services[0].id);
+          // Preselect the first service so the estimate is never empty, while
+          // leaving every option toggleable.
+          if (services.length && this.selectedServiceIds().length === 0) {
+            this.selectedServiceIds.set([services[0].id]);
+          }
         },
         error: () =>
           this.errorMessage.set(
             'Services are temporarily unavailable. Please try again in a moment.',
           ),
+      });
+  }
+
+  /**
+   * Reads the configured pickup area so address search is weighted towards it.
+   * Without this bias the geocoder ranks same-named places in other provinces
+   * above the barangay a few kilometres from the shop.
+   */
+  private loadSearchBias() {
+    this.api
+      .getBusinessSettings()
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        catchError(() => of(null)),
+      )
+      .subscribe((settings) => {
+        if (!settings?.pickupOriginLatitude || !settings.pickupOriginLongitude) return;
+        this.searchBias.set({
+          latitude: settings.pickupOriginLatitude,
+          longitude: settings.pickupOriginLongitude,
+          radiusKm: settings.pickupServiceRadiusKm || 25,
+        });
       });
   }
 

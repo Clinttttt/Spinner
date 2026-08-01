@@ -17,4 +17,16 @@ public sealed record CreateBookingCommand(
     PaymentMethod PaymentMethod,
     int LoadCount,
     string? AdditionalNotes,
-    PickupLocationRequest? PickupLocation = null) : IRequest<Result<BookingConfirmationResponse>>;
+    PickupLocationRequest? PickupLocation = null,
+    IReadOnlyList<BookingServiceRequest>? Services = null)
+    : IRequest<Result<BookingConfirmationResponse>>
+{
+    /// <summary>
+    /// The chosen services, normalised. Falls back to the single
+    /// <see cref="ServiceId"/> and <see cref="LoadCount"/> when no list is sent.
+    /// </summary>
+    public IReadOnlyList<BookingServiceRequest> ServiceSelections =>
+        Services is { Count: > 0 }
+            ? Services
+            : [new BookingServiceRequest(ServiceId, LoadCount)];
+}

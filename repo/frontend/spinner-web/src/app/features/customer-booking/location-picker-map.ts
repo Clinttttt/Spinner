@@ -7,9 +7,10 @@ import {
   effect,
   input,
   output,
+  signal,
   viewChild,
 } from '@angular/core';
-import type * as LeafletNamespace from 'leaflet';
+import * as leaflet from 'leaflet';
 
 export interface MapPoint {
   latitude: number;
@@ -34,13 +35,27 @@ export interface MapPoint {
   template: `
     <div class="map-shell">
       <div class="map-canvas" #canvas role="application" [attr.aria-label]="ariaLabel()"></div>
-      <div class="centre-pin" aria-hidden="true">
-        <svg viewBox="0 0 24 24">
-          <path d="M12 22s-7-5.686-7-11a7 7 0 1 1 14 0c0 5.314-7 11-7 11Z" />
-          <circle cx="12" cy="10" r="2.6" />
-        </svg>
-      </div>
-      <p class="map-hint">Move the map so the pin sits on your pickup point.</p>
+      @if (!failed()) {
+        <div class="centre-pin" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 22s-7-5.686-7-11a7 7 0 1 1 14 0c0 5.314-7 11-7 11Z" />
+            <circle cx="12" cy="10" r="2.6" />
+          </svg>
+        </div>
+      }
+      @if (failed()) {
+        <p class="map-fallback" role="status">
+          The map could not load here. Type your address and landmark instead, or
+          use "Use my current location".
+        </p>
+      } @else if (tilesFailed()) {
+        <p class="map-fallback" role="status">
+          Map images are not loading on this connection. The pin still records
+          your location.
+        </p>
+      } @else {
+        <p class="map-hint">Move the map so the pin sits on your pickup point.</p>
+      }
     </div>
   `,
   styles: [
@@ -105,6 +120,20 @@ export interface MapPoint {
         text-align: center;
         z-index: 2;
       }
+
+      .map-fallback {
+        background: #fff6dd;
+        border-top: 1px solid #f2d38b;
+        color: #7a5200;
+        font-size: 11.5px;
+        font-weight: 600;
+        line-height: 1.45;
+        margin: 0;
+        padding: 10px 12px;
+        position: relative;
+        text-align: center;
+        z-index: 2;
+      }
     `,
   ],
 })
@@ -114,9 +143,13 @@ export class LocationPickerMap implements AfterViewInit, OnDestroy {
   /** Emitted when the customer stops moving the map. */
   readonly pointChosen = output<MapPoint>();
 
+  /** Leaflet itself could not be loaded or initialised. */
+  protected readonly failed = signal(false);
+  /** Leaflet works but the tile server is unreachable. */
+  protected readonly tilesFailed = signal(false);
+
   private readonly canvas = viewChild.required<ElementRef<HTMLDivElement>>('canvas');
-  private map?: LeafletNamespace.Map;
-  private leaflet?: typeof LeafletNamespace;
+  private map?: leaflet.Map;
   /** Suppresses the move event caused by our own programmatic recentre. */
   private applyingExternalCentre = false;
   /** True once the customer has actually dragged or zoomed the map. */
@@ -139,48 +172,55 @@ export class LocationPickerMap implements AfterViewInit, OnDestroy {
     });
   }
 
-  async ngAfterViewInit(): Promise<void> {
-    // Loaded lazily so Leaflet stays out of the initial bundle.
-    const leaflet = await import('leaflet');
-    this.leaflet = leaflet;
+  ngAfterViewInit(): void {
+    try {
+      // Statically imported on purpose. Leaflet is CommonJS, and a dynamic
+      // import resolved to `{ default: namespace }` under this bundler, so
+      // calling `.map()` on the namespace threw and the map silently rendered
+      // as a blank white box.
+      const start = this.centre();
+      const map = leaflet.map(this.canvas().nativeElement, {
+        attributionControl: true,
+        center: [start.latitude, start.longitude],
+        zoom: 17,
+        zoomControl: true,
+      });
 
-    const start = this.centre();
-    const map = leaflet.map(this.canvas().nativeElement, {
-      attributionControl: true,
-      // A rural pickup point needs a street map, not satellite imagery.
-      center: [start.latitude, start.longitude],
-      zoom: 17,
-      zoomControl: true,
-    });
-
-    leaflet
-      .tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      const tiles = leaflet.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap',
         maxZoom: 19,
-      })
-      .addTo(map);
+      });
 
-    map.on('moveend', () => {
-      if (this.applyingExternalCentre) return;
-      // Leaflet also fires moveend for programmatic recentres and for the
-      // invalidateSize() call below. Only a real gesture counts, otherwise the
-      // customer gets a pin at the default centre they never chose.
-      if (!this.userHasMoved) return;
-      const centre = map.getCenter();
-      this.pointChosen.emit({ latitude: centre.lat, longitude: centre.lng });
-    });
+      // A blocked or offline tile server must say so rather than look empty.
+      tiles.on('tileerror', () => this.tilesFailed.set(true));
+      tiles.on('load', () => this.tilesFailed.set(false));
+      tiles.addTo(map);
 
-    const markMoved = () => {
-      if (!this.applyingExternalCentre) this.userHasMoved = true;
-    };
-    map.on('dragstart', markMoved);
-    map.on('zoomstart', markMoved);
+      map.on('moveend', () => {
+        if (this.applyingExternalCentre) return;
+        // Leaflet also fires moveend for programmatic recentres and for the
+        // invalidateSize() calls below. Only a real gesture counts, otherwise
+        // the customer gets a pin at the default centre they never chose.
+        if (!this.userHasMoved) return;
+        const centre = map.getCenter();
+        this.pointChosen.emit({ latitude: centre.lat, longitude: centre.lng });
+      });
 
-    this.map = map;
+      const markMoved = () => {
+        if (!this.applyingExternalCentre) this.userHasMoved = true;
+      };
+      map.on('dragstart', markMoved);
+      map.on('zoomstart', markMoved);
 
-    // The container is often laid out after creation (inside a collapsed
-    // section), which leaves Leaflet with stale dimensions and grey tiles.
-    setTimeout(() => map.invalidateSize(), 0);
+      this.map = map;
+
+      // The container is frequently measured before layout settles, which
+      // leaves Leaflet with stale dimensions and no tiles.
+      setTimeout(() => map.invalidateSize(), 0);
+      setTimeout(() => map.invalidateSize(), 350);
+    } catch {
+      this.failed.set(true);
+    }
   }
 
   ngOnDestroy(): void {

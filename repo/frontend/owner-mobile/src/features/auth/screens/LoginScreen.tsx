@@ -29,6 +29,7 @@ import { spacing } from "../../../theme/spacing";
 import { useAuth } from "../AuthContext";
 
 const welcomeMascot = require("../../../../assets/login-welcome-mascot-cropped.png");
+const authBackground = require("../../../../assets/backgrounds/login-background.webp");
 const MASCOT_CARD_OVERLAP = 64;
 
 type AuthMode = "signIn" | "signUp" | "verify" | "forgot" | "reset";
@@ -344,6 +345,14 @@ export function LoginScreen() {
 
   return (
     <SafeAreaView edges={["top", "bottom"]} style={styles.safeArea}>
+      {/* Sits behind the whole flow so the card reads as a panel on paper
+          rather than a form floating on flat white. */}
+      <Image
+        accessibilityIgnoresInvertColors
+        resizeMode="cover"
+        source={authBackground}
+        style={styles.background}
+      />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.screen}
@@ -708,6 +717,13 @@ export function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
+  background: {
+    height: "100%",
+    left: 0,
+    position: "absolute",
+    top: 0,
+    width: "100%",
+  },
   buttonContent: {
     alignItems: "center",
     flexDirection: "row",
@@ -721,7 +737,7 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.995 }],
   },
   card: {
-    backgroundColor: colors.surface,
+    backgroundColor: "rgba(255,255,255,0.94)",
     borderColor: "#E2E8F0",
     borderRadius: 30,
     borderWidth: 1,
@@ -886,7 +902,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   safeArea: {
-    backgroundColor: colors.background,
+    backgroundColor: "#F4F6F9",
     flex: 1,
   },
   secondaryAction: {

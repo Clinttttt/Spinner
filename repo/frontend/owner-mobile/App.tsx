@@ -1,9 +1,9 @@
 import { NavigationContainer, DefaultTheme } from "@react-navigation/native";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { NavigationBar } from "expo-navigation-bar";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import { AppLoadingScreen } from "./src/components/common/AppLoadingScreen";
 import { AppTabs } from "./src/navigation/AppTabs";
 import { DialogProvider } from "./src/components/common/DialogProvider";
 import { AuthProvider, useAuth } from "./src/features/auth/AuthContext";
@@ -26,13 +26,7 @@ const navigationTheme = {
 function AppContent() {
   const { loading, session } = useAuth();
 
-  if (loading) {
-    return (
-      <View style={styles.loading}>
-        <ActivityIndicator color={colors.navy} size="large" />
-      </View>
-    );
-  }
+  if (loading) return <AppLoadingScreen />;
 
   if (!session) return <LoginScreen />;
 
@@ -58,12 +52,3 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  loading: {
-    alignItems: "center",
-    backgroundColor: colors.background,
-    flex: 1,
-    justifyContent: "center",
-  },
-});
