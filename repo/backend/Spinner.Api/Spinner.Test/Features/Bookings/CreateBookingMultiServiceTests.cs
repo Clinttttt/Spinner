@@ -123,6 +123,57 @@ public sealed class CreateBookingMultiServiceTests
         Assert.Equal(ResultStatus.NotFound, result.Status);
     }
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(50)]
+    public void Should_Accept_Quantities_Within_Bounds(int quantity)
+    {
+        var result = new CreateBookingValidator().Validate(
+            Command([new BookingServiceRequest(Guid.NewGuid(), quantity)]));
+
+        Assert.True(result.IsValid);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-3)]
+    [InlineData(51)]
+    public void Should_Reject_An_Implausible_Quantity(int quantity)
+    {
+        var result = new CreateBookingValidator().Validate(
+            Command([new BookingServiceRequest(Guid.NewGuid(), quantity)]));
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error => error.PropertyName.Contains("Quantity"));
+    }
+
+    [Fact]
+    public void Should_Reject_The_Same_Service_Listed_Twice()
+    {
+        var serviceId = Guid.NewGuid();
+
+        // Two lines for one service would double the customer's bill for a single
+        // tick of the checkbox, so it is refused rather than silently merged.
+        var result = new CreateBookingValidator().Validate(
+            Command(
+                [new BookingServiceRequest(serviceId, 1), new BookingServiceRequest(serviceId, 2)]));
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error => error.ErrorMessage.Contains("only be listed once"));
+    }
+
+    [Fact]
+    public void Should_Not_Require_LoadCount_When_Services_Are_Listed()
+    {
+        // The per-service steppers replace the old shared loads field, so the
+        // scalar is only meaningful for the legacy single-service shape.
+        var result = new CreateBookingValidator().Validate(
+            Command([new BookingServiceRequest(Guid.NewGuid(), 2)]));
+
+        Assert.True(result.IsValid);
+        Assert.DoesNotContain(result.Errors, error => error.PropertyName == "LoadCount");
+    }
+
     private static CreateBookingHandler Handler(AppDbContext dbContext) =>
         new(dbContext, new TestServiceAreaPolicyProvider());
 

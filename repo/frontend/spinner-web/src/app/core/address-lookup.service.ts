@@ -221,21 +221,18 @@ export class AddressLookupService {
       ].join(','),
     });
 
-    return this.http
-      .get<NominatimPlace[]>(`${this.nominatimUrl}/search?${params.toString()}`)
-      .pipe(
-        timeout(LOOKUP_TIMEOUT_MS),
-        map((places) => this.fromNominatim(places)),
-        catchError(() => of([])),
-      );
+    return this.http.get<NominatimPlace[]>(`${this.nominatimUrl}/search?${params.toString()}`).pipe(
+      timeout(LOOKUP_TIMEOUT_MS),
+      map((places) => this.fromNominatim(places)),
+      catchError(() => of([])),
+    );
   }
 
   private fromPhoton(response: PhotonResponse): AddressSuggestion[] {
     return (response.features ?? [])
       .filter(
         (feature) =>
-          !feature.properties?.countrycode ||
-          feature.properties.countrycode.toUpperCase() === 'PH',
+          !feature.properties?.countrycode || feature.properties.countrycode.toUpperCase() === 'PH',
       )
       .map((feature): AddressSuggestion | null => {
         const coordinates = feature.geometry?.coordinates;
@@ -249,8 +246,7 @@ export class AddressLookupService {
           properties.housenumber && properties.street
             ? `${properties.housenumber} ${properties.street}`
             : properties.street;
-        const barangay =
-          properties.suburb ?? properties.locality ?? properties.district ?? null;
+        const barangay = properties.suburb ?? properties.locality ?? properties.district ?? null;
         const cityOrMunicipality = properties.city ?? properties.county ?? null;
         const primaryParts = unique([properties.name, street]);
         const secondaryParts = unique([
@@ -302,8 +298,7 @@ export class AddressLookupService {
           cityOrMunicipality,
           distanceKm: null,
           formattedAddress:
-            place.display_name?.trim() ||
-            unique([primary, ...secondaryParts]).join(', '),
+            place.display_name?.trim() || unique([primary, ...secondaryParts]).join(', '),
           latitude,
           longitude,
           placeId:

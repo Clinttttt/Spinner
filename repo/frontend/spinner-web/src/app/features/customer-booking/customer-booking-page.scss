@@ -146,7 +146,12 @@ button {
 
 .hero-shade {
   background:
-    linear-gradient(90deg, rgba(4, 20, 38, 0.76) 0%, rgba(4, 20, 38, 0.3) 64%, rgba(4, 20, 38, 0.08) 100%),
+    linear-gradient(
+      90deg,
+      rgba(4, 20, 38, 0.76) 0%,
+      rgba(4, 20, 38, 0.3) 64%,
+      rgba(4, 20, 38, 0.08) 100%
+    ),
     linear-gradient(180deg, rgba(4, 20, 38, 0.02) 20%, rgba(4, 20, 38, 0.88) 100%);
 }
 
@@ -364,6 +369,93 @@ button {
   background: #fff;
   border-color: var(--navy);
   box-shadow: inset 0 0 0 1px var(--navy);
+}
+
+/* Wraps the toggle and its stepper. The stepper cannot live inside the toggle
+   because nested buttons are invalid and unreachable by keyboard. */
+.service-card {
+  display: grid;
+}
+
+.service-card.selected .service-toggle {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.service-toggle {
+  width: 100%;
+}
+
+.load-stepper {
+  align-items: center;
+  background: var(--surface-soft);
+  border: 1px solid var(--navy);
+  border-bottom-left-radius: 14px;
+  border-bottom-right-radius: 14px;
+  border-top: 0;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 9px 11px;
+}
+
+.load-stepper-label {
+  color: var(--ink-soft);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.load-stepper-controls {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #dde2e8;
+  border-radius: 999px;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+}
+
+.step-button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  color: var(--navy);
+  cursor: pointer;
+  display: flex;
+  font-size: 16px;
+  font-weight: 700;
+  height: 28px;
+  justify-content: center;
+  line-height: 1;
+  transition: background 140ms ease;
+  width: 28px;
+}
+
+.step-button:hover:not(:disabled) {
+  background: #eef2f8;
+}
+
+.step-button:disabled {
+  color: #c2cad4;
+  cursor: not-allowed;
+}
+
+.load-value {
+  color: var(--navy);
+  font-size: 13px;
+  font-weight: 700;
+  min-width: 20px;
+  text-align: center;
+}
+
+.load-amount {
+  color: var(--navy);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .radio-dot {
@@ -1099,7 +1191,6 @@ input[type='date'].field-control::-webkit-calendar-picker-indicator {
   .brand-copy strong {
     font-size: 13px;
   }
-
 }
 
 @media (max-width: 639px) {

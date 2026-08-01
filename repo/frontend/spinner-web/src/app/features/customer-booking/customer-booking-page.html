@@ -87,24 +87,65 @@
           } @else {
             <div class="choice-grid">
               @for (option of services(); track option.id) {
-                <button
-                  class="choice-card"
-                  type="button"
-                  [class.selected]="isServiceSelected(option.id)"
-                  [attr.aria-pressed]="isServiceSelected(option.id)"
-                  (click)="toggleService(option.id)"
-                >
-                  <span class="check-box" aria-hidden="true">
-                    <svg viewBox="0 0 24 24"><path d="m5 13 4 4L19 7" /></svg>
-                  </span>
-                  <span class="choice-copy">
-                    <strong>{{ option.name }}</strong>
-                    <small>₱{{ option.basePrice }} {{ option.unitLabel }}</small>
-                    @if (option.description) {
-                      <small>{{ option.description }}</small>
-                    }
-                  </span>
-                </button>
+                <div class="service-card" [class.selected]="isServiceSelected(option.id)">
+                  <button
+                    class="choice-card service-toggle"
+                    type="button"
+                    role="checkbox"
+                    [attr.aria-checked]="isServiceSelected(option.id)"
+                    (click)="toggleService(option.id)"
+                  >
+                    <span class="check-box" aria-hidden="true">
+                      <svg viewBox="0 0 24 24"><path d="m5 13 4 4L19 7" /></svg>
+                    </span>
+                    <span class="choice-copy">
+                      <strong>{{ option.name }}</strong>
+                      <small>₱{{ option.basePrice }} {{ option.unitLabel }}</small>
+                      @if (option.description) {
+                        <small>{{ option.description }}</small>
+                      }
+                    </span>
+                  </button>
+
+                  <!-- Each service carries its own quantity, so two loads of washing
+                       and one of drying is a single booking. -->
+                  @if (isServiceSelected(option.id)) {
+                    <div class="load-stepper">
+                      <span class="load-stepper-label">Loads</span>
+                      <div class="load-stepper-controls">
+                        <button
+                          class="step-button"
+                          type="button"
+                          [attr.aria-label]="'Fewer loads of ' + option.name"
+                          [disabled]="!canDecreaseLoads(option.id)"
+                          (click)="adjustServiceLoads(option.id, -1)"
+                        >
+                          &minus;
+                        </button>
+                        <output
+                          class="load-value"
+                          [attr.aria-label]="
+                            serviceLoadCount(option.id) + ' loads of ' + option.name
+                          "
+                        >
+                          {{ serviceLoadCount(option.id) }}
+                        </output>
+                        <button
+                          class="step-button"
+                          type="button"
+                          [attr.aria-label]="'More loads of ' + option.name"
+                          [disabled]="!canIncreaseLoads(option.id)"
+                          (click)="adjustServiceLoads(option.id, 1)"
+                        >
+                          +
+                        </button>
+                      </div>
+                      <b class="load-amount">
+                        ₱{{ option.basePrice * serviceLoadCount(option.id) | number: '1.0-2' }}
+                      </b>
+                    </div>
+                  }
+                </div>
               }
             </div>
           }
@@ -222,16 +263,6 @@
               }
             </label>
             <label class="field">
-              <span>Estimated loads</span>
-              <select class="field-control" formControlName="loadCount">
-                <option [ngValue]="1">1 load</option>
-                <option [ngValue]="2">2 loads</option>
-                <option [ngValue]="3">3 loads</option>
-                <option [ngValue]="4">4 loads</option>
-                <option [ngValue]="5">5+ loads</option>
-              </select>
-            </label>
-            <label class="field">
               <span>Notes <em>Optional</em></span>
               <input
                 class="field-control"
@@ -284,7 +315,11 @@
                   role="listbox"
                   aria-label="Nearby places"
                 >
-                  @for (suggestion of suggestions(); track suggestion.formattedAddress; let index = $index) {
+                  @for (
+                    suggestion of suggestions();
+                    track suggestion.formattedAddress;
+                    let index = $index
+                  ) {
                     <li role="presentation">
                       <button
                         class="suggestion"
@@ -448,7 +483,7 @@
             @for (line of serviceLines(); track line.id) {
               <div>
                 <dt>{{ line.name }} · {{ line.loads }} {{ line.unitLabel }}</dt>
-                <dd>₱{{ line.amount }}.00</dd>
+                <dd>₱{{ line.amount | number: '1.2-2' }}</dd>
               </div>
             }
             @if (!serviceLines().length) {
@@ -459,11 +494,11 @@
             }
             <div>
               <dt>Pickup &amp; delivery</dt>
-              <dd>{{ deliveryFee ? '₱' + deliveryFee + '.00' : 'Free' }}</dd>
+              <dd>{{ deliveryFee ? '₱' + (deliveryFee | number: '1.2-2') : 'Free' }}</dd>
             </div>
             <div class="total">
               <dt>Total estimate</dt>
-              <dd>₱{{ estimatedTotal }}.00</dd>
+              <dd>₱{{ estimatedTotal | number: '1.2-2' }}</dd>
             </div>
           </dl>
           <p class="estimate-note">
@@ -522,52 +557,89 @@
                 <li>
                   <span>
                     <strong>{{ line.name }}</strong>
-                    <small>{{ line.loads }} {{ line.unitLabel }} · ₱{{ line.unitPrice }} each</small>
+                    <small
+                      >{{ line.loads }} {{ line.unitLabel }} · ₱{{ line.unitPrice }} each</small
+                    >
                   </span>
-                  <b>₱{{ line.amount }}.00</b>
+                  <b>₱{{ line.amount | number: '1.2-2' }}</b>
                 </li>
               }
             </ul>
 
             <h3 class="confirmation-section">Schedule</h3>
             <dl class="summary-grid">
-              <div><dt>Method</dt><dd>{{ summary.orderMethodLabel }}</dd></div>
-              <div><dt>Date</dt><dd>{{ summary.preferredDate }}</dd></div>
-              <div><dt>Time</dt><dd>{{ summary.preferredTime }}</dd></div>
-              <div><dt>Payment</dt><dd>{{ summary.paymentLabel }}</dd></div>
+              <div>
+                <dt>Method</dt>
+                <dd>{{ summary.orderMethodLabel }}</dd>
+              </div>
+              <div>
+                <dt>Date</dt>
+                <dd>{{ summary.preferredDate }}</dd>
+              </div>
+              <div>
+                <dt>Time</dt>
+                <dd>{{ summary.preferredTime }}</dd>
+              </div>
+              <div>
+                <dt>Payment</dt>
+                <dd>{{ summary.paymentLabel }}</dd>
+              </div>
             </dl>
 
             <h3 class="confirmation-section">Contact &amp; location</h3>
             <dl class="summary-grid">
-              <div><dt>Name</dt><dd>{{ summary.customerName }}</dd></div>
-              <div><dt>Mobile</dt><dd>{{ summary.mobileNumber }}</dd></div>
+              <div>
+                <dt>Name</dt>
+                <dd>{{ summary.customerName }}</dd>
+              </div>
+              <div>
+                <dt>Mobile</dt>
+                <dd>{{ summary.mobileNumber }}</dd>
+              </div>
               @if (summary.email) {
-                <div><dt>Email</dt><dd>{{ summary.email }}</dd></div>
+                <div>
+                  <dt>Email</dt>
+                  <dd>{{ summary.email }}</dd>
+                </div>
               }
-              <div class="wide"><dt>Address</dt><dd>{{ summary.address }}</dd></div>
+              <div class="wide">
+                <dt>Address</dt>
+                <dd>{{ summary.address }}</dd>
+              </div>
               @if (summary.landmark) {
-                <div class="wide"><dt>Landmark</dt><dd>{{ summary.landmark }}</dd></div>
+                <div class="wide">
+                  <dt>Landmark</dt>
+                  <dd>{{ summary.landmark }}</dd>
+                </div>
               }
               @if (summary.pinCoordinates) {
-                <div class="wide"><dt>Map pin</dt><dd>{{ summary.pinCoordinates }}</dd></div>
+                <div class="wide">
+                  <dt>Map pin</dt>
+                  <dd>{{ summary.pinCoordinates }}</dd>
+                </div>
               }
               @if (summary.notes) {
-                <div class="wide"><dt>Notes</dt><dd>{{ summary.notes }}</dd></div>
+                <div class="wide">
+                  <dt>Notes</dt>
+                  <dd>{{ summary.notes }}</dd>
+                </div>
               }
             </dl>
 
             <dl class="summary-totals">
               <div>
                 <dt>Services</dt>
-                <dd>₱{{ summary.serviceAmount }}.00</dd>
+                <dd>₱{{ summary.serviceAmount | number: '1.2-2' }}</dd>
               </div>
               <div>
                 <dt>Pickup &amp; delivery</dt>
-                <dd>{{ summary.deliveryFee ? '₱' + summary.deliveryFee + '.00' : 'Free' }}</dd>
+                <dd>
+                  {{ summary.deliveryFee ? '₱' + (summary.deliveryFee | number: '1.2-2') : 'Free' }}
+                </dd>
               </div>
               <div class="total">
                 <dt>Total estimate</dt>
-                <dd>₱{{ summary.total }}.00</dd>
+                <dd>₱{{ summary.total | number: '1.2-2' }}</dd>
               </div>
             </dl>
             <p class="estimate-note">

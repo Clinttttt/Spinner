@@ -1,3 +1,4 @@
+import { DecimalPipe } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   ChangeDetectionStrategy,
@@ -96,12 +97,15 @@ interface SubmittedSummary {
 const SUGGESTION_DEBOUNCE_MS = 320;
 const SERVICE_AREA_DEBOUNCE_MS = 400;
 
+/** Upper bound per service line. Bulk jobs are arranged with the shop directly. */
+const MAX_SERVICE_LOADS = 20;
+
 /** Laundromat service area centre, used as the map's starting view. */
 const SERVICE_AREA_CENTRE: MapPoint = { latitude: 9.2381784, longitude: 125.9624521 };
 
 @Component({
   selector: 'app-customer-booking-page',
-  imports: [ReactiveFormsModule, LocationPickerMap],
+  imports: [DecimalPipe, ReactiveFormsModule, LocationPickerMap],
   templateUrl: './customer-booking-page.html',
   styleUrl: './customer-booking-page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -202,7 +206,6 @@ export class CustomerBookingPage {
     email: ['', Validators.email],
     preferredDate: ['', Validators.required],
     preferredTime: ['', Validators.required],
-    loadCount: [1, [Validators.required, Validators.min(1)]],
     notes: [''],
     paymentMethod: this.formBuilder.nonNullable.control<PaymentMethod>('cod'),
     address: ['', Validators.required],
@@ -215,6 +218,15 @@ export class CustomerBookingPage {
    */
   readonly selectedServiceIds = signal<readonly string[]>([]);
 
+  /**
+   * Loads per chosen service, keyed by service id.
+   *
+   * Kept separate from the selection so that unticking a service and ticking it
+   * again does not silently resurrect an old quantity, and so that two services
+   * in one booking can carry genuinely different amounts of laundry.
+   */
+  private readonly serviceLoads = signal<Readonly<Record<string, number>>>({});
+
   /** Bias for address search, taken from the configured pickup area. */
   private readonly searchBias = signal<GeoBias>({
     latitude: 9.2381784,
@@ -226,18 +238,26 @@ export class CustomerBookingPage {
     this.services().filter((service) => this.selectedServiceIds().includes(service.id)),
   );
 
-  readonly loadCount = computed(() => Number(this.bookingForm.controls.loadCount.value) || 1);
-
-  readonly serviceLines = computed(() =>
-    this.selectedServices().map((service) => ({
-      amount: service.basePrice * this.loadCount(),
-      id: service.id,
-      loads: this.loadCount(),
-      name: service.name,
-      unitLabel: service.unitLabel,
-      unitPrice: service.basePrice,
-    })),
+  readonly loadCount = computed(() =>
+    this.serviceLines().reduce((total, line) => total + line.loads, 0),
   );
+
+  readonly serviceLines = computed(() => {
+    const loads = this.serviceLoads();
+
+    return this.selectedServices().map((service) => {
+      const quantity = loads[service.id] ?? 1;
+
+      return {
+        amount: service.basePrice * quantity,
+        id: service.id,
+        loads: quantity,
+        name: service.name,
+        unitLabel: service.unitLabel,
+        unitPrice: service.basePrice,
+      };
+    });
+  });
 
   constructor() {
     this.loadServices();
@@ -290,11 +310,45 @@ export class CustomerBookingPage {
   }
 
   toggleService(serviceId: string): void {
+    const wasSelected = this.selectedServiceIds().includes(serviceId);
+
     this.selectedServiceIds.update((current) =>
-      current.includes(serviceId)
-        ? current.filter((id) => id !== serviceId)
-        : [...current, serviceId],
+      wasSelected ? current.filter((id) => id !== serviceId) : [...current, serviceId],
     );
+
+    this.serviceLoads.update((current) => {
+      const next = { ...current };
+      if (wasSelected) delete next[serviceId];
+      else next[serviceId] = 1;
+      return next;
+    });
+  }
+
+  /** Loads chosen for one service. Defaults to a single load. */
+  serviceLoadCount(serviceId: string): number {
+    return this.serviceLoads()[serviceId] ?? 1;
+  }
+
+  /**
+   * Nudge one service's load count. Bounded because a customer-facing form should
+   * not be able to submit zero loads or an implausible bulk order by holding the
+   * button down; larger jobs are handled by the shop directly.
+   */
+  adjustServiceLoads(serviceId: string, delta: number): void {
+    if (!this.selectedServiceIds().includes(serviceId)) return;
+
+    this.serviceLoads.update((current) => {
+      const next = Math.min(MAX_SERVICE_LOADS, Math.max(1, (current[serviceId] ?? 1) + delta));
+      return { ...current, [serviceId]: next };
+    });
+  }
+
+  canDecreaseLoads(serviceId: string): boolean {
+    return this.serviceLoadCount(serviceId) > 1;
+  }
+
+  canIncreaseLoads(serviceId: string): boolean {
+    return this.serviceLoadCount(serviceId) < MAX_SERVICE_LOADS;
   }
 
   selectOrderMethod(value: OrderMethod): void {
@@ -307,12 +361,7 @@ export class CustomerBookingPage {
 
   hasError(
     controlName:
-      | 'address'
-      | 'email'
-      | 'fullName'
-      | 'mobileNumber'
-      | 'preferredDate'
-      | 'preferredTime',
+      'address' | 'email' | 'fullName' | 'mobileNumber' | 'preferredDate' | 'preferredTime',
   ): boolean {
     const control = this.bookingForm.controls[controlName];
     return control.invalid && (control.dirty || control.touched);
@@ -502,6 +551,9 @@ export class CustomerBookingPage {
     this.closeSuggestions();
     const value = this.bookingForm.getRawValue();
     const selected = this.selectedServices();
+    // Snapshot the lines so the request and the confirmation cannot disagree if a
+    // stepper is nudged while the call is in flight.
+    const lines = this.serviceLines();
 
     this.api
       .createBooking({
@@ -510,16 +562,16 @@ export class CustomerBookingPage {
         emailAddress: value.email.trim() || null,
         fulfillmentType: isPickup ? 'PickupAndDelivery' : 'DropOff',
         fullName: value.fullName.trim(),
-        loadCount: Number(value.loadCount),
+        loadCount: lines.reduce((total, line) => total + line.loads, 0),
         mobileNumber: value.mobileNumber.replace(/\s+/g, ''),
         paymentMethod: value.paymentMethod === 'qr' ? 'QrCodeOnlinePayment' : 'CashOnDelivery',
         pickupLocation: isPickup ? this.toPickupLocationPayload() : null,
         preferredDate: value.preferredDate,
         preferredTimeWindow: value.preferredTime,
         serviceId: selected[0].id,
-        services: selected.map((service) => ({
-          quantity: Number(value.loadCount),
-          serviceId: service.id,
+        services: lines.map((line) => ({
+          quantity: line.loads,
+          serviceId: line.id,
         })),
       })
       .pipe(
@@ -537,13 +589,12 @@ export class CustomerBookingPage {
             mobileNumber: value.mobileNumber.replace(/\s+/g, ''),
             notes: value.notes.trim() || null,
             orderMethodLabel: isPickup ? 'Pickup & Delivery' : 'Drop-off',
-            paymentLabel:
-              value.paymentMethod === 'qr' ? 'QR Online Payment' : 'Cash on Delivery',
+            paymentLabel: value.paymentMethod === 'qr' ? 'QR Online Payment' : 'Cash on Delivery',
             pinCoordinates: isPickup ? this.pinCoordinates() || null : null,
             preferredDate: value.preferredDate,
             preferredTime: value.preferredTime,
             serviceAmount: this.serviceAmount,
-            serviceLines: this.serviceLines(),
+            serviceLines: lines,
             total: this.estimatedTotal,
           });
           this.confirmation.set(confirmation);
@@ -595,9 +646,7 @@ export class CustomerBookingPage {
       .pipe(
         debounceTime(SERVICE_AREA_DEBOUNCE_MS),
         switchMap((pin) =>
-          this.api.checkServiceArea(pin.latitude, pin.longitude).pipe(
-            catchError(() => of(null)),
-          ),
+          this.api.checkServiceArea(pin.latitude, pin.longitude).pipe(catchError(() => of(null))),
         ),
         takeUntilDestroyed(this.destroyRef),
       )
@@ -618,8 +667,7 @@ export class CustomerBookingPage {
       cityOrMunicipality: null,
       // Any pin the customer placed or accepted is a deliberate choice.
       confirmedAt: new Date().toISOString(),
-      formattedAddress:
-        pin.formattedAddress ?? this.bookingForm.controls.address.value.trim(),
+      formattedAddress: pin.formattedAddress ?? this.bookingForm.controls.address.value.trim(),
       landmark: landmark || null,
       latitude: pin.latitude,
       locationConfirmed: true,
@@ -645,6 +693,7 @@ export class CustomerBookingPage {
           // leaving every option toggleable.
           if (services.length && this.selectedServiceIds().length === 0) {
             this.selectedServiceIds.set([services[0].id]);
+            this.serviceLoads.set({ [services[0].id]: 1 });
           }
         },
         error: () =>

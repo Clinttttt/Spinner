@@ -4,6 +4,9 @@ namespace Spinner.Api.Features.Bookings.CreateBooking;
 
 public sealed class CreateBookingValidator : AbstractValidator<CreateBookingCommand>
 {
+    /// <summary>Loads allowed on a single service line.</summary>
+    private const int MaxQuantityPerService = 50;
+
     public CreateBookingValidator()
     {
         RuleFor(command => command.FullName)
@@ -27,8 +30,18 @@ public sealed class CreateBookingValidator : AbstractValidator<CreateBookingComm
             .ChildRules(service =>
             {
                 service.RuleFor(item => item.ServiceId).NotEmpty();
-                service.RuleFor(item => item.Quantity).GreaterThan(0);
+
+                // An upper bound keeps a malformed or hostile client from booking an
+                // implausible job. Genuine bulk work is arranged with the shop.
+                service.RuleFor(item => item.Quantity)
+                    .InclusiveBetween(1, MaxQuantityPerService);
             })
+            .When(command => command.Services is { Count: > 0 });
+
+        RuleFor(command => command.Services!)
+            .Must(services => services.Select(service => service.ServiceId).Distinct().Count()
+                              == services.Count)
+            .WithMessage("Each service may only be listed once.")
             .When(command => command.Services is { Count: > 0 });
 
         RuleFor(command => command.Address)

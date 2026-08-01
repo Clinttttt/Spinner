@@ -1,12 +1,12 @@
 import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 
 import { CustomerBookingPage } from './customer-booking-page';
-import { DeviceLocationService, GeolocationUnavailableError } from '../../core/device-location.service';
+import {
+  DeviceLocationService,
+  GeolocationUnavailableError,
+} from '../../core/device-location.service';
 import {
   type CreateBookingPayload,
   type ServiceAreaCheckDto,
@@ -18,6 +18,16 @@ const service = {
   description: null,
   id: 'service-1',
   name: 'Wash, Dry & Fold',
+  supportsPickupAndDelivery: true,
+  unitLabel: 'per load',
+};
+
+const dryOnly = {
+  basePrice: 90,
+  deliveryFee: 60,
+  description: null,
+  id: 'service-2',
+  name: 'Dry Only',
   supportsPickupAndDelivery: true,
   unitLabel: 'per load',
 };
@@ -46,7 +56,7 @@ describe('CustomerBookingPage pickup location', () => {
     getCurrentPosition: ReturnType<typeof vi.fn>;
   };
 
-  function createPage() {
+  function createPage(catalogue: readonly (typeof service)[] = [service]) {
     locationStub = {
       getCurrentPosition: vi.fn(),
       isInAppBrowser: false,
@@ -68,7 +78,7 @@ describe('CustomerBookingPage pickup location', () => {
 
     http
       .expectOne((request) => request.url.includes('/api/services-pricing/services'))
-      .flush([service]);
+      .flush(catalogue);
     // The page also reads public settings to bias address search.
     http
       .expectOne((request) => request.url.endsWith('/api/business-settings'))
@@ -85,7 +95,6 @@ describe('CustomerBookingPage pickup location', () => {
     page.bookingForm.patchValue({
       address: CUSTOMER_ADDRESS,
       fullName: 'Kendra Mae',
-      loadCount: 1,
       mobileNumber: '09171234567',
       preferredDate: '2026-08-05',
       preferredTime: '15:00-17:00',
@@ -239,6 +248,111 @@ describe('CustomerBookingPage pickup location', () => {
     expect(payload.fulfillmentType).toBe('DropOff');
     expect(payload.address).toBe('In-store');
     expect(payload.pickupLocation).toBeNull();
+  });
+
+  describe('per-service loads', () => {
+    it('gives each chosen service its own quantity', () => {
+      const { page } = createPage([service, dryOnly]);
+
+      // Wash is preselected; add drying alongside it.
+      page.toggleService(dryOnly.id);
+      page.adjustServiceLoads(service.id, 1);
+      page.adjustServiceLoads(service.id, 1);
+
+      expect(page.serviceLoadCount(service.id)).toBe(3);
+      expect(page.serviceLoadCount(dryOnly.id)).toBe(1);
+
+      page.submitBooking();
+      const payload = submittedPayload();
+
+      expect(payload.services).toEqual([
+        { quantity: 3, serviceId: service.id },
+        { quantity: 1, serviceId: dryOnly.id },
+      ]);
+      // The legacy scalar carries the combined total for older consumers.
+      expect(payload.loadCount).toBe(4);
+    });
+
+    it('prices each line on its own quantity and charges delivery once', () => {
+      const { page } = createPage([service, dryOnly]);
+
+      page.toggleService(dryOnly.id);
+      page.adjustServiceLoads(service.id, 1);
+
+      // 2 x 170 + 1 x 90
+      expect(page.serviceAmount).toBe(430);
+      expect(page.deliveryFee).toBe(60);
+      expect(page.estimatedTotal).toBe(490);
+      expect(page.loadCount()).toBe(3);
+    });
+
+    it('starts every newly chosen service at one load', () => {
+      const { page } = createPage([service, dryOnly]);
+
+      page.adjustServiceLoads(service.id, 4);
+      page.toggleService(dryOnly.id);
+
+      expect(page.serviceLoadCount(service.id)).toBe(5);
+      expect(page.serviceLoadCount(dryOnly.id)).toBe(1);
+    });
+
+    it('forgets the quantity when a service is removed', () => {
+      const { page } = createPage([service, dryOnly]);
+
+      page.toggleService(dryOnly.id);
+      page.adjustServiceLoads(dryOnly.id, 3);
+      expect(page.serviceLoadCount(dryOnly.id)).toBe(4);
+
+      // Unticking and reticking must not resurrect the old figure.
+      page.toggleService(dryOnly.id);
+      page.toggleService(dryOnly.id);
+
+      expect(page.serviceLoadCount(dryOnly.id)).toBe(1);
+    });
+
+    it('never drops below one load or above the ceiling', () => {
+      const { page } = createPage([service, dryOnly]);
+
+      page.adjustServiceLoads(service.id, -5);
+      expect(page.serviceLoadCount(service.id)).toBe(1);
+      expect(page.canDecreaseLoads(service.id)).toBe(false);
+
+      for (let index = 0; index < 40; index += 1) page.adjustServiceLoads(service.id, 1);
+      expect(page.serviceLoadCount(service.id)).toBe(20);
+      expect(page.canIncreaseLoads(service.id)).toBe(false);
+    });
+
+    it('ignores adjustments for a service that is not chosen', () => {
+      const { page } = createPage([service, dryOnly]);
+
+      page.adjustServiceLoads(dryOnly.id, 3);
+
+      expect(page.serviceLoadCount(dryOnly.id)).toBe(1);
+      expect(page.serviceLines().map((line) => line.id)).toEqual([service.id]);
+    });
+
+    it('renders a stepper only for chosen services', () => {
+      const { fixture, page } = createPage([service, dryOnly]);
+
+      expect(fixture.nativeElement.querySelectorAll('.load-stepper').length).toBe(1);
+
+      page.toggleService(dryOnly.id);
+      fixture.detectChanges();
+
+      const steppers = fixture.nativeElement.querySelectorAll('.load-stepper');
+      expect(steppers.length).toBe(2);
+      // Each stepper reports its own line total, not a shared one.
+      expect(steppers[0].querySelector('.load-amount').textContent).toContain('170');
+      expect(steppers[1].querySelector('.load-amount').textContent).toContain('90');
+    });
+
+    it('keeps the stepper buttons out of the toggle so both stay reachable', () => {
+      const { fixture } = createPage([service, dryOnly]);
+
+      const stepButton = fixture.nativeElement.querySelector('.step-button');
+      // A button nested in a button is invalid markup and unreachable by keyboard.
+      expect(stepButton.closest('.service-toggle')).toBeNull();
+    });
   });
 
   describe('service area', () => {

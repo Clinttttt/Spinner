@@ -45,13 +45,12 @@ export interface MapPoint {
       }
       @if (failed()) {
         <p class="map-fallback" role="status">
-          The map could not load here. Type your address and landmark instead, or
-          use "Use my current location".
+          The map could not load here. Type your address and landmark instead, or use "Use my
+          current location".
         </p>
       } @else if (tilesFailed()) {
         <p class="map-fallback" role="status">
-          Map images are not loading on this connection. The pin still records
-          your location.
+          Map images are not loading on this connection. The pin still records your location.
         </p>
       } @else {
         <p class="map-hint">Move the map so the pin sits on your pickup point.</p>
