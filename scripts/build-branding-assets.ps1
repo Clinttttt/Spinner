@@ -129,32 +129,49 @@ function Get-KeyedWordmark([string] $path, [int] $top, [int] $bottom) {
 }
 
 # --- Splash: one image the native launch screen can show -------------------
-# The native splash can only place a single image on a flat colour, so the mascot
-# and wordmark are combined at the same relative spacing the running app uses.
-# Matching them means the handoff from the launch screen to the live screen does
-# not visibly move the logo.
-function New-SplashComposite(
-  [System.Drawing.Bitmap] $mascot,
-  [System.Drawing.Bitmap] $wordmark,
-  [int] $width) {
+# Android 12+ draws this as the splash *icon* and masks it, so anything near the
+# edges is cut. An earlier attempt stacked the mascot and wordmark here and the
+# wordmark was sliced in half on device. Only the mascot goes on the launch
+# screen now, on a square canvas, and the running app draws the wordmark itself.
+function New-SplashIcon([System.Drawing.Bitmap] $mascot, [int] $side) {
+  $scale = [Math]::Min($side / $mascot.Width, $side / $mascot.Height)
+  $width = [int]($mascot.Width * $scale)
+  $height = [int]($mascot.Height * $scale)
 
-  $mascotWidth = $width
-  $mascotHeight = [int]($mascot.Height * ($mascotWidth / $mascot.Width))
-  $wordmarkWidth = [int]($width * 0.86)
-  $wordmarkHeight = [int]($wordmark.Height * ($wordmarkWidth / $wordmark.Width))
-  $gap = [int]($width * 0.04)
-
-  $canvas = New-Object System.Drawing.Bitmap $width, ($mascotHeight + $gap + $wordmarkHeight), ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+  $canvas = New-Object System.Drawing.Bitmap $side, $side, ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
   $graphics = [System.Drawing.Graphics]::FromImage($canvas)
   try {
     $graphics.Clear([System.Drawing.Color]::Transparent)
     $graphics.InterpolationMode = 'HighQualityBicubic'
-    $graphics.DrawImage($mascot, (New-Object System.Drawing.Rectangle 0, 0, $mascotWidth, $mascotHeight))
-    $graphics.DrawImage($wordmark, (New-Object System.Drawing.Rectangle `
-      ([int](($width - $wordmarkWidth) / 2)), ($mascotHeight + $gap), $wordmarkWidth, $wordmarkHeight))
+    $graphics.DrawImage($mascot, (New-Object System.Drawing.Rectangle `
+      ([int](($side - $width) / 2)), ([int](($side - $height) / 2)), $width, $height))
   } finally { $graphics.Dispose() }
 
   return $canvas
+}
+
+# How far the artwork actually reaches from the centre. Android keeps roughly the
+# inner 192dp of a 288dp icon, so this decides the largest imageWidth that cannot
+# clip rather than leaving it to trial and error on a device.
+function Get-SafeImageWidth([System.Drawing.Bitmap] $icon) {
+  $centre = ($icon.Width - 1) / 2.0
+  $maxRadius = 0.0
+
+  for ($y = 0; $y -lt $icon.Height; $y++) {
+    for ($x = 0; $x -lt $icon.Width; $x++) {
+      if ($icon.GetPixel($x, $y).A -le 8) { continue }
+      $dx = $x - $centre
+      $dy = $y - $centre
+      $radius = [Math]::Sqrt($dx * $dx + $dy * $dy)
+      if ($radius -gt $maxRadius) { $maxRadius = $radius }
+    }
+  }
+
+  $fraction = $maxRadius / $icon.Width
+  return [pscustomobject]@{
+    RadiusFraction = [Math]::Round($fraction, 4)
+    SafeImageWidth = [int][Math]::Floor(96.0 / $fraction)
+  }
 }
 
 Write-Output 'Mascot'
@@ -168,9 +185,12 @@ Write-Output 'Wordmark'
 $wordmark = Get-KeyedWordmark $referencePath 1036 1196
 Save-Png $wordmark (Join-Path $OutputDir 'loading\wordmark.png')
 
-Write-Output 'Splash composite'
-$splash = New-SplashComposite $mascot $wordmark 900
+Write-Output 'Splash icon'
+$splash = New-SplashIcon $mascot 900
 Save-Png $splash (Join-Path $OutputDir 'splash-spinner.png')
+$safe = Get-SafeImageWidth $splash
+Write-Output ("  artwork reaches {0:P1} of the canvas width from its centre" -f $safe.RadiusFraction)
+Write-Output ("  -> expo-splash-screen imageWidth must be {0} dp or less to avoid clipping" -f $safe.SafeImageWidth)
 
 foreach ($bitmap in @($mascot, $wordmark, $splash)) { $bitmap.Dispose() }
 

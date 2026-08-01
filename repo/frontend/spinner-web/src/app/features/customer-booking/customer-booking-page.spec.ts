@@ -150,8 +150,9 @@ describe('CustomerBookingPage pickup location', () => {
   it('records a point the customer chose by moving the map', () => {
     const { page } = createPage();
 
-    // The map is visible from the start; dragging it sets the point.
-    expect(page.mapVisible()).toBe(true);
+    // The map is opt-in now, so opening it is itself a deliberate act.
+    expect(page.mapVisible()).toBe(false);
+    page.openMap();
     expect(page.pickupPin()).toBeNull();
 
     page.onMapPointChosen({ latitude: 9.24101, longitude: 125.96712 });
@@ -248,6 +249,77 @@ describe('CustomerBookingPage pickup location', () => {
     expect(payload.fulfillmentType).toBe('DropOff');
     expect(payload.address).toBe('In-store');
     expect(payload.pickupLocation).toBeNull();
+  });
+
+  describe('pin is only ever captured deliberately', () => {
+    it('sends no pickup location when the customer only types an address', () => {
+      const { page } = createPage();
+
+      // Exactly the reported case: a full written address, no suggestion chosen,
+      // no map opened, no GPS.
+      page.submitBooking();
+      const payload = submittedPayload();
+
+      expect(payload.address).toBe(CUSTOMER_ADDRESS);
+      expect(payload.pickupLocation).toBeNull();
+      expect(page.pickupPin()).toBeNull();
+      expect(page.locationStatus()).toBe('idle');
+    });
+
+    it('does not render the map until the customer asks for it', () => {
+      const { fixture, page } = createPage();
+
+      // The map rendering unprompted is what allowed a page scroll over it to be
+      // read as a deliberate pan and save a pin near the default centre.
+      expect(page.mapVisible()).toBe(false);
+      expect(fixture.nativeElement.querySelector('app-location-picker-map')).toBeNull();
+
+      page.openMap();
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('app-location-picker-map')).not.toBeNull();
+    });
+
+    it('drops a map pin when the customer hides the map again', () => {
+      const { page } = createPage();
+
+      page.openMap();
+      page.onMapPointChosen({ latitude: 9.24101, longitude: 125.96712 });
+      flushReverseIfAny();
+      expect(page.pickupPin()).not.toBeNull();
+
+      page.closeMap();
+
+      // No hidden coordinate may survive on the order.
+      expect(page.pickupPin()).toBeNull();
+      page.submitBooking();
+      expect(submittedPayload().pickupLocation).toBeNull();
+    });
+
+    it('keeps a GPS pin when the map is hidden, because that was deliberate', async () => {
+      const { page } = createPage();
+      locationStub.getCurrentPosition.mockResolvedValue({
+        accuracyMeters: 12,
+        latitude: 9.2401,
+        longitude: 125.9671,
+      });
+
+      await page.useCurrentLocation();
+      flushReverseIfAny();
+      page.closeMap();
+
+      expect(page.pickupPin()!.source).toBe('currentLocation');
+    });
+
+    it('still records a pin the customer chose from a suggestion', () => {
+      const { page } = createPage();
+
+      page.applySuggestion(schoolSuggestion);
+
+      expect(page.pickupPin()!.source).toBe('addressSearch');
+      // And it becomes visible, so it can be checked or corrected.
+      expect(page.mapVisible()).toBe(true);
+    });
   });
 
   describe('per-service loads', () => {

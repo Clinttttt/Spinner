@@ -127,6 +127,14 @@ function mapListItem(dto: BookingListDto, index: number): BookingListItem {
     bookingCode: dto.orderCode,
     bookingStatus: mapApiOrderStatus(dto.status),
     canClear: dto.status === "Completed" || dto.status === "Rejected",
+    // An unpaid order that is already under way cannot be completed (that needs
+    // confirmed payment) and cannot be rejected (that only applies before
+    // approval), so without this it would sit on the list with no action at all.
+    // The usual case is a QR order the customer walked away from.
+    canCancel:
+      dto.status !== "Completed" &&
+      dto.status !== "Rejected" &&
+      dto.paymentStatus !== "Paid",
     customerName: dto.customerName,
     dateBucket: dateBucket(dto.preferredDate),
     fulfillmentType: primaryFulfillment,
@@ -149,6 +157,19 @@ export async function getBookings(): Promise<BookingListItem[]> {
  * total, and history entry are all kept; only the work list is tidied.
  */
 export async function clearBooking(bookingId: string) {
+  await apiRequest(`/api/orders/${bookingId}/archive`, { method: "POST" });
+}
+
+/**
+ * Cancels an order the shop will not fulfil and then clears it.
+ *
+ * Two calls rather than one because cancelling and clearing are separate
+ * decisions everywhere else: cancel closes the job, clear tidies the list.
+ * Clearing is safe to retry, so a failure between the two leaves the order
+ * cancelled and still clearable.
+ */
+export async function cancelAndClearBooking(bookingId: string) {
+  await apiRequest(`/api/orders/${bookingId}/cancel`, { method: "POST" });
   await apiRequest(`/api/orders/${bookingId}/archive`, { method: "POST" });
 }
 

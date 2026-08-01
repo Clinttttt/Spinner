@@ -31,14 +31,27 @@ interface PickupLocationDto {
   plusCode?: string;
 }
 
+interface PickupScheduleServiceDto {
+  name: string;
+  quantity: number;
+  subtotal: number;
+  unitLabel: string;
+  unitPrice: number;
+}
+
 /**
  * `/api/pickups` returns everything the pickup list renders, so the screen no
  * longer issues one extra order request per row.
  */
 interface PickupScheduleDto {
+  additionalNotes?: string;
   address: string;
   awaitingConfirmation: boolean;
   customerName: string;
+  estimatedDeliveryFee: number;
+  estimatedServiceAmount: number;
+  estimatedTotalAmount: number;
+  loadCount: number;
   mobileNumber?: string;
   orderCode: string;
   orderId: string;
@@ -50,6 +63,7 @@ interface PickupScheduleDto {
   pickupUpdatedAt?: string;
   preferredDate: string;
   preferredTimeWindow: string;
+  serviceLines?: PickupScheduleServiceDto[];
   services: string[];
   shortAddress: string;
   updatedAt: string;
@@ -57,13 +71,22 @@ interface PickupScheduleDto {
 
 interface OrderServiceDto {
   name: string;
+  quantity: number;
   serviceId: string;
+  subtotal: number;
+  unitLabel: string;
+  unitPrice: number;
 }
 
 interface OrderDetailsDto {
+  additionalNotes?: string;
   address: string;
   archivedAt?: string;
   customerName: string;
+  estimatedDeliveryFee: number;
+  estimatedServiceAmount: number;
+  estimatedTotalAmount: number;
+  loadCount: number;
   mobileNumber: string;
   orderCode: string;
   orderId: string;
@@ -210,22 +233,29 @@ function mapScheduleItem(
   filterBucket: PickupFilter,
 ): PickupTask {
   return {
+    additionalNotes: dto.additionalNotes,
     address: dto.shortAddress || dto.address,
     awaitingConfirmation: dto.awaitingConfirmation,
     bookingCode: dto.orderCode,
     canClear: isClearable(dto.orderStatus),
     completedAt: dto.pickupUpdatedAt,
     customerName: dto.customerName,
+    deliveryFee: dto.estimatedDeliveryFee ?? 0,
     filterBucket,
     id: dto.orderId,
+    loadCount: dto.loadCount ?? 0,
     location: mapLocation(dto.pickupLocation, dto.address),
     orderStatus: dto.orderStatus,
+    paymentMethod: dto.paymentMethod,
     paymentStatus: paymentStatus(dto),
     phone: dto.mobileNumber,
     pickupStatus: pickupStatus(dto.pickupStatus),
     scheduledAt: scheduledAt(dto.preferredDate, dto.preferredTimeWindow),
+    serviceAmount: dto.estimatedServiceAmount ?? 0,
+    serviceLines: dto.serviceLines ?? [],
     services: buildServices(dto.orderId, dto.services),
     timeLabel: dto.preferredTimeWindow,
+    totalAmount: dto.estimatedTotalAmount ?? 0,
   };
 }
 
@@ -234,25 +264,38 @@ function mapOrderDetails(
   filterBucket: PickupFilter,
 ): PickupTask {
   return {
+    additionalNotes: dto.additionalNotes,
     address: dto.address,
     awaitingConfirmation: dto.status === "BookingReceived",
     bookingCode: dto.orderCode,
     canClear: isClearable(dto.status),
     completedAt: dto.pickupUpdatedAt,
     customerName: dto.customerName,
+    deliveryFee: dto.estimatedDeliveryFee ?? 0,
     filterBucket,
     id: dto.orderId,
+    loadCount: dto.loadCount ?? 0,
     location: mapLocation(dto.pickupLocation, dto.address),
     orderStatus: dto.status,
+    paymentMethod: dto.paymentMethod,
     paymentStatus: paymentStatus(dto),
     phone: dto.mobileNumber,
     pickupStatus: pickupStatus(dto.pickupStatus),
     scheduledAt: scheduledAt(dto.preferredDate, dto.preferredTimeWindow),
+    serviceAmount: dto.estimatedServiceAmount ?? 0,
+    serviceLines: (dto.services ?? []).map((service) => ({
+      name: service.name,
+      quantity: service.quantity,
+      subtotal: service.subtotal,
+      unitLabel: service.unitLabel,
+      unitPrice: service.unitPrice,
+    })),
     services: buildServices(
       dto.orderId,
       dto.services.map((service) => service.name),
     ),
     timeLabel: dto.preferredTimeWindow,
+    totalAmount: dto.estimatedTotalAmount ?? 0,
   };
 }
 
@@ -270,18 +313,23 @@ function replaceTask(next: PickupTask) {
 
 function toLocationDetails(item: PickupTask): PickupLocationDetails {
   return {
+    additionalNotes: item.additionalNotes,
     awaitingConfirmation: item.awaitingConfirmation,
     customerName: item.customerName,
     customerPhone: item.phone,
+    deliveryFee: item.deliveryFee,
     location: { ...item.location },
     orderCode: item.bookingCode,
     paymentMethod: item.paymentStatus,
+    paymentMethodCode: item.paymentMethod,
     pickupId: item.id,
     pickupStatus: item.pickupStatus,
     pickupTime: item.timeLabel,
     routePreview: item.routePreview,
+    serviceLines: item.serviceLines.map((line) => ({ ...line })),
     services: item.services.map((service) => ({ ...service })),
     shortAddress: item.address,
+    totalAmount: item.totalAmount,
   };
 }
 

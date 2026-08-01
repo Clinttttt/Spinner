@@ -19,7 +19,8 @@ public static class BookingTestData
         FulfillmentType fulfillmentType = FulfillmentType.PickupAndDelivery,
         PaymentMethod paymentMethod = PaymentMethod.CashOnDelivery,
         Spinner.Api.Features.Orders.PickupLocationRequest? pickupLocation = null,
-        string? preferredTimeWindow = null)
+        string? preferredTimeWindow = null,
+        string? additionalNotes = null)
     {
         var supportsPickup = fulfillmentType == FulfillmentType.PickupAndDelivery;
         var service = new LaundryService(
@@ -59,7 +60,7 @@ public static class BookingTestData
                 timeWindow,
                 paymentMethod,
                 1,
-                null,
+                additionalNotes,
                 pickupLocation),
             CancellationToken.None);
     }

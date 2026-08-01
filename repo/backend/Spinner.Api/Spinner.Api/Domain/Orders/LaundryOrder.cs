@@ -290,6 +290,34 @@ public sealed class LaundryOrder
         return Result.Success();
     }
 
+    /// <summary>
+    /// Closes an order that is never going to proceed.
+    /// </summary>
+    /// <remarks>
+    /// Without this an order could become unclearable. A QR order that the
+    /// customer abandoned cannot be completed, because completion requires
+    /// confirmed payment, and it cannot be rejected, because rejection only
+    /// applies to a booking still awaiting approval. It therefore sat on the
+    /// owner's list permanently with no action available.
+    ///
+    /// Paid orders are deliberately excluded: money has already changed hands, so
+    /// that is a refund decision rather than a list-tidying one.
+    /// </remarks>
+    public Result Cancel(DateTimeOffset now)
+    {
+        if (IsClosed)
+            return Result.Success();
+
+        if (PaymentStatus == PaymentStatus.Paid)
+            return Result.Conflict(
+                "This order is already paid. Complete it or issue a refund instead of cancelling.");
+
+        Status = OrderStatus.Rejected;
+        UpdatedAt = now;
+
+        return Result.Success();
+    }
+
     public Result Reschedule(DateOnly preferredDate, string preferredTimeWindow, DateTimeOffset now)
     {
         if (Status is OrderStatus.Completed or OrderStatus.Rejected)

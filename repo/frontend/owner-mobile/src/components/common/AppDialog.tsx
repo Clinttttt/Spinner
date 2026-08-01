@@ -1,7 +1,9 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import type { ComponentProps } from "react";
+import { type ComponentProps, useEffect, useMemo } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   Modal,
   Pressable,
   ScrollView,
@@ -79,10 +81,24 @@ export function AppDialog({
   const insets = useSafeAreaInsets();
   const palette = toneStyles[tone];
   const dismissible = Boolean(cancelLabel && onCancel) && !busy;
+  // useMemo rather than a ref: reading ref.current during render is disallowed.
+  const entrance = useMemo(() => new Animated.Value(0), []);
+
+  useEffect(() => {
+    // A short scale-and-fade reads as a dialog answering the button that was
+    // pressed. The previous bottom-sheet slide implied a draggable surface the
+    // owner could swipe through, which this is not.
+    Animated.timing(entrance, {
+      duration: 170,
+      easing: Easing.out(Easing.quad),
+      toValue: 1,
+      useNativeDriver: true,
+    }).start();
+  }, [entrance]);
 
   return (
     <Modal
-      animationType="slide"
+      animationType="fade"
       onRequestClose={() => {
         if (dismissible) onCancel?.();
       }}
@@ -103,11 +119,25 @@ export function AppDialog({
           onPress={() => onCancel?.()}
           style={styles.backdrop}
         />
-        <View
+        <Animated.View
           accessibilityViewIsModal
-          style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 18) }]}
+          style={[
+            styles.sheet,
+            {
+              marginBottom: Math.max(insets.bottom, 0),
+              marginTop: Math.max(insets.top, 0),
+              opacity: entrance,
+              transform: [
+                {
+                  scale: entrance.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.96, 1],
+                  }),
+                },
+              ],
+            },
+          ]}
         >
-          <View style={styles.handle} />
           <View style={[styles.icon, { backgroundColor: palette.background }]}>
             <Ionicons color={palette.accent} name={palette.icon} size={26} />
           </View>
@@ -173,7 +203,7 @@ export function AppDialog({
               )}
             </Pressable>
           </View>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -228,19 +258,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
   },
   disabled: { opacity: 0.6 },
-  handle: {
-    alignSelf: "center",
-    backgroundColor: "#D0D5DD",
-    borderRadius: 2,
-    height: 4,
-    width: 38,
-  },
   icon: {
     alignItems: "center",
     borderRadius: radii.lg,
     height: 52,
     justifyContent: "center",
-    marginTop: spacing.md,
     width: 52,
   },
   messageArea: { maxHeight: 260 },
@@ -251,8 +273,10 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   root: {
+    alignItems: "center",
     flex: 1,
-    justifyContent: "flex-end",
+    justifyContent: "center",
+    paddingHorizontal: spacing.md,
   },
   secondaryButton: {
     backgroundColor: colors.surface,
@@ -266,10 +290,17 @@ const styles = StyleSheet.create({
   },
   sheet: {
     backgroundColor: colors.surface,
-    borderTopLeftRadius: radii.xl + 4,
-    borderTopRightRadius: radii.xl + 4,
+    borderRadius: radii.xl + 2,
+    elevation: 8,
+    maxWidth: 460,
+    paddingBottom: spacing.lg - 2,
     paddingHorizontal: spacing.lg - 2,
-    paddingTop: spacing.sm - 2,
+    paddingTop: spacing.lg - 4,
+    shadowColor: "#082347",
+    shadowOffset: { height: 10, width: 0 },
+    shadowOpacity: 0.22,
+    shadowRadius: 26,
+    width: "100%",
   },
   title: {
     color: colors.navy,

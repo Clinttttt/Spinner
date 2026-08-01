@@ -35,7 +35,10 @@ function BookingCardComponent({
     bookingServicePalettes[
       getBookingServicePaletteVariant(booking.serviceTags.length)
     ];
-  const showClear = booking.canClear && Boolean(onClearPress);
+  // Also offered for an order that is stuck open and unpaid, which the handler
+  // cancels first. Otherwise such an order has no available action at all.
+  const showClear =
+    (booking.canClear || booking.canCancel) && Boolean(onClearPress);
   // Clear and View together need most of the row, so a clearable card shows one
   // tag plus a "+N" chip instead of two full tags.
   const visibleTagCount = showClear ? 1 : 2;

@@ -28,7 +28,11 @@ import type {
   BookingStatusFilter,
   BookingsViewState,
 } from "../models/booking";
-import { clearBooking, getBookings } from "../services/bookingsService";
+import {
+  cancelAndClearBooking,
+  clearBooking,
+  getBookings,
+} from "../services/bookingsService";
 
 interface BookingsScreenProps {
   navigation: BottomTabNavigationProp<RootTabParamList, "Orders">;
@@ -97,25 +101,33 @@ export function BookingsScreen({
 
   const handleClearBooking = useCallback(
     async (booking: BookingListItem) => {
+      // A finished booking is simply tidied away. One that is still open has to
+      // be cancelled first, which is a different decision and says so.
+      const needsCancel = !booking.canClear && booking.canCancel;
+
       const accepted = await dialog.confirm({
         bullets: [`${booking.bookingCode} · ${booking.customerName}`],
-        confirmLabel: "Clear",
-        message:
-          "This finished booking is removed from the list. Sales, receipts, and history keep the record.",
-        title: "Clear this booking?",
-        tone: "warning",
+        confirmLabel: needsCancel ? "Cancel & Clear" : "Clear",
+        message: needsCancel
+          ? "This order is still open and unpaid. Cancelling it stops the job and removes it from the list. Sales, receipts, and history keep the record."
+          : "This finished booking is removed from the list. Sales, receipts, and history keep the record.",
+        title: needsCancel ? "Cancel this order?" : "Clear this booking?",
+        tone: needsCancel ? "danger" : "warning",
       });
       if (!accepted) return;
 
       try {
-        await clearBooking(booking.id);
+        if (needsCancel) await cancelAndClearBooking(booking.id);
+        else await clearBooking(booking.id);
         setBookings((current) =>
           current.filter((item) => item.id !== booking.id),
         );
       } catch (error) {
         await dialog.notify({
           message: describeApiError(error, "Please try again."),
-          title: "Unable to clear booking",
+          title: needsCancel
+            ? "Unable to cancel order"
+            : "Unable to clear booking",
           tone: "danger",
         });
       }

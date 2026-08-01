@@ -138,9 +138,16 @@ export class CustomerBookingPage {
   readonly locationStatus = signal<LocationStatus>('idle');
   readonly locationError = signal('');
   readonly pickupPin = signal<PickupPin | null>(null);
-  // The map is the primary way to set a rural pickup point, so it is shown from
-  // the start rather than hidden behind a button.
-  readonly mapVisible = signal(true);
+  /**
+   * The map is hidden until the customer asks for it.
+   *
+   * It used to render immediately, and on a phone a page scroll that started over
+   * the map panned the map instead of scrolling the page. Leaflet reported that
+   * as a real gesture, so the form saved a pin at roughly the default centre and
+   * labelled it with whatever place happened to be nearest. Customers ended up
+   * with an order pointing at a barangay school they had never selected.
+   */
+  readonly mapVisible = signal(false);
 
   readonly serviceArea = signal<ServiceAreaCheckDto | null>(null);
   readonly checkingServiceArea = signal(false);
@@ -417,6 +424,9 @@ export class CustomerBookingPage {
       placeId: suggestion.placeId,
       source: 'addressSearch',
     });
+    // Choosing a place is deliberate, so show the pin that was just set rather
+    // than attaching a coordinate the customer cannot see.
+    this.mapVisible.set(true);
     this.closeSuggestions();
   }
 
@@ -508,12 +518,32 @@ export class CustomerBookingPage {
     }
   }
 
-  changeLocation(): void {
+  /** The customer asked for the map, so a pan from here on is deliberate. */
+  openMap(): void {
+    this.mapVisible.set(true);
+    this.closeSuggestions();
+  }
+
+  /**
+   * Puts the form back to address-only. The pin is dropped as well, because
+   * leaving a hidden coordinate attached to the order is exactly how a customer
+   * ends up with a pickup point they cannot see or correct.
+   */
+  closeMap(): void {
+    this.mapVisible.set(false);
+    if (this.pickupPin()?.source === 'manualPin') this.clearPin();
+  }
+
+  private clearPin(): void {
     this.pickupPin.set(null);
     this.locationStatus.set('idle');
     this.locationError.set('');
     this.serviceArea.set(null);
     this.checkingServiceArea.set(false);
+  }
+
+  changeLocation(): void {
+    this.clearPin();
     this.mapVisible.set(true);
   }
 

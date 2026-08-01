@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Spinner.Api.Features.Orders;
 using Spinner.Api.Features.Orders.ArchiveOrder;
+using Spinner.Api.Features.Orders.CancelOrder;
 using Spinner.Api.Features.Orders.GetCustomerTracking;
 using Spinner.Api.Features.Orders.GetOrderDetails;
 using Spinner.Api.Features.Orders.UpdateOrderStatus;
@@ -58,6 +59,16 @@ public sealed class OrdersController : ApiControllerBase
     public async Task<ActionResult<OrderDetailsResponse>> Restore(Guid id, CancellationToken ct)
     {
         var result = await Sender.Send(new ArchiveOrderCommand(id, false), ct);
+        return HandleResponse(result);
+    }
+
+    /// <summary>
+    /// Cancels an unpaid order the shop will not fulfil, so it can be cleared.
+    /// </summary>
+    [HttpPost("{id:guid}/cancel")]
+    public async Task<ActionResult<OrderDetailsResponse>> Cancel(Guid id, CancellationToken ct)
+    {
+        var result = await Sender.Send(new CancelOrderCommand(id), ct);
         return HandleResponse(result);
     }
 }

@@ -2,7 +2,7 @@ import { NavigationContainer, DefaultTheme } from "@react-navigation/native";
 import { NavigationBar } from "expo-navigation-bar";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { AppLoadingScreen } from "./src/components/common/AppLoadingScreen";
@@ -30,8 +30,29 @@ const navigationTheme = {
   },
 };
 
+/**
+ * Keeps the branded loading screen on screen for a moment.
+ *
+ * Restoring the saved session is usually near-instant, so the loading screen was
+ * drawn and torn down within a frame or two: the owner only ever saw the native
+ * launch screen and reported the branded one as missing. This runs alongside the
+ * session restore, so in practice it adds nothing unless startup was already
+ * faster than the eye can follow.
+ */
+function useBrandMoment(durationMs: number) {
+  const [elapsed, setElapsed] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setElapsed(true), durationMs);
+    return () => clearTimeout(timer);
+  }, [durationMs]);
+
+  return elapsed;
+}
+
 function AppContent() {
   const { loading, session } = useAuth();
+  const brandMomentDone = useBrandMoment(900);
 
   useEffect(() => {
     // The branded loading screen is now on screen and continues the launch
@@ -39,7 +60,7 @@ function AppContent() {
     void SplashScreen.hideAsync().catch(() => undefined);
   }, []);
 
-  if (loading) return <AppLoadingScreen />;
+  if (loading || !brandMomentDone) return <AppLoadingScreen />;
 
   if (!session) return <LoginScreen />;
 

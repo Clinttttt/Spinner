@@ -24,6 +24,10 @@ import { PickupOverviewCard } from "../components/PickupOverviewCard";
 import { PickupSkeleton } from "../components/PickupSkeleton";
 import { PickupStateCard } from "../components/PickupStateCard";
 import type { PickupStackParamList } from "../navigation/types";
+import {
+  buildPickupConfirmationLines,
+  confirmationSourceFromTask,
+} from "../services/pickupConfirmation";
 import type {
   PickupFilter,
   PickupTask,
@@ -195,10 +199,10 @@ export function PickupScreen({ navigation }: PickupScreenProps) {
       if (!task) return;
 
       const accepted = await dialog.confirm({
-        bullets: [`${task.customerName} · ${task.timeLabel}`, task.address],
+        bullets: buildPickupConfirmationLines(confirmationSourceFromTask(task)),
         confirmLabel: "Mark Picked Up",
         message:
-          "Confirm that the laundry has been collected. The customer is notified and the order moves into processing.",
+          "Check this against the bags before you confirm. The customer is notified and the order moves into processing.",
         title: "Mark this pickup collected?",
       });
       if (!accepted) return;
@@ -219,7 +223,7 @@ export function PickupScreen({ navigation }: PickupScreenProps) {
   const handleConfirmBooking = useCallback(
     async (task: PickupTask) => {
       const accepted = await dialog.confirm({
-        bullets: [`${task.customerName} · ${task.timeLabel}`, task.address],
+        bullets: buildPickupConfirmationLines(confirmationSourceFromTask(task)),
         confirmLabel: "Confirm Booking",
         message:
           "This customer booking is still waiting for your approval. Confirming it keeps the job on the pickup schedule and notifies the customer.",

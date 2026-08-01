@@ -17,6 +17,8 @@ export interface BookingListItem {
   bookingCode: string;
   /** Finished orders can be cleared from the active list. */
   canClear: boolean;
+  /** Unpaid and still open, so it can be cancelled to get it off the list. */
+  canCancel: boolean;
   customerName: string;
   phoneNumber?: string;
   scheduleLabel: string;

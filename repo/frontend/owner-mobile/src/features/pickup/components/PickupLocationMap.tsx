@@ -20,10 +20,10 @@ const businessHomeMarker = require("../../../../assets/branding/business-home-ma
 /**
  * No `customMapStyle` is applied on purpose.
  *
- * The previous hand-written palette flattened roads, buildings, and land to
- * near-white, which read as fog and hid exactly the detail a rider needs. Google's
- * default road map already renders named streets, buildings, and points of
- * interest at high contrast, so the most legible option is to leave it alone.
+ * An earlier hand-written palette flattened roads, buildings, and land to
+ * near-white, which read as fog and hid exactly the detail a rider needs. Custom
+ * styling is also ignored on satellite and hybrid map types, so the map type does
+ * the work instead.
  */
 interface PickupLocationMapProps {
   compact: boolean;
@@ -123,9 +123,15 @@ export function PickupLocationMap({
           longitudeDelta: 0.0035,
         }}
         mapPadding={{ bottom: 24, left: 20, right: 20, top: 32 }}
-        // A road map names the streets a rider actually follows. Satellite
-        // imagery of rural Surigao is unreadable green texture.
-        mapType="standard"
+        // Hybrid: satellite imagery with Google's road and place labels drawn on
+        // top. A rider heading to "Purok 4" has no house numbers to work from, so
+        // seeing the actual roofs, tracks, and yards is what makes the pin usable.
+        //
+        // It also sidesteps a real problem with the plain road map: the Google
+        // Maps SDK follows the system dark theme, and on a phone in dark mode the
+        // road map rendered near-black with almost no visible detail. Satellite
+        // tiles are photography and are not re-themed.
+        mapType="hybrid"
         onMapReady={handleMapReady}
         pitchEnabled={false}
         provider={PROVIDER_GOOGLE}

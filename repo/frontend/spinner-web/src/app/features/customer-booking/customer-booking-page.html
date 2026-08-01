@@ -375,6 +375,17 @@
                   </span>
                 </button>
               }
+              <!-- Opt-in. The map used to render straight away, and on a phone a
+                   page scroll that began on the map panned the map instead, which
+                   silently saved a pin the customer never chose. -->
+              @if (!mapVisible()) {
+                <button class="locate-button" type="button" (click)="openMap()">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M9 20 3 17V4l6 3m0 13 6-3m-6 3V7m6 10 6 3V7l-6-3m0 13V4" />
+                  </svg>
+                  <span>Point it out on a map</span>
+                </button>
+              }
             </div>
 
             @if (mapVisible()) {
@@ -383,6 +394,9 @@
                   [centre]="mapCentre()"
                   (pointChosen)="onMapPointChosen($event)"
                 />
+                <button class="link-button" type="button" (click)="closeMap()">
+                  Hide the map — my written address is enough
+                </button>
               </div>
             }
 
@@ -421,8 +435,8 @@
               }
               @default {
                 <p class="address-hint">
-                  Optional but strongly recommended. A pin lets the rider navigate straight to you
-                  instead of calling for directions.
+                  Your written address and landmark are enough to book. A map pin is optional and
+                  only helps the rider navigate straight to you.
                 </p>
               }
             }

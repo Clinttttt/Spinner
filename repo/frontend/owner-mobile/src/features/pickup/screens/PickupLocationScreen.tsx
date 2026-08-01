@@ -22,6 +22,10 @@ import { PickupLocationDetailsCard } from "../components/PickupLocationDetailsCa
 import { PickupLocationHeader } from "../components/PickupLocationHeader";
 import { PickupLocationMap } from "../components/PickupLocationMap";
 import {
+  buildPickupConfirmationLines,
+  confirmationSourceFromDetails,
+} from "../services/pickupConfirmation";
+import {
   PickupLocationSkeleton,
   PickupLocationState,
 } from "../components/PickupLocationStates";
@@ -153,10 +157,9 @@ export function PickupLocationScreen({
 
     if (details.awaitingConfirmation) {
       const accepted = await dialog.confirm({
-        bullets: [
-          `${details.customerName} · ${details.pickupTime}`,
-          details.location.formattedAddress || details.shortAddress,
-        ],
+        bullets: buildPickupConfirmationLines(
+          confirmationSourceFromDetails(details),
+        ),
         confirmLabel: "Confirm Booking",
         message:
           "This customer booking still needs your approval before the pickup can be collected.",
@@ -165,10 +168,12 @@ export function PickupLocationScreen({
       if (!accepted) return;
     } else if (details.pickupStatus === "onRoute") {
       const accepted = await dialog.confirm({
-        bullets: [`${details.customerName} · ${details.orderCode}`],
+        bullets: buildPickupConfirmationLines(
+          confirmationSourceFromDetails(details),
+        ),
         confirmLabel: "Mark Picked Up",
         message:
-          "Confirm that the laundry has been collected. The customer is notified and the order moves into processing.",
+          "Check this against the bags before you confirm. The customer is notified and the order moves into processing.",
         title: "Mark this pickup collected?",
       });
       if (!accepted) return;

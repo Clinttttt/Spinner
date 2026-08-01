@@ -63,14 +63,19 @@ module.exports = {
         // Without this plugin Android 12+ falls back to its system splash: a
         // small launcher icon on a black background.
         //
-        // The image and colour deliberately match the first frame of
-        // AppLoadingScreen, so the launch screen hands over to the running app
-        // without the logo moving or the background changing colour.
+        // Android 12+ treats this image as the splash *icon* and masks it, keeping
+        // roughly the inner 192dp of a 288dp area. A previous version stacked the
+        // mascot and the wordmark here and the wordmark was sliced in half on
+        // device, so the launch screen shows the mascot alone; AppLoadingScreen
+        // draws the wordmark, swirl, and progress bar once React is up.
+        //
+        // 180dp is under the 187dp ceiling that scripts/build-branding-assets.ps1
+        // calculates from how far the artwork actually reaches from its centre.
         "expo-splash-screen",
         {
           backgroundColor: "#F7FAFF",
           image: "./assets/splash-spinner.png",
-          imageWidth: 240,
+          imageWidth: 180,
           resizeMode: "contain",
         },
       ],
