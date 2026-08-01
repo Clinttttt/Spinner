@@ -1,6 +1,8 @@
 import { NavigationContainer, DefaultTheme } from "@react-navigation/native";
 import { NavigationBar } from "expo-navigation-bar";
+import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
+import { useEffect } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { AppLoadingScreen } from "./src/components/common/AppLoadingScreen";
@@ -10,6 +12,11 @@ import { AuthProvider, useAuth } from "./src/features/auth/AuthContext";
 import { LoginScreen } from "./src/features/auth/screens/LoginScreen";
 import { colors } from "./src/theme/colors";
 import { OfflineNotice } from "./src/offline/OfflineNotice";
+
+// Hold the native launch screen until React has painted, otherwise Android shows
+// a blank frame between the two. Failures are ignored: a visible splash is far
+// better than a crash on startup.
+void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 const navigationTheme = {
   ...DefaultTheme,
@@ -25,6 +32,12 @@ const navigationTheme = {
 
 function AppContent() {
   const { loading, session } = useAuth();
+
+  useEffect(() => {
+    // The branded loading screen is now on screen and continues the launch
+    // artwork, so the native splash can come down without a visible seam.
+    void SplashScreen.hideAsync().catch(() => undefined);
+  }, []);
 
   if (loading) return <AppLoadingScreen />;
 

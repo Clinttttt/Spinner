@@ -28,7 +28,7 @@ import { radii } from "../../../theme/radii";
 import { spacing } from "../../../theme/spacing";
 import { useAuth } from "../AuthContext";
 
-const welcomeMascot = require("../../../../assets/login-welcome-mascot-cropped.png");
+const welcomeMascot = require("../../../../assets/spinner-mascot.png");
 const authBackground = require("../../../../assets/backgrounds/login-background.webp");
 const MASCOT_CARD_OVERLAP = 64;
 
@@ -344,385 +344,390 @@ export function LoginScreen() {
   );
 
   return (
-    <SafeAreaView edges={["top", "bottom"]} style={styles.safeArea}>
-      {/* Sits behind the whole flow so the card reads as a panel on paper
-          rather than a form floating on flat white. */}
+    <View style={styles.root}>
+      {/* Outside the safe area on purpose. A percentage height inside it resolves
+          against the inset-padded box, which left the artwork short of the bottom
+          of the screen and showed a bare strip under the card. */}
       <Image
         accessibilityIgnoresInvertColors
         resizeMode="cover"
         source={authBackground}
         style={styles.background}
       />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.screen}
-      >
-        <ScrollView
-          automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
-          contentContainerStyle={[
-            styles.content,
-            keyboardVisible && styles.contentKeyboard,
-          ]}
-          keyboardDismissMode="on-drag"
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+      <SafeAreaView edges={["top", "bottom"]} style={styles.safeArea}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.screen}
         >
-          {/* The mascot is a sign-in welcome flourish. On the taller Create
+          <ScrollView
+            automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+            contentContainerStyle={[
+              styles.content,
+              keyboardVisible && styles.contentKeyboard,
+            ]}
+            keyboardDismissMode="on-drag"
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {/* The mascot is a sign-in welcome flourish. On the taller Create
               Account, Verify, and Reset forms it only got cropped, so it is
               hidden there and the form starts at the top of the screen. */}
-          {!keyboardVisible && isSignIn ? (
-            <View style={[styles.hero, { height: heroHeight }]}>
-              <Image
-                accessibilityIgnoresInvertColors
-                resizeMode="contain"
-                source={welcomeMascot}
-                style={styles.mascot}
-              />
-            </View>
-          ) : null}
-
-          <View
-            style={[
-              styles.card,
-              !keyboardVisible && isSignIn && styles.cardWithMascotOverlap,
-            ]}
-          >
-            <View style={styles.heading}>
-              <Text style={styles.title}>{title}</Text>
-              <Text style={styles.subtitle}>{subtitle}</Text>
-            </View>
-
-            {isSignIn || isSignUp ? (
-              <View style={styles.modeSwitch}>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => changeMode("signIn")}
-                  style={[
-                    styles.modeButton,
-                    mode === "signIn" && styles.modeButtonActive,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.modeLabel,
-                      mode === "signIn" && styles.modeLabelActive,
-                    ]}
-                  >
-                    Sign In
-                  </Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => changeMode("signUp")}
-                  style={[
-                    styles.modeButton,
-                    mode === "signUp" && styles.modeButtonActive,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.modeLabel,
-                      mode === "signUp" && styles.modeLabelActive,
-                    ]}
-                  >
-                    Create Account
-                  </Text>
-                </Pressable>
+            {!keyboardVisible && isSignIn ? (
+              <View style={[styles.hero, { height: heroHeight }]}>
+                <Image
+                  accessibilityIgnoresInvertColors
+                  resizeMode="contain"
+                  source={welcomeMascot}
+                  style={styles.mascot}
+                />
               </View>
             ) : null}
 
-            <View style={styles.form}>
-              {isSignUp ? (
-                <>
-                  <AuthField
-                    autoCapitalize="words"
-                    autoComplete="name"
-                    editable={!submitting}
-                    icon="person-outline"
-                    label="Full name"
-                    onChangeText={setFullName}
-                    placeholder="Your full name"
-                    value={fullName}
-                  />
-                  <AuthField
-                    autoComplete="email"
-                    editable={!submitting}
-                    icon="mail-outline"
-                    keyboardType="email-address"
-                    label="Email address"
-                    onChangeText={setEmailAddress}
-                    placeholder="Enter your email address"
-                    value={emailAddress}
-                  />
-                  <AuthField
-                    autoComplete="tel"
-                    editable={!submitting}
-                    icon="call-outline"
-                    keyboardType="phone-pad"
-                    label="Mobile number"
-                    onChangeText={setMobileNumber}
-                    placeholder="09xx xxx xxxx"
-                    value={mobileNumber}
-                  />
-                </>
-              ) : isSignIn ? (
-                <AuthField
-                  autoComplete="username"
-                  editable={!submitting}
-                  icon="person-outline"
-                  label="Email or mobile number"
-                  onChangeText={setLogin}
-                  placeholder="Enter email or mobile number"
-                  value={login}
-                />
-              ) : isVerify ? (
-                <>
-                  <AuthField
-                    autoComplete="email"
-                    editable={!submitting}
-                    icon="mail-outline"
-                    keyboardType="email-address"
-                    label="Email address"
-                    onChangeText={setEmailAddress}
-                    placeholder="Enter your email address"
-                    value={emailAddress}
-                  />
-                  <AuthField
-                    autoComplete="one-time-code"
-                    editable={!submitting}
-                    icon="keypad-outline"
-                    keyboardType="number-pad"
-                    label="Verification code"
-                    onChangeText={(value) =>
-                      setCode(value.replace(/\D/g, "").slice(0, 6))
-                    }
-                    onSubmitEditing={() => void submit()}
-                    placeholder="000000"
-                    value={code}
-                  />
-                </>
-              ) : isForgot ? (
-                <AuthField
-                  autoComplete="username"
-                  editable={!submitting}
-                  icon="person-outline"
-                  label="Email or mobile number"
-                  onChangeText={setPendingLogin}
-                  onSubmitEditing={() => void submit()}
-                  placeholder="Enter email or mobile number"
-                  value={pendingLogin}
-                />
-              ) : (
-                <>
-                  <AuthField
-                    autoComplete="one-time-code"
-                    editable={!submitting}
-                    icon="keypad-outline"
-                    keyboardType="number-pad"
-                    label="Reset code"
-                    onChangeText={(value) =>
-                      setCode(value.replace(/\D/g, "").slice(0, 6))
-                    }
-                    placeholder="000000"
-                    value={code}
-                  />
-                </>
-              )}
-
-              {isSignIn || isSignUp || isReset ? (
-                <AuthField
-                  autoComplete={
-                    isSignUp || isReset ? "new-password" : "current-password"
-                  }
-                  editable={!submitting}
-                  icon="lock-closed-outline"
-                  label="Password"
-                  onChangeText={setPassword}
-                  onSubmitEditing={
-                    isSignUp || isReset ? undefined : () => void submit()
-                  }
-                  placeholder={
-                    isSignUp || isReset
-                      ? "At least 10 characters"
-                      : "Enter your password"
-                  }
-                  rightAccessory={passwordAccessory}
-                  secureTextEntry={!showPassword}
-                  value={password}
-                />
-              ) : null}
-
-              {isSignUp || isReset ? (
-                <AuthField
-                  autoComplete="new-password"
-                  editable={!submitting}
-                  icon="shield-checkmark-outline"
-                  label="Confirm password"
-                  onChangeText={setConfirmPassword}
-                  onSubmitEditing={() => void submit()}
-                  placeholder="Re-enter your password"
-                  rightAccessory={
-                    <Pressable
-                      accessibilityLabel={
-                        showConfirmPassword
-                          ? "Hide confirmed password"
-                          : "Show confirmed password"
-                      }
-                      accessibilityRole="button"
-                      hitSlop={10}
-                      onPress={() =>
-                        setShowConfirmPassword((visible) => !visible)
-                      }
-                    >
-                      <Ionicons
-                        color={colors.textSecondary}
-                        name={
-                          showConfirmPassword
-                            ? "eye-off-outline"
-                            : "eye-outline"
-                        }
-                        size={23}
-                      />
-                    </Pressable>
-                  }
-                  secureTextEntry={!showConfirmPassword}
-                  value={confirmPassword}
-                />
-              ) : null}
-            </View>
-
-            {isSignIn ? (
-              <Pressable
-                accessibilityRole="button"
-                disabled={submitting}
-                hitSlop={8}
-                onPress={() => {
-                  setPendingLogin(login.trim());
-                  changeMode("forgot");
-                }}
-                style={styles.inlineAction}
-              >
-                <Text style={styles.inlineActionLabel}>Forgot password?</Text>
-              </Pressable>
-            ) : null}
-
-            {notice ? (
-              <View accessibilityLiveRegion="polite" style={styles.noticeBox}>
-                <Ionicons
-                  color={colors.success}
-                  name="checkmark-circle-outline"
-                  size={18}
-                />
-                <Text style={styles.notice}>{notice}</Text>
-              </View>
-            ) : null}
-
-            {error ? (
-              <View accessibilityLiveRegion="polite" style={styles.errorBox}>
-                <Ionicons
-                  color={colors.danger}
-                  name="alert-circle-outline"
-                  size={18}
-                />
-                <Text style={styles.error}>{error}</Text>
-              </View>
-            ) : null}
-
-            <Pressable
-              accessibilityRole="button"
-              disabled={submitting}
-              onPress={() => void submit()}
-              style={({ pressed }) => [
-                styles.primaryButton,
-                pressed && styles.buttonPressed,
-                submitting && styles.buttonDisabled,
+            <View
+              style={[
+                styles.card,
+                !keyboardVisible && isSignIn && styles.cardWithMascotOverlap,
               ]}
             >
-              {submitting ? (
-                <View style={styles.buttonContent}>
-                  <ActivityIndicator color={colors.surface} size="small" />
+              <View style={styles.heading}>
+                <Text style={styles.title}>{title}</Text>
+                <Text style={styles.subtitle}>{subtitle}</Text>
+              </View>
+
+              {isSignIn || isSignUp ? (
+                <View style={styles.modeSwitch}>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => changeMode("signIn")}
+                    style={[
+                      styles.modeButton,
+                      mode === "signIn" && styles.modeButtonActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.modeLabel,
+                        mode === "signIn" && styles.modeLabelActive,
+                      ]}
+                    >
+                      Sign In
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => changeMode("signUp")}
+                    style={[
+                      styles.modeButton,
+                      mode === "signUp" && styles.modeButtonActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.modeLabel,
+                        mode === "signUp" && styles.modeLabelActive,
+                      ]}
+                    >
+                      Create Account
+                    </Text>
+                  </Pressable>
+                </View>
+              ) : null}
+
+              <View style={styles.form}>
+                {isSignUp ? (
+                  <>
+                    <AuthField
+                      autoCapitalize="words"
+                      autoComplete="name"
+                      editable={!submitting}
+                      icon="person-outline"
+                      label="Full name"
+                      onChangeText={setFullName}
+                      placeholder="Your full name"
+                      value={fullName}
+                    />
+                    <AuthField
+                      autoComplete="email"
+                      editable={!submitting}
+                      icon="mail-outline"
+                      keyboardType="email-address"
+                      label="Email address"
+                      onChangeText={setEmailAddress}
+                      placeholder="Enter your email address"
+                      value={emailAddress}
+                    />
+                    <AuthField
+                      autoComplete="tel"
+                      editable={!submitting}
+                      icon="call-outline"
+                      keyboardType="phone-pad"
+                      label="Mobile number"
+                      onChangeText={setMobileNumber}
+                      placeholder="09xx xxx xxxx"
+                      value={mobileNumber}
+                    />
+                  </>
+                ) : isSignIn ? (
+                  <AuthField
+                    autoComplete="username"
+                    editable={!submitting}
+                    icon="person-outline"
+                    label="Email or mobile number"
+                    onChangeText={setLogin}
+                    placeholder="Enter email or mobile number"
+                    value={login}
+                  />
+                ) : isVerify ? (
+                  <>
+                    <AuthField
+                      autoComplete="email"
+                      editable={!submitting}
+                      icon="mail-outline"
+                      keyboardType="email-address"
+                      label="Email address"
+                      onChangeText={setEmailAddress}
+                      placeholder="Enter your email address"
+                      value={emailAddress}
+                    />
+                    <AuthField
+                      autoComplete="one-time-code"
+                      editable={!submitting}
+                      icon="keypad-outline"
+                      keyboardType="number-pad"
+                      label="Verification code"
+                      onChangeText={(value) =>
+                        setCode(value.replace(/\D/g, "").slice(0, 6))
+                      }
+                      onSubmitEditing={() => void submit()}
+                      placeholder="000000"
+                      value={code}
+                    />
+                  </>
+                ) : isForgot ? (
+                  <AuthField
+                    autoComplete="username"
+                    editable={!submitting}
+                    icon="person-outline"
+                    label="Email or mobile number"
+                    onChangeText={setPendingLogin}
+                    onSubmitEditing={() => void submit()}
+                    placeholder="Enter email or mobile number"
+                    value={pendingLogin}
+                  />
+                ) : (
+                  <>
+                    <AuthField
+                      autoComplete="one-time-code"
+                      editable={!submitting}
+                      icon="keypad-outline"
+                      keyboardType="number-pad"
+                      label="Reset code"
+                      onChangeText={(value) =>
+                        setCode(value.replace(/\D/g, "").slice(0, 6))
+                      }
+                      placeholder="000000"
+                      value={code}
+                    />
+                  </>
+                )}
+
+                {isSignIn || isSignUp || isReset ? (
+                  <AuthField
+                    autoComplete={
+                      isSignUp || isReset ? "new-password" : "current-password"
+                    }
+                    editable={!submitting}
+                    icon="lock-closed-outline"
+                    label="Password"
+                    onChangeText={setPassword}
+                    onSubmitEditing={
+                      isSignUp || isReset ? undefined : () => void submit()
+                    }
+                    placeholder={
+                      isSignUp || isReset
+                        ? "At least 10 characters"
+                        : "Enter your password"
+                    }
+                    rightAccessory={passwordAccessory}
+                    secureTextEntry={!showPassword}
+                    value={password}
+                  />
+                ) : null}
+
+                {isSignUp || isReset ? (
+                  <AuthField
+                    autoComplete="new-password"
+                    editable={!submitting}
+                    icon="shield-checkmark-outline"
+                    label="Confirm password"
+                    onChangeText={setConfirmPassword}
+                    onSubmitEditing={() => void submit()}
+                    placeholder="Re-enter your password"
+                    rightAccessory={
+                      <Pressable
+                        accessibilityLabel={
+                          showConfirmPassword
+                            ? "Hide confirmed password"
+                            : "Show confirmed password"
+                        }
+                        accessibilityRole="button"
+                        hitSlop={10}
+                        onPress={() =>
+                          setShowConfirmPassword((visible) => !visible)
+                        }
+                      >
+                        <Ionicons
+                          color={colors.textSecondary}
+                          name={
+                            showConfirmPassword
+                              ? "eye-off-outline"
+                              : "eye-outline"
+                          }
+                          size={23}
+                        />
+                      </Pressable>
+                    }
+                    secureTextEntry={!showConfirmPassword}
+                    value={confirmPassword}
+                  />
+                ) : null}
+              </View>
+
+              {isSignIn ? (
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={submitting}
+                  hitSlop={8}
+                  onPress={() => {
+                    setPendingLogin(login.trim());
+                    changeMode("forgot");
+                  }}
+                  style={styles.inlineAction}
+                >
+                  <Text style={styles.inlineActionLabel}>Forgot password?</Text>
+                </Pressable>
+              ) : null}
+
+              {notice ? (
+                <View accessibilityLiveRegion="polite" style={styles.noticeBox}>
+                  <Ionicons
+                    color={colors.success}
+                    name="checkmark-circle-outline"
+                    size={18}
+                  />
+                  <Text style={styles.notice}>{notice}</Text>
+                </View>
+              ) : null}
+
+              {error ? (
+                <View accessibilityLiveRegion="polite" style={styles.errorBox}>
+                  <Ionicons
+                    color={colors.danger}
+                    name="alert-circle-outline"
+                    size={18}
+                  />
+                  <Text style={styles.error}>{error}</Text>
+                </View>
+              ) : null}
+
+              <Pressable
+                accessibilityRole="button"
+                disabled={submitting}
+                onPress={() => void submit()}
+                style={({ pressed }) => [
+                  styles.primaryButton,
+                  pressed && styles.buttonPressed,
+                  submitting && styles.buttonDisabled,
+                ]}
+              >
+                {submitting ? (
+                  <View style={styles.buttonContent}>
+                    <ActivityIndicator color={colors.surface} size="small" />
+                    <Text style={styles.primaryButtonLabel}>
+                      {isSignUp
+                        ? "Creating account..."
+                        : isVerify
+                          ? "Verifying..."
+                          : isForgot
+                            ? "Sending code..."
+                            : isReset
+                              ? "Resetting password..."
+                              : "Signing in..."}
+                    </Text>
+                  </View>
+                ) : (
                   <Text style={styles.primaryButtonLabel}>
                     {isSignUp
-                      ? "Creating account..."
+                      ? "Create Account"
                       : isVerify
-                        ? "Verifying..."
+                        ? "Verify & Sign In"
                         : isForgot
-                          ? "Sending code..."
+                          ? "Send Reset Code"
                           : isReset
-                            ? "Resetting password..."
-                            : "Signing in..."}
+                            ? "Reset Password"
+                            : "Sign In"}
                   </Text>
+                )}
+              </Pressable>
+
+              {isVerify ? (
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={submitting}
+                  onPress={() => void resendCode()}
+                  style={styles.secondaryAction}
+                >
+                  <Text style={styles.secondaryActionLabel}>
+                    Resend verification code
+                  </Text>
+                </Pressable>
+              ) : null}
+
+              {!isSignIn && !isSignUp ? (
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={submitting}
+                  onPress={() => changeMode("signIn")}
+                  style={styles.secondaryAction}
+                >
+                  <Ionicons
+                    color={colors.navy}
+                    name="arrow-back-outline"
+                    size={17}
+                  />
+                  <Text style={styles.secondaryActionLabel}>
+                    Back to sign in
+                  </Text>
+                </Pressable>
+              ) : null}
+
+              <View style={styles.security}>
+                <View style={styles.securityIcon}>
+                  <Ionicons
+                    color={colors.actionBlue}
+                    name="shield-checkmark-outline"
+                    size={18}
+                  />
                 </View>
-              ) : (
-                <Text style={styles.primaryButtonLabel}>
-                  {isSignUp
-                    ? "Create Account"
-                    : isVerify
-                      ? "Verify & Sign In"
-                      : isForgot
-                        ? "Send Reset Code"
-                        : isReset
-                          ? "Reset Password"
-                          : "Sign In"}
+                <Text style={styles.securityLabel}>
+                  Your account data is secured on this device.
                 </Text>
-              )}
-            </Pressable>
-
-            {isVerify ? (
-              <Pressable
-                accessibilityRole="button"
-                disabled={submitting}
-                onPress={() => void resendCode()}
-                style={styles.secondaryAction}
-              >
-                <Text style={styles.secondaryActionLabel}>
-                  Resend verification code
-                </Text>
-              </Pressable>
-            ) : null}
-
-            {!isSignIn && !isSignUp ? (
-              <Pressable
-                accessibilityRole="button"
-                disabled={submitting}
-                onPress={() => changeMode("signIn")}
-                style={styles.secondaryAction}
-              >
-                <Ionicons
-                  color={colors.navy}
-                  name="arrow-back-outline"
-                  size={17}
-                />
-                <Text style={styles.secondaryActionLabel}>Back to sign in</Text>
-              </Pressable>
-            ) : null}
-
-            <View style={styles.security}>
-              <View style={styles.securityIcon}>
-                <Ionicons
-                  color={colors.actionBlue}
-                  name="shield-checkmark-outline"
-                  size={18}
-                />
               </View>
-              <Text style={styles.securityLabel}>
-                Your account data is secured on this device.
-              </Text>
             </View>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   background: {
-    height: "100%",
+    bottom: 0,
     left: 0,
     position: "absolute",
+    right: 0,
     top: 0,
-    width: "100%",
   },
   buttonContent: {
     alignItems: "center",
@@ -737,7 +742,7 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.995 }],
   },
   card: {
-    backgroundColor: "rgba(255,255,255,0.94)",
+    backgroundColor: colors.surface,
     borderColor: "#E2E8F0",
     borderRadius: 30,
     borderWidth: 1,
@@ -901,8 +906,14 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: "800",
   },
-  safeArea: {
+  root: {
+    // The artwork is near-white, so this only shows for the instant before the
+    // image decodes and while it is letterboxed on an unusual aspect ratio.
     backgroundColor: "#F4F6F9",
+    flex: 1,
+  },
+  safeArea: {
+    backgroundColor: "transparent",
     flex: 1,
   },
   secondaryAction: {

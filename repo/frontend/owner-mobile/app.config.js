@@ -62,11 +62,15 @@ module.exports = {
       [
         // Without this plugin Android 12+ falls back to its system splash: a
         // small launcher icon on a black background.
+        //
+        // The image and colour deliberately match the first frame of
+        // AppLoadingScreen, so the launch screen hands over to the running app
+        // without the logo moving or the background changing colour.
         "expo-splash-screen",
         {
-          backgroundColor: "#0D2A52",
-          image: "./assets/icon-spinner-app.png",
-          imageWidth: 260,
+          backgroundColor: "#F7FAFF",
+          image: "./assets/splash-spinner.png",
+          imageWidth: 240,
           resizeMode: "contain",
         },
       ],
