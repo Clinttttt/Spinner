@@ -76,6 +76,17 @@ export function confirmationSourceFromDetails(
 }
 
 /**
+ * Turns a price unit into a countable noun.
+ *
+ * Services are priced "per load", which reads as "2 per loads" if the label is
+ * used verbatim after a number.
+ */
+function countLabel(quantity: number, unitLabel: string | undefined): string {
+  const noun = (unitLabel || "load").replace(/^per\s+/i, "").trim() || "load";
+  return `${quantity} ${noun}${quantity === 1 ? "" : "s"}`;
+}
+
+/**
  * The lines quoted back to the owner before a pickup is confirmed or collected.
  *
  * Collecting laundry is the point of no return for the customer's instructions:
@@ -93,9 +104,8 @@ export function buildPickupConfirmationLines(
 
   if (source.serviceLines.length > 0) {
     for (const line of source.serviceLines) {
-      const unit = line.unitLabel || "load";
       lines.push(
-        `${line.name} — ${line.quantity} ${unit}${line.quantity === 1 ? "" : "s"} · ${peso(line.subtotal)}`,
+        `${line.name} — ${countLabel(line.quantity, line.unitLabel)} · ${peso(line.subtotal)}`,
       );
     }
   } else if (source.serviceNames.length > 0) {

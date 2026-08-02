@@ -55,21 +55,32 @@ export class PaymentCompletePage {
     return current.serviceAmount > 0 ? current.serviceAmount + current.deliveryFee : current.amount;
   });
 
-  /** A readable date, or the raw value if it is not a date we recognise. */
-  readonly scheduleDate = computed(() => {
-    const raw = this.status()?.preferredDate;
-    if (!raw) return null;
+  /**
+   * Turns a price unit into a countable noun.
+   *
+   * Services are priced "per load", which renders as "2 per load" if the label is
+   * dropped straight after the quantity.
+   */
+  countLabel(quantity: number, unitLabel: string | null): string {
+    const noun = (unitLabel || 'load').replace(/^per\s+/i, '').trim() || 'load';
+    return `${quantity} ${noun}${quantity === 1 ? '' : 's'}`;
+  }
 
-    const parsed = new Date(`${raw}T00:00:00`);
-    if (Number.isNaN(parsed.getTime())) return raw;
+  /** A readable date, or the raw value if it is not a date we recognise. */ readonly scheduleDate =
+    computed(() => {
+      const raw = this.status()?.preferredDate;
+      if (!raw) return null;
 
-    return parsed.toLocaleDateString('en-PH', {
-      day: 'numeric',
-      month: 'long',
-      weekday: 'long',
-      year: 'numeric',
+      const parsed = new Date(`${raw}T00:00:00`);
+      if (Number.isNaN(parsed.getTime())) return raw;
+
+      return parsed.toLocaleDateString('en-PH', {
+        day: 'numeric',
+        month: 'long',
+        weekday: 'long',
+        year: 'numeric',
+      });
     });
-  });
 
   constructor() {
     const reference = this.route.snapshot.queryParamMap.get('ref')?.trim() ?? '';

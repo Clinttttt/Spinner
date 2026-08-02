@@ -89,7 +89,7 @@
                     <li>
                       <span>
                         <strong>{{ line.name }}</strong>
-                        <small>{{ line.quantity }} {{ line.unitLabel || 'load' }}</small>
+                        <small>{{ countLabel(line.quantity, line.unitLabel) }}</small>
                       </span>
                       <b>₱{{ line.subtotal | number: '1.2-2' }}</b>
                     </li>

@@ -72,8 +72,24 @@ describe('PaymentCompletePage', () => {
     expect(text).toContain('Purok 4, San Vicente, Carmen');
     expect(text).toContain('Beside the blue gate');
     expect(text).toContain('09384326772');
+    // Priced "per load", so the quantity must read as a count, not "2 per load".
+    expect(text).toContain('2 loads');
+    expect(text).not.toContain('2 per load');
     // The receipt totals 340 + 60.
     expect(text).toContain('400.00');
+  });
+
+  it('writes a single load without pluralising', () => {
+    const fixture = createPage(PAID.reference);
+    flushStatus({
+      ...PAID,
+      services: [{ name: 'Dry Only', quantity: 1, subtotal: 90, unitLabel: 'per load' }],
+    });
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('1 load');
+    expect(text).not.toContain('1 loads');
   });
 
   it('tells a drop-off customer to bring the laundry in', () => {
