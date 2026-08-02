@@ -907,9 +907,9 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   root: {
-    // The artwork is near-white, so this only shows for the instant before the
-    // image decodes and while it is letterboxed on an unusual aspect ratio.
-    backgroundColor: "#F4F6F9",
+    // Sampled from the top of the gradient, so this only ever shows for the frame
+    // before the image decodes and nothing appears to flash.
+    backgroundColor: "#FAFCFE",
     flex: 1,
   },
   safeArea: {

@@ -322,6 +322,57 @@ describe('CustomerBookingPage pickup location', () => {
     });
   });
 
+  describe('form field behaviour', () => {
+    it('says nothing about suggestions until there are some', () => {
+      const { fixture, page } = createPage();
+
+      // Three lines of instructions about a list that is not on screen is noise.
+      expect(fixture.nativeElement.textContent).not.toContain('only moves the map pin');
+
+      page.suggestions.set([schoolSuggestion]);
+      page.suggestionsOpen.set(true);
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelectorAll('.suggestion').length).toBe(1);
+      expect(fixture.nativeElement.textContent).toContain('only moves the map pin');
+    });
+
+    it('hides the suggestion list when a search returns nothing', () => {
+      const { fixture, page } = createPage();
+
+      page.suggestions.set([]);
+      page.suggestionsOpen.set(true);
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.suggestion-list')).toBeNull();
+      expect(fixture.nativeElement.textContent).not.toContain('only moves the map pin');
+    });
+
+    it('prompts an empty date field, because the browser shows a blank box', () => {
+      const { fixture, page } = createPage();
+      page.bookingForm.controls.preferredDate.setValue('');
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.date-prompt')?.textContent).toContain(
+        'Select a date',
+      );
+
+      page.bookingForm.controls.preferredDate.setValue('2026-08-05');
+      fixture.detectChanges();
+
+      // Once chosen, the native value speaks for itself.
+      expect(fixture.nativeElement.querySelector('.date-prompt')).toBeNull();
+    });
+
+    it('does not let the address box be dragged out of shape', () => {
+      const { fixture } = createPage();
+      const address = fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;
+
+      // The drag handle sat where a thumb lands when scrolling past the field.
+      expect(getComputedStyle(address).resize).toBe('none');
+    });
+  });
+
   describe('paying by QR', () => {
     it('opens a checkout instead of creating a booking', () => {
       const { page } = createPage();

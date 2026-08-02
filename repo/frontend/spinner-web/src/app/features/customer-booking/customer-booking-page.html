@@ -239,12 +239,21 @@
           <div class="field-grid">
             <label class="field">
               <span>Preferred date</span>
-              <input
-                class="field-control"
-                formControlName="preferredDate"
-                type="date"
-                [min]="minimumDate"
-              />
+              <!-- An empty date input renders as a blank box in the Android WebView
+                   that Messenger's browser uses: no hint of what goes in it. The
+                   overlay supplies the prompt without fighting the native picker,
+                   which still opens on tap. -->
+              <span class="date-field">
+                <input
+                  class="field-control"
+                  formControlName="preferredDate"
+                  type="date"
+                  [min]="minimumDate"
+                />
+                @if (!bookingForm.controls.preferredDate.value) {
+                  <span class="date-prompt" aria-hidden="true">Select a date</span>
+                }
+              </span>
               @if (hasError('preferredDate')) {
                 <small class="field-error">Choose your preferred date.</small>
               }
@@ -347,10 +356,15 @@
                   }
                 </ul>
               }
-              <p class="address-hint">
-                Suggestions list nearby known places. Choosing one only moves the map pin — your
-                written address stays exactly as you typed it.
-              </p>
+              <!-- Only worth explaining when there is something to choose. With no
+                   results it was three lines of instructions about a list that
+                   wasn't there. -->
+              @if (suggestionsOpen() && suggestions().length) {
+                <p class="address-hint">
+                  Choosing one only moves the map pin — your written address stays exactly as you
+                  typed it.
+                </p>
+              }
             </div>
 
             <div class="location-actions">

@@ -594,10 +594,31 @@ select.field-control {
   text-overflow: ellipsis;
 }
 
-/* Chrome's date indicator crowds the border in the same way. */
+/* The native indicator is drawn at the right edge of the content box, so it sat
+   almost against the border while the select next to it had a comfortable inset.
+   A margin on the trailing side is what moves it, not extra padding. */
 input[type='date'].field-control::-webkit-calendar-picker-indicator {
-  margin-inline-start: 8px;
-  opacity: 0.7;
+  margin-inline-end: 6px;
+  opacity: 0.65;
+}
+
+/* Wraps the date input so the prompt can sit over it. */
+.date-field {
+  display: block;
+  position: relative;
+  width: 100%;
+}
+
+.date-prompt {
+  color: #98a2b3;
+  font-size: 13px;
+  font-weight: 500;
+  left: 14px;
+  /* The input underneath still receives the tap, so the picker opens normally. */
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .field-control.ng-invalid.ng-touched {
@@ -607,7 +628,10 @@ input[type='date'].field-control::-webkit-calendar-picker-indicator {
 .textarea {
   min-height: 88px;
   padding-block: 13px;
-  resize: vertical;
+  /* Not resizable: the drag handle sits exactly where a thumb lands when scrolling
+     past this field, and catching it stretched the box to most of the screen. Three
+     lines is enough for an address, and it scrolls if a customer writes more. */
+  resize: none;
 }
 
 .field-error {

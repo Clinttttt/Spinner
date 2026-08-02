@@ -26,12 +26,12 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 if (-not $MascotSource) { $MascotSource = Join-Path $repoRoot 'assets\login_welcome_mascot.png' }
 if (-not $OutputDir) { $OutputDir = Join-Path $repoRoot 'repo\frontend\owner-mobile\assets' }
 
-$referencePath = Join-Path $SourceDir 'spinner_loading_text_adjusted_v2 (1).png'
-foreach ($required in @($referencePath, $MascotSource)) {
+$loginBackground = Join-Path $SourceDir 'spinner_login_background.webp'
+foreach ($required in @($loginBackground, $MascotSource)) {
   if (-not (Test-Path $required)) { throw "Missing source asset: $required" }
 }
 
-New-Item -ItemType Directory -Force -Path (Join-Path $OutputDir 'loading') | Out-Null
+New-Item -ItemType Directory -Force -Path (Join-Path $OutputDir 'backgrounds') | Out-Null
 
 function Save-Png([System.Drawing.Bitmap] $bitmap, [string] $path) {
   $bitmap.Save($path, [System.Drawing.Imaging.ImageFormat]::Png)
@@ -70,60 +70,6 @@ function Get-TrimmedMascot([string] $path) {
       $graphics.DrawImage($source, (New-Object System.Drawing.Rectangle 0, 0, $crop.Width, $crop.Height), $crop, 'Pixel')
     } finally { $graphics.Dispose() }
 
-    return $trimmed
-  } finally { $source.Dispose() }
-}
-
-# --- Wordmark: lift it off the mock's opaque background ---------------------
-# Each row's own left edge supplies the local background colour, so the mock's
-# vertical gradient does not leave a visible block behind the letters. A ramp
-# rather than a hard cutoff keeps the type's antialiased edges smooth.
-function Get-KeyedWordmark([string] $path, [int] $top, [int] $bottom) {
-  $source = [System.Drawing.Bitmap]::new($path)
-  try {
-    $height = $bottom - $top + 1
-    $keyed = New-Object System.Drawing.Bitmap $source.Width, $height, ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
-
-    $minX = $source.Width; $maxX = -1
-    for ($y = 0; $y -lt $height; $y++) {
-      $sourceY = $top + $y
-      $background = $source.GetPixel(4, $sourceY)
-
-      for ($x = 0; $x -lt $source.Width; $x++) {
-        $pixel = $source.GetPixel($x, $sourceY)
-        $distance = [Math]::Max(
-          [Math]::Abs([int] $pixel.R - [int] $background.R),
-          [Math]::Max(
-            [Math]::Abs([int] $pixel.G - [int] $background.G),
-            [Math]::Abs([int] $pixel.B - [int] $background.B)))
-
-        $alpha = if ($distance -le 8) { 0 } elseif ($distance -ge 30) { 255 }
-                 else { [int](($distance - 8) * 255 / 22) }
-
-        if ($alpha -gt 0) {
-          $keyed.SetPixel($x, $y, [System.Drawing.Color]::FromArgb($alpha, $pixel.R, $pixel.G, $pixel.B))
-          if ($alpha -gt 40) {
-            if ($x -lt $minX) { $minX = $x }
-            if ($x -gt $maxX) { $maxX = $x }
-          }
-        }
-      }
-    }
-
-    # Trim the empty margins so the wordmark can be laid out by width alone.
-    $padding = 6
-    $left = [Math]::Max(0, $minX - $padding)
-    $width = [Math]::Min($source.Width - $left, $maxX - $left + 1 + $padding)
-
-    $trimmed = New-Object System.Drawing.Bitmap $width, $height, ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
-    $graphics = [System.Drawing.Graphics]::FromImage($trimmed)
-    try {
-      $graphics.Clear([System.Drawing.Color]::Transparent)
-      $graphics.DrawImage($keyed, (New-Object System.Drawing.Rectangle 0, 0, $width, $height),
-        (New-Object System.Drawing.Rectangle $left, 0, $width, $height), 'Pixel')
-    } finally { $graphics.Dispose() }
-
-    $keyed.Dispose()
     return $trimmed
   } finally { $source.Dispose() }
 }
@@ -180,11 +126,6 @@ $mascot = Get-TrimmedMascot $MascotSource
 # and a second copy would add another megabyte to the bundle for no benefit.
 Save-Png $mascot (Join-Path $OutputDir 'spinner-mascot.png')
 
-Write-Output 'Wordmark'
-# Band located by scanning the mock for its only dark ink below the mascot.
-$wordmark = Get-KeyedWordmark $referencePath 1036 1196
-Save-Png $wordmark (Join-Path $OutputDir 'loading\wordmark.png')
-
 Write-Output 'Splash icon'
 $splash = New-SplashIcon $mascot 900
 Save-Png $splash (Join-Path $OutputDir 'splash-spinner.png')
@@ -192,12 +133,11 @@ $safe = Get-SafeImageWidth $splash
 Write-Output ("  artwork reaches {0:P1} of the canvas width from its centre" -f $safe.RadiusFraction)
 Write-Output ("  -> expo-splash-screen imageWidth must be {0} dp or less to avoid clipping" -f $safe.SafeImageWidth)
 
-foreach ($bitmap in @($mascot, $wordmark, $splash)) { $bitmap.Dispose() }
+foreach ($bitmap in @($mascot, $splash)) { $bitmap.Dispose() }
 
-# The webp originals stay as-is: they are opaque backgrounds and need no alpha.
-Copy-Item (Join-Path $SourceDir 'spinner_loading_background.webp') `
-  (Join-Path $OutputDir 'loading\background.webp') -Force
-Copy-Item (Join-Path $SourceDir 'minimal_login_background.webp') `
+# The launch screen, the loading screen, and the login screen share one gradient,
+# so startup reads as a single surface rather than three.
+Copy-Item (Join-Path $SourceDir 'spinner_login_background.webp') `
   (Join-Path $OutputDir 'backgrounds\login-background.webp') -Force
 
 Write-Output 'Done.'
