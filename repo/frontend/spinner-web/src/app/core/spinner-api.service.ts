@@ -93,6 +93,48 @@ export interface PublicBusinessSettingsDto {
   hasPickupServiceArea: boolean;
 }
 
+export interface BookingCheckoutDto {
+  reference: string;
+  checkoutUrl: string;
+  amount: number;
+  currency: string;
+}
+
+export interface CheckoutServiceLineDto {
+  name: string;
+  quantity: number;
+  unitLabel: string;
+  subtotal: number;
+}
+
+/**
+ * The payment result, as judged by the API rather than by the redirect.
+ *
+ * `confirming` means the money is recorded but the order has not been written
+ * yet, which is a real state for a second or two after paying.
+ */
+export interface BookingCheckoutStatusDto {
+  reference: string;
+  state: 'awaitingPayment' | 'confirming' | 'paid' | 'failed' | 'expired';
+  amount: number;
+  currency: string;
+  checkoutUrl: string | null;
+  orderCode: string | null;
+  trackingCode: string | null;
+  fulfillmentType: 'PickupAndDelivery' | 'DropOff' | null;
+  customerName: string;
+  address: string | null;
+  landmark: string | null;
+  preferredDate: string | null;
+  preferredTimeWindow: string | null;
+  mobileNumber: string | null;
+  services: CheckoutServiceLineDto[];
+  serviceAmount: number;
+  deliveryFee: number;
+  businessName: string | null;
+  businessAddress: string | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class SpinnerApiService {
   private readonly http = inject(HttpClient);
@@ -107,6 +149,22 @@ export class SpinnerApiService {
   /** Public settings, used to bias address search towards the service area. */
   getBusinessSettings() {
     return this.http.get<PublicBusinessSettingsDto>(`${this.baseUrl}/api/business-settings`);
+  }
+
+  /**
+   * Opens a paid checkout instead of creating the booking.
+   *
+   * The order is created by the API once payment is confirmed, so nothing exists
+   * for the shop to act on until the money has actually arrived.
+   */
+  startCheckout(payload: CreateBookingPayload) {
+    return this.http.post<BookingCheckoutDto>(`${this.baseUrl}/api/bookings/checkout`, payload);
+  }
+
+  getCheckoutStatus(reference: string) {
+    return this.http.get<BookingCheckoutStatusDto>(
+      `${this.baseUrl}/api/bookings/checkout/${encodeURIComponent(reference)}`,
+    );
   }
 
   /**

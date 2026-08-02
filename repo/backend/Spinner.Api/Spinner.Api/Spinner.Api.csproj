@@ -7,6 +7,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- So tests can reach helpers that exist for verification rather than for
+         callers, such as reproducing a provider's webhook signature. -->
+    <InternalsVisibleTo Include="Spinner.Test" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
     <PackageReference Include="MediatR" Version="14.2.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.4" />

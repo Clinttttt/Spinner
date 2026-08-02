@@ -4,6 +4,7 @@ using Spinner.Api.Domain.Business;
 using Spinner.Api.Domain.Customers;
 using Spinner.Api.Domain.Notifications;
 using Spinner.Api.Domain.Orders;
+using Spinner.Api.Domain.Payments;
 using Spinner.Api.Domain.Services;
 using Spinner.Api.Domain.Transactions;
 using Spinner.Api.Domain.Users;
@@ -38,6 +39,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<AccountActionCode> AccountActionCodes => Set<AccountActionCode>();
 
     public DbSet<ActivityLogEntry> ActivityLogEntries => Set<ActivityLogEntry>();
+    public DbSet<PendingBooking> PendingBookings => Set<PendingBooking>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -314,6 +316,39 @@ public sealed class AppDbContext : DbContext
             entity.HasIndex(entry => entry.Action);
             entity.HasIndex(entry => entry.EntityId);
             entity.HasIndex(entry => entry.CreatedAt);
+        });
+
+        modelBuilder.Entity<PendingBooking>(entity =>
+        {
+            entity.ToTable("PendingBookings");
+            entity.HasKey(booking => booking.Id);
+
+            entity.Property(booking => booking.Reference).HasMaxLength(64).IsRequired();
+            entity.Property(booking => booking.CheckoutSessionId).HasMaxLength(128);
+            entity.Property(booking => booking.CheckoutUrl).HasMaxLength(2048);
+            entity.Property(booking => booking.PayloadJson).IsRequired();
+            entity.Property(booking => booking.PayloadFingerprint).HasMaxLength(64);
+            entity.Property(booking => booking.Amount).HasPrecision(18, 2).IsRequired();
+            entity.Property(booking => booking.Currency).HasMaxLength(3).IsRequired();
+            entity.Property(booking => booking.PaymentReference).HasMaxLength(128);
+            entity.Property(booking => booking.FailureReason).HasMaxLength(500);
+            entity.Property(booking => booking.Status)
+                .HasConversion<string>()
+                .HasMaxLength(32)
+                .IsRequired();
+
+            // The reference is public, and the session id is how a provider event
+            // finds its booking; both must resolve to exactly one row. The order id
+            // is unique so a booking can never be charged into two orders.
+            entity.HasIndex(booking => booking.Reference).IsUnique();
+            entity.HasIndex(booking => booking.CheckoutSessionId)
+                .IsUnique()
+                .HasFilter("\"CheckoutSessionId\" IS NOT NULL");
+            entity.HasIndex(booking => booking.OrderId)
+                .IsUnique()
+                .HasFilter("\"OrderId\" IS NOT NULL");
+            entity.HasIndex(booking => booking.Status);
+            entity.HasIndex(booking => booking.ExpiresAt);
         });
     }
 }

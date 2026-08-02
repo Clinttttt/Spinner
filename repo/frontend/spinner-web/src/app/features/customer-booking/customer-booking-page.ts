@@ -30,6 +30,7 @@ import {
 } from '../../core/device-location.service';
 import {
   type BookingConfirmationDto,
+  type CreateBookingPayload,
   type LaundryServiceDto,
   type PickupLocationPayload,
   type ServiceAreaCheckDto,
@@ -542,6 +543,33 @@ export class CustomerBookingPage {
     this.checkingServiceArea.set(false);
   }
 
+  /**
+   * Hands the customer to the payment provider.
+   *
+   * Deliberately no order is created here. If the customer never pays, nothing is
+   * left behind for the shop to chase, and if they pay twice the API resolves both
+   * attempts to the one booking.
+   */
+  private startQrCheckout(payload: CreateBookingPayload): void {
+    this.api
+      .startCheckout(payload)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (checkout) => {
+          // Leaving the site, so the submitting state stays on until we go.
+          window.location.assign(checkout.checkoutUrl);
+        },
+        error: (error: { error?: { detail?: string; title?: string } }) => {
+          this.submitting.set(false);
+          this.errorMessage.set(
+            error.error?.detail ??
+              error.error?.title ??
+              'We could not open the payment page. Please try again, or choose Cash on Delivery.',
+          );
+        },
+      });
+  }
+
   changeLocation(): void {
     this.clearPin();
     this.mapVisible.set(true);
@@ -585,25 +613,37 @@ export class CustomerBookingPage {
     // stepper is nudged while the call is in flight.
     const lines = this.serviceLines();
 
+    const payload = {
+      additionalNotes: value.notes.trim() || null,
+      address: isPickup ? value.address.trim() : 'In-store',
+      emailAddress: value.email.trim() || null,
+      fulfillmentType: isPickup ? ('PickupAndDelivery' as const) : ('DropOff' as const),
+      fullName: value.fullName.trim(),
+      loadCount: lines.reduce((total, line) => total + line.loads, 0),
+      mobileNumber: value.mobileNumber.replace(/\s+/g, ''),
+      paymentMethod:
+        value.paymentMethod === 'qr'
+          ? ('QrCodeOnlinePayment' as const)
+          : ('CashOnDelivery' as const),
+      pickupLocation: isPickup ? this.toPickupLocationPayload() : null,
+      preferredDate: value.preferredDate,
+      preferredTimeWindow: value.preferredTime,
+      serviceId: selected[0].id,
+      services: lines.map((line) => ({
+        quantity: line.loads,
+        serviceId: line.id,
+      })),
+    };
+
+    // QR is paid before the booking exists, so this hands off to the payment page
+    // rather than creating an order the shop could start working on unpaid.
+    if (value.paymentMethod === 'qr') {
+      this.startQrCheckout(payload);
+      return;
+    }
+
     this.api
-      .createBooking({
-        additionalNotes: value.notes.trim() || null,
-        address: isPickup ? value.address.trim() : 'In-store',
-        emailAddress: value.email.trim() || null,
-        fulfillmentType: isPickup ? 'PickupAndDelivery' : 'DropOff',
-        fullName: value.fullName.trim(),
-        loadCount: lines.reduce((total, line) => total + line.loads, 0),
-        mobileNumber: value.mobileNumber.replace(/\s+/g, ''),
-        paymentMethod: value.paymentMethod === 'qr' ? 'QrCodeOnlinePayment' : 'CashOnDelivery',
-        pickupLocation: isPickup ? this.toPickupLocationPayload() : null,
-        preferredDate: value.preferredDate,
-        preferredTimeWindow: value.preferredTime,
-        serviceId: selected[0].id,
-        services: lines.map((line) => ({
-          quantity: line.loads,
-          serviceId: line.id,
-        })),
-      })
+      .createBooking(payload)
       .pipe(
         takeUntilDestroyed(this.destroyRef),
         finalize(() => this.submitting.set(false)),

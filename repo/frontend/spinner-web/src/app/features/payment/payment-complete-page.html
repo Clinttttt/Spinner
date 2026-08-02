@@ -1,0 +1,185 @@
+<main class="page">
+  <section class="card" role="status" aria-live="polite">
+    @if (loading()) {
+      <div class="state">
+        <div class="spinner" aria-hidden="true"></div>
+        <h1>Checking your payment…</h1>
+        <p>This only takes a moment.</p>
+      </div>
+    } @else if (notFound()) {
+      <div class="state">
+        <span class="badge neutral" aria-hidden="true">?</span>
+        <h1>We could not find that payment</h1>
+        <p>
+          The link may be incomplete or the payment may have been started on another device. If you
+          were charged, contact us with your payment reference and we will sort it out.
+        </p>
+        <a class="primary" routerLink="/">Back to booking</a>
+      </div>
+    } @else if (status(); as result) {
+      @switch (result.state) {
+        @case ('paid') {
+          <div class="state">
+            <span class="badge success" aria-hidden="true">✓</span>
+            <h1>Payment received — thank you!</h1>
+            <p class="lead">
+              Your booking is confirmed and fully paid. We appreciate you choosing
+              {{ result.businessName || 'us' }}.
+            </p>
+
+            <dl class="reference">
+              <dt>Order reference</dt>
+              <dd>{{ result.orderCode }}</dd>
+            </dl>
+
+            <!-- What happens next depends entirely on how they chose to get the
+                 laundry to us, so the wording follows that rather than being
+                 generic. -->
+            @if (isPickup()) {
+              <div class="next">
+                <h2>What happens next</h2>
+                <p>
+                  We will collect your laundry
+                  @if (scheduleDate()) {
+                    on <strong>{{ scheduleDate() }}</strong>
+                  }
+                  @if (result.preferredTimeWindow) {
+                    between <strong>{{ result.preferredTimeWindow }}</strong>
+                  }
+                  at <strong>{{ result.address }}</strong>
+                  @if (result.landmark) {
+                    <span> ({{ result.landmark }})</span>
+                  }
+                  .
+                </p>
+                <p>
+                  Our rider will call
+                  @if (result.mobileNumber) {
+                    <strong>{{ result.mobileNumber }}</strong>
+                  } @else {
+                    you
+                  }
+                  shortly before arriving. Please have your laundry ready and sorted if you have
+                  special instructions.
+                </p>
+              </div>
+            } @else {
+              <div class="next">
+                <h2>What happens next</h2>
+                <p>
+                  Bring your laundry to
+                  <strong>{{ result.businessAddress || 'our shop' }}</strong>
+                  @if (scheduleDate()) {
+                    on <strong>{{ scheduleDate() }}</strong>
+                  }
+                  @if (result.preferredTimeWindow) {
+                    between <strong>{{ result.preferredTimeWindow }}</strong>
+                  }
+                  .
+                </p>
+                <p>Show your order reference at the counter — there is nothing left to pay.</p>
+              </div>
+            }
+
+            @if (result.services.length) {
+              <div class="receipt">
+                <h2>Your receipt</h2>
+                <ul>
+                  @for (line of result.services; track line.name) {
+                    <li>
+                      <span>
+                        <strong>{{ line.name }}</strong>
+                        <small>{{ line.quantity }} {{ line.unitLabel || 'load' }}</small>
+                      </span>
+                      <b>₱{{ line.subtotal | number: '1.2-2' }}</b>
+                    </li>
+                  }
+                </ul>
+                <dl class="totals">
+                  @if (result.deliveryFee > 0) {
+                    <div>
+                      <dt>Pickup &amp; delivery</dt>
+                      <dd>₱{{ result.deliveryFee | number: '1.2-2' }}</dd>
+                    </div>
+                  }
+                  <div class="total">
+                    <dt>Total paid</dt>
+                    <dd>₱{{ total() | number: '1.2-2' }}</dd>
+                  </div>
+                </dl>
+              </div>
+            }
+
+            <p class="footnote">
+              Keep this reference for any questions about your order. Payment reference
+              {{ result.reference }}.
+            </p>
+            <a class="primary" routerLink="/">Book another load</a>
+          </div>
+        }
+
+        @case ('confirming') {
+          <div class="state">
+            <div class="spinner" aria-hidden="true"></div>
+            <h1>Confirming your payment</h1>
+            @if (stillWaiting()) {
+              <p>
+                Your payment has been received and is still being confirmed. Your booking will
+                appear shortly — there is nothing more for you to do. If you do not hear from us
+                today, contact us with payment reference
+                <strong>{{ result.reference }}</strong
+                >.
+              </p>
+            } @else {
+              <p>
+                We have your payment and are just finishing your booking. This page updates on its
+                own.
+              </p>
+            }
+          </div>
+        }
+
+        @case ('awaitingPayment') {
+          <div class="state">
+            <span class="badge warning" aria-hidden="true">!</span>
+            <h1>This booking has not been paid yet</h1>
+            <p>
+              Nothing has been charged. Your booking is held for a short while, so you can still
+              complete the payment.
+            </p>
+            @if (result.checkoutUrl) {
+              <a class="primary" [href]="result.checkoutUrl"
+                >Pay ₱{{ result.amount | number: '1.2-2' }} now</a
+              >
+            }
+            <a class="secondary" routerLink="/">Start again</a>
+          </div>
+        }
+
+        @case ('failed') {
+          <div class="state">
+            <span class="badge danger" aria-hidden="true">×</span>
+            <h1>Your payment did not go through</h1>
+            <p>
+              Nothing was charged and no booking was created, so you can safely try again. If your
+              bank shows a hold, it will be released automatically.
+            </p>
+            <a class="primary" routerLink="/">Try again</a>
+          </div>
+        }
+
+        @default {
+          <div class="state">
+            <span class="badge warning" aria-hidden="true">!</span>
+            <h1>This payment link has expired</h1>
+            <p>
+              Nothing was charged. Please make your booking again — it only takes a moment, and your
+              details are not lost, just not yet submitted.
+            </p>
+            <a class="primary" routerLink="/">Book again</a>
+          </div>
+        }
+      }
+    }
+  </section>
+</main>

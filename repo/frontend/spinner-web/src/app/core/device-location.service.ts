@@ -7,11 +7,7 @@ export interface DeviceLocation {
 }
 
 export type GeolocationFailure =
-  | 'unsupported'
-  | 'insecureContext'
-  | 'permissionDenied'
-  | 'positionUnavailable'
-  | 'timeout';
+  'unsupported' | 'insecureContext' | 'permissionDenied' | 'positionUnavailable' | 'timeout';
 
 export class GeolocationUnavailableError extends Error {
   constructor(

@@ -7,7 +7,9 @@ using Spinner.Api.Features.Bookings;
 using Spinner.Api.Features.Bookings.ConfirmBooking;
 using Spinner.Api.Features.Bookings.CreateBooking;
 using Spinner.Api.Features.Bookings.GetBookingConfirmation;
+using Spinner.Api.Features.Bookings.GetBookingCheckoutStatus;
 using Spinner.Api.Features.Bookings.GetBookings;
+using Spinner.Api.Features.Bookings.StartBookingCheckout;
 using Spinner.Api.Features.Bookings.RejectBooking;
 using Spinner.Api.Features.Bookings.RescheduleBooking;
 using Spinner.Api.Features.Orders;
@@ -45,24 +47,54 @@ public sealed class BookingsController : ApiControllerBase
         CancellationToken ct)
     {
         var result = await Sender.Send(
-            new CreateBookingCommand(
-                request.FullName,
-                request.MobileNumber,
-                request.EmailAddress,
-                request.ServiceId,
-                request.FulfillmentType,
-                request.Address,
-                request.PreferredDate,
-                request.PreferredTimeWindow,
-                request.PaymentMethod,
-                request.LoadCount,
-                request.AdditionalNotes,
-                request.PickupLocation,
-                request.Services),
+            ToCommand(request),
             ct);
-
         return HandleResponse(result);
     }
+
+    /// <summary>
+    /// Opens a paid checkout for a QR booking. The order is created only once the
+    /// payment is confirmed, so an abandoned checkout leaves nothing behind.
+    /// </summary>
+    [HttpPost("checkout")]
+    [AllowAnonymous]
+    public async Task<ActionResult<BookingCheckoutResponse>> StartCheckout(
+        [FromBody] CreateBookingRequest request,
+        CancellationToken ct)
+    {
+        var result = await Sender.Send(new StartBookingCheckoutCommand(ToCommand(request)), ct);
+        return HandleResponse(result);
+    }
+
+    /// <summary>
+    /// Backs the customer's payment-complete page. Anonymous by design, which is why
+    /// the reference carries random characters rather than being sequential.
+    /// </summary>
+    [HttpGet("checkout/{reference}")]
+    [AllowAnonymous]
+    public async Task<ActionResult<BookingCheckoutStatusResponse>> GetCheckoutStatus(
+        string reference,
+        CancellationToken ct)
+    {
+        var result = await Sender.Send(new GetBookingCheckoutStatusQuery(reference), ct);
+        return HandleResponse(result);
+    }
+
+    private static CreateBookingCommand ToCommand(CreateBookingRequest request) =>
+        new(
+            request.FullName,
+            request.MobileNumber,
+            request.EmailAddress,
+            request.ServiceId,
+            request.FulfillmentType,
+            request.Address,
+            request.PreferredDate,
+            request.PreferredTimeWindow,
+            request.PaymentMethod,
+            request.LoadCount,
+            request.AdditionalNotes,
+            request.PickupLocation,
+            request.Services);
 
     [HttpGet("{orderCode}/confirmation")]
     [AllowAnonymous]

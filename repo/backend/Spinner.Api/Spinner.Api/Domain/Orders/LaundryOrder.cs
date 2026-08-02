@@ -122,6 +122,37 @@ public sealed class LaundryOrder
         return order;
     }
 
+    /// <summary>
+    /// Prices a customer booking without creating it.
+    /// </summary>
+    /// <remarks>
+    /// Needed because a QR booking is charged before the order exists. The figures
+    /// must be the ones the order will end up with, so
+    /// <c>BookingQuoteMatchesCreatedOrderTests</c> asserts this against a real
+    /// created order and fails if the two ever drift apart.
+    /// </remarks>
+    public static BookingQuote QuoteCustomerBooking(
+        IReadOnlyList<(LaundryService Service, int Quantity)> serviceSelections,
+        FulfillmentType fulfillmentType)
+    {
+        if (serviceSelections.Count == 0)
+            throw new ArgumentException("At least one service is required.", nameof(serviceSelections));
+
+        var serviceAmount = serviceSelections.Sum(
+            selection => selection.Service.BasePrice * selection.Quantity);
+
+        // Charged once per trip, at the highest rate among the chosen services.
+        var deliveryFee = fulfillmentType == FulfillmentType.PickupAndDelivery
+            ? serviceSelections.Max(selection => selection.Service.DeliveryFee ?? 0m)
+            : 0m;
+
+        return new BookingQuote(
+            serviceSelections.Sum(selection => selection.Quantity),
+            serviceAmount,
+            deliveryFee,
+            serviceAmount + deliveryFee);
+    }
+
     public static LaundryOrder CreateManual(
         string orderCode,
         string trackingCode,
@@ -459,6 +490,47 @@ public sealed class LaundryOrder
         if (paidAmount != EstimatedTotalAmount)
             return Result.Conflict("Online payment amount does not match the expected order total.");
 
+        PaymentStatus = PaymentStatus.Paid;
+        PaidAt = now;
+        ReceiptCode = receiptCode.Trim();
+        UpdatedAt = now;
+
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Settles an order that was paid before it was created.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="ConfirmOnlinePayment"/> cannot be used here. It was written for the
+    /// older sequence where the owner activates a booking, a payment link is issued,
+    /// and the customer pays afterwards, so it requires an existing reference and
+    /// refuses an order that is still Booking Received. A prepaid QR booking is in
+    /// exactly that state the moment it is created, and its reference comes from the
+    /// checkout that has already been paid.
+    ///
+    /// The amount is still checked against the order total, so a tampered or stale
+    /// payment cannot settle a more expensive booking.
+    /// </remarks>
+    public Result SettlePrepaidOnlinePayment(
+        string paymentReference,
+        decimal paidAmount,
+        string receiptCode,
+        DateTimeOffset now)
+    {
+        if (PaymentMethod != PaymentMethod.QrCodeOnlinePayment)
+            return Result.Conflict("Only QR Code Online Payment orders can be settled by a paid checkout.");
+
+        if (PaymentStatus == PaymentStatus.Paid)
+            return Result.Success();
+
+        if (Status == OrderStatus.Rejected)
+            return Result.Conflict("A rejected order cannot be settled.");
+
+        if (paidAmount != EstimatedTotalAmount)
+            return Result.Conflict("The paid amount does not match this order's total.");
+
+        OnlinePaymentReference = paymentReference.Trim();
         PaymentStatus = PaymentStatus.Paid;
         PaidAt = now;
         ReceiptCode = receiptCode.Trim();

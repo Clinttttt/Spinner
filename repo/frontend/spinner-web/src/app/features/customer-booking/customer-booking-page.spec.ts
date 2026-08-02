@@ -322,6 +322,64 @@ describe('CustomerBookingPage pickup location', () => {
     });
   });
 
+  describe('paying by QR', () => {
+    it('opens a checkout instead of creating a booking', () => {
+      const { page } = createPage();
+      const assign = vi.fn();
+      vi.spyOn(window, 'location', 'get').mockReturnValue({
+        ...window.location,
+        assign,
+      } as unknown as Location);
+
+      page.selectPayment('qr');
+      page.submitBooking();
+
+      // No order may exist before the money does.
+      http.expectNone((request) => request.url.endsWith('/api/bookings'));
+      const checkout = http.expectOne(
+        (request) => request.url.endsWith('/api/bookings/checkout') && request.method === 'POST',
+      );
+      expect(checkout.request.body.paymentMethod).toBe('QrCodeOnlinePayment');
+
+      checkout.flush({
+        amount: 400,
+        checkoutUrl: 'https://checkout.paymongo.test/abc',
+        currency: 'PHP',
+        reference: 'PAY-20260802-ABCDEFGHJK',
+      });
+
+      expect(assign).toHaveBeenCalledWith('https://checkout.paymongo.test/abc');
+      vi.restoreAllMocks();
+    });
+
+    it('keeps the customer on the form when the checkout cannot open', () => {
+      const { page } = createPage();
+
+      page.selectPayment('qr');
+      page.submitBooking();
+
+      http
+        .expectOne((request) => request.url.endsWith('/api/bookings/checkout'))
+        .flush(
+          { detail: 'Online payment is not available right now.' },
+          { status: 409, statusText: 'Conflict' },
+        );
+
+      expect(page.errorMessage()).toContain('not available');
+      // Still usable, so the customer can switch to Cash on Delivery.
+      expect(page.submitting()).toBe(false);
+    });
+
+    it('still creates the booking directly for cash on delivery', () => {
+      const { page } = createPage();
+
+      page.submitBooking();
+
+      http.expectNone((request) => request.url.endsWith('/api/bookings/checkout'));
+      expect(submittedPayload().paymentMethod).toBe('CashOnDelivery');
+    });
+  });
+
   describe('per-service loads', () => {
     it('gives each chosen service its own quantity', () => {
       const { page } = createPage([service, dryOnly]);

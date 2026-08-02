@@ -48,6 +48,58 @@ public static class StartupConfigurationValidator
             throw new InvalidOperationException(
                 "Production OnlinePayments:PublicPaymentBaseUrl must be an absolute HTTPS URL.");
         }
+
+        ValidatePayMongo(configuration);
+    }
+
+    /// <summary>
+    /// Checks the PayMongo settings only when they are present.
+    /// </summary>
+    /// <remarks>
+    /// Online payment is optional: a shop can run on Cash on Delivery alone, and an
+    /// unconfigured deployment refuses checkouts with a clear message rather than
+    /// failing to boot. But a half-configured one is worse than either, so if a key
+    /// is supplied the rest has to be right — including that the return URL is real,
+    /// since that is where a paying customer is sent.
+    /// </remarks>
+    private static void ValidatePayMongo(IConfiguration configuration)
+    {
+        var section = OnlinePaymentOptions.SectionName;
+        var secretKey = configuration[$"{section}:PayMongoSecretKey"];
+        var webhookSecret = configuration[$"{section}:PayMongoWebhookSecret"];
+
+        if (string.IsNullOrWhiteSpace(secretKey) && string.IsNullOrWhiteSpace(webhookSecret))
+            return;
+
+        if (string.IsNullOrWhiteSpace(secretKey))
+            throw new InvalidOperationException(
+                "OnlinePayments:PayMongoSecretKey must be set when a PayMongo webhook secret is configured.");
+
+        if (string.IsNullOrWhiteSpace(webhookSecret))
+        {
+            throw new InvalidOperationException(
+                "OnlinePayments:PayMongoWebhookSecret must be set when a PayMongo secret key is configured. " +
+                "Without it no payment can ever be verified.");
+        }
+
+        if (!secretKey.StartsWith("sk_test_", StringComparison.Ordinal) &&
+            !secretKey.StartsWith("sk_live_", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "OnlinePayments:PayMongoSecretKey must be a PayMongo secret key (sk_test_ or sk_live_). " +
+                "A public key cannot create a checkout.");
+        }
+
+        foreach (var name in new[] { "CheckoutSuccessUrl", "CheckoutCancelUrl" })
+        {
+            var value = configuration[$"{section}:{name}"];
+            if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) ||
+                !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    $"OnlinePayments:{name} must be an absolute HTTPS URL when PayMongo is configured.");
+            }
+        }
     }
 
     private static void ValidateNotificationDelivery(

@@ -1,0 +1,250 @@
+:host {
+  --navy: #0d2a52;
+  --ink-soft: #667085;
+  --line: #e6eaf0;
+  --surface-soft: #f7f9fc;
+
+  display: block;
+}
+
+.page {
+  align-items: center;
+  background: linear-gradient(180deg, #f4f7fc 0%, #ffffff 60%);
+  display: flex;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: 24px 16px 40px;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  box-shadow: 0 18px 50px rgba(8, 35, 71, 0.08);
+  max-width: 520px;
+  padding: 28px 22px 24px;
+  width: 100%;
+}
+
+.state {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  text-align: center;
+}
+
+h1 {
+  color: var(--navy);
+  font-size: 22px;
+  line-height: 1.3;
+  margin: 0;
+}
+
+h2 {
+  color: var(--navy);
+  font-size: 12px;
+  letter-spacing: 0.07em;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+}
+
+p {
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.lead {
+  font-size: 14.5px;
+}
+
+strong,
+b {
+  color: var(--navy);
+}
+
+.badge {
+  align-items: center;
+  border-radius: 50%;
+  display: flex;
+  font-size: 26px;
+  font-weight: 700;
+  height: 56px;
+  justify-content: center;
+  width: 56px;
+}
+
+.badge.success {
+  background: #e7f7ee;
+  color: #067647;
+}
+
+.badge.danger {
+  background: #fdeceb;
+  color: #b42318;
+}
+
+.badge.warning {
+  background: #fff6dd;
+  color: #7a5200;
+}
+
+.badge.neutral {
+  background: var(--surface-soft);
+  color: var(--navy);
+}
+
+/* A plain CSS spinner rather than an animated asset: it must render instantly on
+   a slow connection, which is exactly when this page is being watched. */
+.spinner {
+  animation: spin 900ms linear infinite;
+  border: 3px solid #e3eaf4;
+  border-radius: 50%;
+  border-top-color: var(--navy);
+  height: 34px;
+  width: 34px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 2.4s;
+  }
+}
+
+.reference {
+  background: var(--surface-soft);
+  border-radius: 14px;
+  display: grid;
+  gap: 2px;
+  margin: 4px 0 0;
+  padding: 12px 16px;
+  width: 100%;
+}
+
+.reference dt {
+  color: var(--ink-soft);
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.reference dd {
+  color: var(--navy);
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  margin: 0;
+}
+
+.next,
+.receipt {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 16px;
+  text-align: left;
+  width: 100%;
+}
+
+.receipt ul {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.receipt li {
+  align-items: flex-start;
+  background: var(--surface-soft);
+  border-radius: 12px;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 11px 12px;
+}
+
+.receipt li span {
+  display: grid;
+  gap: 2px;
+}
+
+.receipt small {
+  color: var(--ink-soft);
+  font-size: 10.5px;
+}
+
+.totals {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding-top: 12px;
+}
+
+.totals > div {
+  display: flex;
+  justify-content: space-between;
+}
+
+.totals dt,
+.totals dd {
+  color: var(--ink-soft);
+  font-size: 13px;
+  margin: 0;
+}
+
+.totals dd {
+  color: var(--navy);
+  font-weight: 700;
+}
+
+.totals .total dt,
+.totals .total dd {
+  color: var(--navy);
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.footnote {
+  border-top: 1px solid var(--line);
+  font-size: 11.5px;
+  margin-top: 8px;
+  padding-top: 14px;
+  text-align: left;
+  width: 100%;
+}
+
+.primary,
+.secondary {
+  align-items: center;
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 14px;
+  font-weight: 700;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 22px;
+  text-decoration: none;
+  width: 100%;
+}
+
+.primary {
+  background: var(--navy);
+  color: #fff;
+  margin-top: 8px;
+}
+
+.secondary {
+  background: #fff;
+  border: 1px solid var(--navy);
+  color: var(--navy);
+}

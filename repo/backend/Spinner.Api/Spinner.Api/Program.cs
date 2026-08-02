@@ -14,6 +14,7 @@ using Spinner.Api.Database.Seeders;
 using Spinner.Api.Features.Notifications.ProcessNotificationOutbox;
 using Spinner.Api.Features.ServiceArea;
 using Spinner.Api.Integrations.Notifications;
+using Spinner.Api.Features.Payments;
 using Spinner.Api.Integrations.OnlinePayments;
 using System.Text;
 using System.Text.Json.Serialization;
@@ -116,6 +117,16 @@ builder.Services.AddHostedService<NotificationOutboxWorker>();
 builder.Services.Configure<OnlinePaymentOptions>(
     builder.Configuration.GetSection(OnlinePaymentOptions.SectionName));
 builder.Services.AddScoped<OnlinePaymentSignatureVerifier>();
+builder.Services.AddScoped<PayMongoWebhookSignatureVerifier>();
+builder.Services.AddScoped<PaidBookingFinaliser>();
+
+// A typed client so the provider's base address, credentials, and timeout live in
+// one place. The timeout is short: a customer is waiting on this call, and Cash on
+// Delivery remains available if the provider is slow.
+builder.Services.AddHttpClient<IPaymentCheckoutGateway, PayMongoCheckoutGateway>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(20);
+});
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
