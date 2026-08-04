@@ -328,29 +328,51 @@ export function PickupScreen({ navigation }: PickupScreenProps) {
     ],
   );
 
+  // Wrapped so the memoised card actually holds. These were inline arrows, which
+  // are a new function identity on every render and so defeated the memo entirely.
+  const rowStyle = useMemo(
+    () => ({ marginHorizontal: pageHorizontalPadding }),
+    [pageHorizontalPadding],
+  );
+
+  const clearTask = useCallback(
+    (task: PickupTask) => void handleClear(task),
+    [handleClear],
+  );
+
+  const confirmBooking = useCallback(
+    (task: PickupTask) => void handleConfirmBooking(task),
+    [handleConfirmBooking],
+  );
+
+  const markPickedUp = useCallback(
+    (id: string) => void handleMarkPickedUp(id),
+    [handleMarkPickedUp],
+  );
+
   const renderItem = useCallback(
     ({ item }: { item: PickupTask }) => (
-      <View style={{ marginHorizontal: pageHorizontalPadding }}>
+      <View style={rowStyle}>
         <PickupCard
           compact={compact}
           item={item}
           onCall={handleCall}
           onCancel={setCancelCandidate}
-          onClear={(task) => void handleClear(task)}
-          onConfirmBooking={(task) => void handleConfirmBooking(task)}
+          onClear={clearTask}
+          onConfirmBooking={confirmBooking}
           onDirections={handleDirections}
-          onMarkPickedUp={(id) => void handleMarkPickedUp(id)}
+          onMarkPickedUp={markPickedUp}
         />
       </View>
     ),
     [
+      clearTask,
       compact,
+      confirmBooking,
       handleCall,
-      handleClear,
-      handleConfirmBooking,
       handleDirections,
-      handleMarkPickedUp,
-      pageHorizontalPadding,
+      markPickedUp,
+      rowStyle,
     ],
   );
 

@@ -20,11 +20,28 @@ public sealed class GetBookingConfirmationHandler
         GetBookingConfirmationQuery request,
         CancellationToken cancellationToken)
     {
+        // Accepts either code, in any case, ignoring stray spacing.
+        //
+        // The confirmation shows the customer an "Order reference" and a "Tracking
+        // code", so someone trying to track their order naturally types the tracking
+        // code — which used to return "not found". Matching was also case sensitive
+        // and untrimmed, so a code pasted from a message or typed in lower case
+        // failed too. None of that is the customer's mistake.
+        var code = request.OrderCode?.Trim() ?? string.Empty;
+
+        if (code.Length is 0 or > 64)
+            return Result<BookingConfirmationResponse>.NotFound("Booking confirmation was not found.");
+
+        var normalized = code.ToUpperInvariant();
+
         var order = await _dbContext.LaundryOrders
             .AsNoTracking()
             .Include(order => order.Customer)
             .FirstOrDefaultAsync(
-                order => order.OrderCode == request.OrderCode && order.Source == OrderSource.CustomerWeb,
+                order =>
+                    order.Source == OrderSource.CustomerWeb &&
+                    (order.OrderCode.ToUpper() == normalized ||
+                     order.TrackingCode.ToUpper() == normalized),
                 cancellationToken);
 
         if (order is null)

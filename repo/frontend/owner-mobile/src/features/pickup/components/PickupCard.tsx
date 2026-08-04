@@ -1,3 +1,4 @@
+import { memo } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -52,7 +53,7 @@ function IconAction({
   );
 }
 
-export function PickupCard({
+function PickupCardComponent({
   compact,
   item,
   onCall,
@@ -374,3 +375,7 @@ const styles = StyleSheet.create({
     opacity: 0.72,
   },
 });
+
+// Memoised like BookingCard: the store replaces the whole task array on every
+// mutation, so confirming one pickup re-rendered every other card and its icons.
+export const PickupCard = memo(PickupCardComponent);

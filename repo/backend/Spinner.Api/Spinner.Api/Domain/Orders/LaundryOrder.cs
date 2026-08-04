@@ -328,10 +328,25 @@ public sealed class LaundryOrder
         return Result.Success();
     }
 
+    /// <summary>
+    /// Turns down a booking the shop is not going to take.
+    /// </summary>
+    /// <remarks>
+    /// Paid bookings are refused for the same reason as <see cref="Cancel"/>. This
+    /// guard was unnecessary when rejection was written, because a booking awaiting
+    /// approval could not yet be paid. Pay-before-submit changed that: a prepaid QR
+    /// booking sits at Booking Received with payment already settled, so without
+    /// this the owner could reject an order the customer has paid for, leaving the
+    /// money recorded against a job that will never be done.
+    /// </remarks>
     public Result Reject(DateTimeOffset now)
     {
         if (Status != OrderStatus.BookingReceived)
             return Result.Conflict("Only bookings with Booking Received status can be rejected.");
+
+        if (PaymentStatus == PaymentStatus.Paid)
+            return Result.Conflict(
+                "This booking is already paid. Issue a refund instead of rejecting it.");
 
         Status = OrderStatus.Rejected;
         UpdatedAt = now;
@@ -410,8 +425,16 @@ public sealed class LaundryOrder
     private bool IsValidNextStatus(OrderStatus nextStatus) => Status switch
     {
         OrderStatus.BookingReceived => nextStatus == OrderStatus.Confirmed,
+
+        // PickedUp is deliberately reachable for every fulfilment type: it means the
+        // shop now has the laundry, whether staff collected it or the customer
+        // brought it in, and GetCustomerTrackingHandler shows it to a drop-off
+        // customer as "Dropped Off". A drop-off order may also skip straight to
+        // processing. MarkPickedUp is the narrower pickup-run action and keeps its
+        // own guard; do not "tighten" this branch to match it.
         OrderStatus.Confirmed => nextStatus == OrderStatus.PickedUp ||
             (FulfillmentType != FulfillmentType.PickupAndDelivery && nextStatus == OrderStatus.BeingProcessed),
+
         OrderStatus.PickedUp => nextStatus == OrderStatus.BeingProcessed,
         OrderStatus.BeingProcessed => nextStatus == OrderStatus.ReadyForDelivery,
         OrderStatus.ReadyForDelivery => nextStatus == OrderStatus.Completed,

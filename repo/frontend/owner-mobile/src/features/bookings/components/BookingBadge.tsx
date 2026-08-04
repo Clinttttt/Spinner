@@ -19,6 +19,7 @@ const badgeLabels: Record<BadgeValue, string> = {
   confirmed: "Confirmed",
   inProcess: "In Process",
   ready: "Ready",
+  cancelled: "Cancelled",
   completed: "Completed",
 };
 

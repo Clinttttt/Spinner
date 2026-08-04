@@ -1,11 +1,17 @@
 export type BookingStatus =
-  "new" | "confirmed" | "inProcess" | "ready" | "completed";
+  | "new"
+  | "confirmed"
+  | "inProcess"
+  | "ready"
+  | "completed"
+  /** Rejected or cancelled. This used to be mislabelled as completed. */
+  | "cancelled";
 
 export type PaymentStatus = "cod" | "paid" | "unpaid";
 
 export type FulfillmentType = "pickup" | "dropOff" | "delivery";
 
-export type BookingDateBucket = "today" | "tomorrow";
+export type BookingDateBucket = "today" | "tomorrow" | "later" | "overdue";
 
 export type BookingService =
   "pickup" | "dropOff" | "delivery" | "washDryFold" | "dryOnly" | "selfService";

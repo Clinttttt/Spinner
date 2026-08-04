@@ -222,22 +222,30 @@ export function BookingsScreen({
     [onViewBooking],
   );
 
+  // Stable identities so memo(BookingCard) holds. React Native's cell renderer is
+  // not a PureComponent, so an inline arrow here re-rendered every card and every
+  // icon inside it whenever the list re-rendered.
+  const cardWrapperStyle = useMemo(
+    () => [styles.cardWrapper, { marginHorizontal: pageHorizontalPadding }],
+    [pageHorizontalPadding],
+  );
+
+  const onClearBookingPress = useCallback(
+    (booking: BookingListItem) => void handleClearBooking(booking),
+    [handleClearBooking],
+  );
+
   const renderBooking = useCallback(
     ({ item }: { item: BookingListItem }) => (
-      <View
-        style={[
-          styles.cardWrapper,
-          { marginHorizontal: pageHorizontalPadding },
-        ]}
-      >
+      <View style={cardWrapperStyle}>
         <BookingCard
           booking={item}
-          onClearPress={(booking) => void handleClearBooking(booking)}
+          onClearPress={onClearBookingPress}
           onViewPress={handleViewBooking}
         />
       </View>
     ),
-    [handleClearBooking, handleViewBooking, pageHorizontalPadding],
+    [cardWrapperStyle, onClearBookingPress, handleViewBooking],
   );
 
   const listHeader = useMemo(

@@ -39,6 +39,8 @@ interface ManualOrdersScreenProps {
   viewState: ManualOrdersViewState;
 }
 
+const extractOrderId = (item: ManualOrder) => item.id;
+
 export function ManualOrdersScreen({
   navigation,
   onClearOrder,
@@ -97,6 +99,36 @@ export function ManualOrdersScreen({
     setFilter("all");
   }, []);
 
+  // FlatList props kept referentially stable. Passing fresh arrow functions and
+  // style arrays here re-rendered every card, and each card's icons with it, on
+  // each keystroke of the search box — which is what made the list feel like it
+  // was constantly redrawing itself.
+  const listContentStyle = useMemo(
+    () => [
+      styles.listContent,
+      { paddingBottom: Math.max(insets.bottom, 14) + 104 },
+    ],
+    [insets.bottom],
+  );
+
+  const cardWrapperStyle = useMemo(
+    () => [styles.cardWrapper, { marginHorizontal: pagePadding }],
+    [pagePadding],
+  );
+
+  const renderOrder = useCallback(
+    ({ item }: { item: ManualOrder }) => (
+      <View style={cardWrapperStyle}>
+        <ManualOrderCard
+          onClearPress={onClearOrder}
+          order={item}
+          onViewPress={onViewOrder}
+        />
+      </View>
+    ),
+    [cardWrapperStyle, onClearOrder, onViewOrder],
+  );
+
   const listHeader = (
     <>
       <ManualOrdersHeader
@@ -151,26 +183,15 @@ export function ManualOrdersScreen({
   return (
     <View style={styles.screen}>
       <FlatList
-        contentContainerStyle={[
-          styles.listContent,
-          { paddingBottom: Math.max(insets.bottom, 14) + 104 },
-        ]}
+        contentContainerStyle={listContentStyle}
         data={viewState === "ready" ? filteredOrders : []}
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
-        keyExtractor={(item) => item.id}
+        keyExtractor={extractOrderId}
         ListEmptyComponent={emptyState}
         ListHeaderComponent={listHeader}
         onScrollBeginDrag={Keyboard.dismiss}
-        renderItem={({ item }) => (
-          <View style={[styles.cardWrapper, { marginHorizontal: pagePadding }]}>
-            <ManualOrderCard
-              onClearPress={onClearOrder}
-              order={item}
-              onViewPress={onViewOrder}
-            />
-          </View>
-        )}
+        renderItem={renderOrder}
         showsVerticalScrollIndicator={false}
       />
       {showFloatingCreateButton ? (

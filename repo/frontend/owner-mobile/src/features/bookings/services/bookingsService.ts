@@ -2,6 +2,7 @@ import { apiRequest } from "../../../api/apiClient";
 import { getAllPages } from "../../../api/pagination";
 import type {
   AvatarTone,
+  BookingDateBucket,
   BookingListItem,
   BookingService,
   BookingStatus,
@@ -95,18 +96,42 @@ function detailsServiceType(name: string): BookingServiceType {
   return value;
 }
 
-function dateBucket(date: string): "today" | "tomorrow" {
+/**
+ * Which day a booking falls on, relative to today.
+ *
+ * Previously anything that was not tomorrow was reported as "today", so a booking
+ * for next week and one that was already overdue both displayed "Today" — which
+ * made genuinely different bookings look like the same row repeated.
+ */
+function dateBucket(date: string): BookingDateBucket {
   const target = new Date(`${date}T00:00:00`);
+  if (Number.isNaN(target.getTime())) return "later";
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(today.getDate() + 1);
-  return target.getTime() === tomorrow.getTime() ? "tomorrow" : "today";
+
+  const days = Math.round((target.getTime() - today.getTime()) / 86_400_000);
+
+  if (days < 0) return "overdue";
+  if (days === 0) return "today";
+  if (days === 1) return "tomorrow";
+  return "later";
 }
 
 function dateLabel(date: string) {
   const bucket = dateBucket(date);
-  return bucket === "tomorrow" ? "Tomorrow" : "Today";
+  if (bucket === "today") return "Today";
+  if (bucket === "tomorrow") return "Tomorrow";
+
+  // A real date, because "Today" on a booking three days out is worse than useless.
+  const target = new Date(`${date}T00:00:00`);
+  if (Number.isNaN(target.getTime())) return date;
+
+  return target.toLocaleDateString("en-PH", {
+    day: "numeric",
+    month: "short",
+    weekday: "short",
+  });
 }
 
 function scheduleLabel(
