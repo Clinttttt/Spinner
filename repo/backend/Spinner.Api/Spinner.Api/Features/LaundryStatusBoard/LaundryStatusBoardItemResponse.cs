@@ -18,7 +18,7 @@ public sealed record LaundryStatusBoardItemResponse(
     public static LaundryStatusBoardItemResponse FromEntity(LaundryOrder order) => new(
         order.Id,
         order.OrderCode,
-        order.Customer.FullName,
+        order.ContactName,
         order.ServiceName,
         order.LoadCount,
         order.FulfillmentType,

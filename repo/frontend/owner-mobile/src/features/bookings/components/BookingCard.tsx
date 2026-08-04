@@ -69,6 +69,14 @@ function BookingCardComponent({
             </View>
           </View>
 
+          {/* A returning customer books repeatedly under the same name, often for
+              the same time window, so name and schedule alone made separate
+              bookings look like one repeated row. The code is what tells them
+              apart. */}
+          <Text numberOfLines={1} style={styles.bookingCode}>
+            {booking.bookingCode}
+          </Text>
+
           <View style={styles.metaRow}>
             <Ionicons
               color={colors.textSecondary}
@@ -208,6 +216,14 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 7,
     minHeight: 30,
+  },
+  bookingCode: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    fontVariant: ["tabular-nums"],
+    fontWeight: "600",
+    letterSpacing: 0.2,
+    marginTop: 2,
   },
   customerName: {
     color: colors.navy,

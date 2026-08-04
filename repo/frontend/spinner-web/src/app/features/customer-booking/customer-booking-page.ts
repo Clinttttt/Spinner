@@ -123,6 +123,11 @@ export class CustomerBookingPage {
 
   readonly bookingComplete = signal(false);
   readonly trackingNoticeVisible = signal(false);
+  /** The order lookup dialog, replacing a native browser prompt. */
+  readonly trackingLookupOpen = signal(false);
+  readonly trackingCodeInput = signal('');
+  readonly trackingLooking = signal(false);
+  readonly trackingError = signal('');
   readonly services = signal<readonly LaundryServiceDto[]>([]);
   readonly loadingServices = signal(true);
   readonly submitting = signal(false);
@@ -565,6 +570,25 @@ export class CustomerBookingPage {
     window.open(link.href, '_blank', 'noopener');
   }
 
+  /**
+   * How trustworthy the captured point is, in plain words.
+   *
+   * A network fix can be hundreds of metres out, which lands the pin on a
+   * neighbour's house. Saying so is what prompts the customer to nudge it rather
+   * than assume the pin is exact.
+   */
+  readonly pinAccuracyLabel = computed(() => {
+    const accuracy = this.pickupPin()?.accuracyMeters;
+    if (accuracy === null || accuracy === undefined) return null;
+
+    if (accuracy <= 25) return `Accurate to about ${accuracy} m`;
+    if (accuracy <= 150) {
+      return `Accurate to about ${accuracy} m — check the pin is on your house`;
+    }
+
+    return `Only accurate to about ${Math.round(accuracy / 10) * 10} m, so please move the pin onto your house`;
+  });
+
   /** The customer asked for the map, so a pan from here on is deliberate. */
   openMap(): void {
     this.mapVisible.set(true);
@@ -725,19 +749,58 @@ export class CustomerBookingPage {
       });
   }
 
-  showTrackingNotice(): void {
-    const orderCode = window.prompt('Enter your order code');
-    if (!orderCode?.trim()) return;
-    this.errorMessage.set('');
+  /**
+   * Opens the order lookup.
+   *
+   * Previously this called window.prompt, which renders the browser's own grey
+   * dialog showing the site's hostname — it looks like a security warning rather
+   * than part of the shop, and in some in-app browsers it is suppressed entirely,
+   * so the button appeared to do nothing.
+   */
+  openTrackingLookup(): void {
+    this.trackingCodeInput.set('');
+    this.trackingError.set('');
+    this.trackingLookupOpen.set(true);
+  }
+
+  closeTrackingLookup(): void {
+    this.trackingLookupOpen.set(false);
+    this.trackingLooking.set(false);
+    this.trackingError.set('');
+  }
+
+  onTrackingCodeInput(event: Event): void {
+    this.trackingCodeInput.set((event.target as HTMLInputElement).value);
+    this.trackingError.set('');
+  }
+
+  lookUpOrder(): void {
+    const code = this.trackingCodeInput().trim();
+
+    if (!code) {
+      this.trackingError.set('Enter the order code from your confirmation.');
+      return;
+    }
+
+    this.trackingLooking.set(true);
+    this.trackingError.set('');
+
     this.api
-      .getBookingConfirmation(orderCode.trim())
-      .pipe(takeUntilDestroyed(this.destroyRef))
+      .getBookingConfirmation(code)
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => this.trackingLooking.set(false)),
+      )
       .subscribe({
         next: (confirmation) => {
           this.confirmation.set(confirmation);
+          this.trackingLookupOpen.set(false);
           this.trackingNoticeVisible.set(true);
         },
-        error: () => this.errorMessage.set('We could not find that order code.'),
+        error: () =>
+          this.trackingError.set(
+            'No order found with that code. Check the code on your confirmation and try again.',
+          ),
       });
   }
 

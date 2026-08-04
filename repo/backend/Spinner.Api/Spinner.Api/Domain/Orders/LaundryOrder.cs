@@ -32,6 +32,14 @@ public sealed class LaundryOrder
         TrackingCode = trackingCode;
         Customer = customer;
         CustomerId = customer.Id;
+        // Captured rather than read back through the customer.
+        //
+        // One customer record is matched by mobile number and its name is refreshed
+        // on every booking, so reading the name through the navigation property made
+        // a new booking rewrite the name shown on all of that customer's earlier
+        // orders. Three separate bookings then looked like the same one repeated.
+        // An order is a record of what was submitted, so it keeps its own copy.
+        ContactName = customer.FullName;
         Service = service;
         ServiceId = service.Id;
         ServiceName = service.Name;
@@ -228,6 +236,16 @@ public sealed class LaundryOrder
     public OrderSource Source { get; private set; }
     public Guid CustomerId { get; private set; }
     public Customer Customer { get; private set; } = null!;
+
+    /// <summary>
+    /// The customer's name as it was given on this order.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately a copy. The customer record is shared across every order from
+    /// the same mobile number and its name is updated on each new booking, so
+    /// resolving the name through it rewrote history.
+    /// </remarks>
+    public string ContactName { get; private set; } = string.Empty;
     public Guid ServiceId { get; private set; }
     public LaundryService Service { get; private set; } = null!;
     public string ServiceName { get; private set; } = string.Empty;

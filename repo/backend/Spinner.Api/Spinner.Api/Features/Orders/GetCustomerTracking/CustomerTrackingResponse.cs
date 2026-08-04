@@ -20,7 +20,7 @@ public sealed record CustomerTrackingResponse(
     public static CustomerTrackingResponse FromEntity(LaundryOrder order) => new(
         order.OrderCode,
         order.TrackingCode,
-        order.Customer.FullName,
+        order.ContactName,
         order.ServiceName,
         order.FulfillmentType,
         order.PreferredDate,

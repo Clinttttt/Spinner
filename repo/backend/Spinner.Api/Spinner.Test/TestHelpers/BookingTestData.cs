@@ -20,7 +20,9 @@ public static class BookingTestData
         PaymentMethod paymentMethod = PaymentMethod.CashOnDelivery,
         Spinner.Api.Features.Orders.PickupLocationRequest? pickupLocation = null,
         string? preferredTimeWindow = null,
-        string? additionalNotes = null)
+        string? additionalNotes = null,
+        string fullName = "Maria Santos",
+        string mobileNumber = "09171234567")
     {
         var supportsPickup = fulfillmentType == FulfillmentType.PickupAndDelivery;
         var service = new LaundryService(
@@ -50,8 +52,8 @@ public static class BookingTestData
 
         return await new CreateBookingHandler(dbContext, new TestServiceAreaPolicyProvider()).Handle(
             new CreateBookingCommand(
-                "Maria Santos",
-                "09171234567",
+                fullName,
+                mobileNumber,
                 null,
                 service.Id,
                 fulfillmentType,

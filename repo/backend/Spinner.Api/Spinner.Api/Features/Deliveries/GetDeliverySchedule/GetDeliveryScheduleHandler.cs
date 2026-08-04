@@ -28,7 +28,7 @@ public sealed class GetDeliveryScheduleHandler
             .Where(order => order.PreferredDate <= request.Date)
             .Where(order => order.DeliveryStatus != DeliveryStatus.Delivered)
             .OrderBy(order => order.PreferredTimeWindow)
-            .ThenBy(order => order.Customer.FullName)
+            .ThenBy(order => order.ContactName)
             .ToListAsync(cancellationToken);
 
         var deliveries = deliveryOrders

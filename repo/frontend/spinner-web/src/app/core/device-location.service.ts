@@ -117,20 +117,13 @@ export class DeviceLocationService {
       throw this.deniedError();
     }
 
-    const coarse = await this.read({
-      enableHighAccuracy: false,
-      maximumAge: 60_000,
-      timeout: COARSE_TIMEOUT_MS,
-    }).catch((error: GeolocationUnavailableError) => error);
-
-    if (!(coarse instanceof GeolocationUnavailableError)) {
-      if (onRefined) this.refineInBackground(coarse, onRefined);
-      return coarse;
-    }
-
-    if (coarse.reason === 'permissionDenied') throw coarse;
-
-    // One patient high-accuracy attempt.
+    // High accuracy first.
+    //
+    // The coarse network fix is derived from wifi and cell towers and is routinely
+    // hundreds of metres out, which is what put the pin on a neighbour's house.
+    // Asking for GPS first costs a few seconds and is the difference between the
+    // right roof and the right barangay. The coarse read stays only as a fallback,
+    // so someone indoors with no satellite lock still gets a pin to adjust.
     const precise = await this.read({
       enableHighAccuracy: true,
       maximumAge: 0,
@@ -139,6 +132,21 @@ export class DeviceLocationService {
 
     if (!(precise instanceof GeolocationUnavailableError)) return precise;
     if (precise.reason === 'permissionDenied') throw precise;
+
+    const coarse = await this.read({
+      enableHighAccuracy: false,
+      maximumAge: 60_000,
+      timeout: COARSE_TIMEOUT_MS,
+    }).catch((error: GeolocationUnavailableError) => error);
+
+    if (!(coarse instanceof GeolocationUnavailableError)) {
+      // A satellite lock often lands a moment after the network guess, so keep
+      // trying in the background and upgrade the pin in place.
+      if (onRefined) this.refineInBackground(coarse, onRefined);
+      return coarse;
+    }
+
+    if (coarse.reason === 'permissionDenied') throw coarse;
 
     // Last resort: some WebViews answer a watch but never a one-shot request.
     const watched = await this.watchOnce().catch((error: GeolocationUnavailableError) => error);

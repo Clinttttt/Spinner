@@ -322,6 +322,111 @@ describe('CustomerBookingPage pickup location', () => {
     });
   });
 
+  describe('how trustworthy the pin is', () => {
+    it('asks the customer to move a vague pin onto their house', async () => {
+      const { fixture, page } = createPage();
+      locationStub.getCurrentPosition.mockResolvedValue({
+        accuracyMeters: 850,
+        latitude: 9.24,
+        longitude: 125.97,
+      });
+
+      await page.useCurrentLocation();
+      flushReverseIfAny();
+      fixture.detectChanges();
+
+      // A network fix this vague is what landed the pin on a neighbour's house.
+      expect(page.pinAccuracyLabel()).toContain('move the pin onto your house');
+      expect(fixture.nativeElement.textContent).toContain('move the pin onto your house');
+    });
+
+    it('simply states the accuracy when the fix is tight', async () => {
+      const { page } = createPage();
+      locationStub.getCurrentPosition.mockResolvedValue({
+        accuracyMeters: 8,
+        latitude: 9.24,
+        longitude: 125.97,
+      });
+
+      await page.useCurrentLocation();
+      flushReverseIfAny();
+
+      expect(page.pinAccuracyLabel()).toBe('Accurate to about 8 m');
+    });
+
+    it('says nothing when the device reports no accuracy', () => {
+      const { page } = createPage();
+      page.onMapPointChosen({ latitude: 9.24, longitude: 125.97 });
+      flushReverseIfAny();
+
+      // A hand-placed pin has no accuracy figure and needs no caveat.
+      expect(page.pinAccuracyLabel()).toBeNull();
+    });
+  });
+
+  describe('tracking an existing order', () => {
+    it('asks for the code in the page rather than a browser prompt', () => {
+      const { fixture, page } = createPage();
+      const prompt = vi.spyOn(window, 'prompt');
+
+      page.openTrackingLookup();
+      fixture.detectChanges();
+
+      // window.prompt shows the browser's own dialog with the hostname, and some
+      // in-app browsers suppress it entirely so the button did nothing.
+      expect(prompt).not.toHaveBeenCalled();
+      expect(fixture.nativeElement.querySelector('#tracking-code')).not.toBeNull();
+      prompt.mockRestore();
+    });
+
+    it('shows the order status for a real code', () => {
+      const { fixture, page } = createPage();
+      page.openTrackingLookup();
+      page.trackingCodeInput.set('ES-20260804-001');
+      page.lookUpOrder();
+
+      http
+        .expectOne((request) => request.url.includes('/api/bookings/ES-20260804-001/confirmation'))
+        .flush({
+          customerName: 'Viz Goc',
+          estimatedTotalAmount: 230,
+          orderCode: 'ES-20260804-001',
+          orderId: 'order-1',
+          status: 'BookingReceived',
+          trackingCode: 'TRK-1',
+        });
+      fixture.detectChanges();
+
+      expect(page.trackingLookupOpen()).toBe(false);
+      expect(fixture.nativeElement.textContent).toContain('ES-20260804-001');
+    });
+
+    it('explains an unknown code without closing the dialog', () => {
+      const { page } = createPage();
+      page.openTrackingLookup();
+      page.trackingCodeInput.set('ES-nope');
+      page.lookUpOrder();
+
+      http
+        .expectOne((request) => request.url.includes('/confirmation'))
+        .flush({ detail: 'not found' }, { status: 404, statusText: 'Not Found' });
+
+      // Kept open so the code can be corrected without starting over.
+      expect(page.trackingLookupOpen()).toBe(true);
+      expect(page.trackingError()).toContain('No order found');
+      expect(page.trackingLooking()).toBe(false);
+    });
+
+    it('does not call the API for an empty code', () => {
+      const { page } = createPage();
+      page.openTrackingLookup();
+      page.lookUpOrder();
+
+      http.expectNone((request) => request.url.includes('/confirmation'));
+      expect(page.trackingError()).toContain('Enter the order code');
+    });
+  });
+
   describe('dismissing the suggestions', () => {
     it('closes when the customer taps outside the address block', () => {
       const { fixture, page } = createPage();

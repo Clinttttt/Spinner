@@ -38,7 +38,7 @@ public sealed class GetBookingsHandler
             var search = request.Search.Trim().ToLowerInvariant();
             query = query.Where(order =>
                 order.OrderCode.ToLower().Contains(search) ||
-                order.Customer.FullName.ToLower().Contains(search) ||
+                order.ContactName.ToLower().Contains(search) ||
                 order.Customer.MobileNumber.ToLower().Contains(search) ||
                 order.Address.ToLower().Contains(search));
         }
@@ -56,7 +56,7 @@ public sealed class GetBookingsHandler
         var response = bookings.Select(order => new BookingListItemResponse(
             order.Id,
             order.OrderCode,
-            order.Customer.FullName,
+            order.ContactName,
             order.Customer.MobileNumber,
             order.Address,
             order.PreferredDate,

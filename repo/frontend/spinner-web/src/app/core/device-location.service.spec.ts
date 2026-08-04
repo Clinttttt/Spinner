@@ -62,6 +62,42 @@ describe('DeviceLocationService', () => {
     vi.useRealTimers();
   });
 
+  it('asks for GPS before accepting a network guess', async () => {
+    install();
+    const requested: boolean[] = [];
+    getCurrentPosition.mockImplementation(
+      (onSuccess: PositionCallback, _onError: ErrorCallback, options: PositionOptions) => {
+        requested.push(options.enableHighAccuracy === true);
+        onSuccess(position(9.2374, 125.9616, 12));
+      },
+    );
+
+    const location = await service.getCurrentPosition();
+
+    // A wifi/cell fix can be hundreds of metres out, which put the pin on a
+    // neighbour's house. The precise attempt has to come first.
+    expect(requested[0]).toBe(true);
+    expect(location.accuracyMeters).toBe(12);
+  });
+
+  it('still returns a network fix when GPS cannot lock', async () => {
+    install();
+    getCurrentPosition.mockImplementation(
+      (onSuccess: PositionCallback, onError: ErrorCallback, options: PositionOptions) => {
+        if (options.enableHighAccuracy) {
+          onError(failure(3));
+          return;
+        }
+        onSuccess(position(9.24, 125.97, 800));
+      },
+    );
+
+    const location = await service.getCurrentPosition();
+
+    // Indoors with no satellite lock, something to adjust beats nothing.
+    expect(location.accuracyMeters).toBe(800);
+  });
+
   it('returns the first coarse fix without waiting for precision', async () => {
     install();
     getCurrentPosition.mockImplementation((onSuccess: PositionCallback) =>

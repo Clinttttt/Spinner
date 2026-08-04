@@ -41,7 +41,7 @@ public sealed class GetManualOrdersHandler
             var search = request.Search.Trim().ToLowerInvariant();
             query = query.Where(order =>
                 order.OrderCode.ToLower().Contains(search) ||
-                order.Customer.FullName.ToLower().Contains(search) ||
+                order.ContactName.ToLower().Contains(search) ||
                 order.Customer.MobileNumber.ToLower().Contains(search) ||
                 order.Address.ToLower().Contains(search));
         }
@@ -59,7 +59,7 @@ public sealed class GetManualOrdersHandler
         var response = orders.Select(order => new ManualOrderListItemResponse(
             order.Id,
             order.OrderCode,
-            order.Customer.FullName,
+            order.ContactName,
             order.Customer.MobileNumber,
             order.FulfillmentType,
             order.Address,

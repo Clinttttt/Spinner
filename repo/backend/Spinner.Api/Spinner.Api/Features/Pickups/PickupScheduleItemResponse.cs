@@ -51,7 +51,7 @@ public sealed record PickupScheduleItemResponse(
     public static PickupScheduleItemResponse FromEntity(LaundryOrder order) => new(
         order.Id,
         order.OrderCode,
-        order.Customer.FullName,
+        order.ContactName,
         order.Customer.MobileNumber,
         ToShortAddress(order.Address),
         order.Address,

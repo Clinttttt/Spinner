@@ -25,13 +25,16 @@ public sealed class GetNewBookingRequestsHandler
             .Include(order => order.Customer)
             .Where(order =>
                 order.Source == OrderSource.CustomerWeb &&
-                order.Status == OrderStatus.BookingReceived)
+                order.Status == OrderStatus.BookingReceived &&
+                // Every other list excludes cleared orders; this one did not, so a
+                // tidied-away job could still have surfaced here.
+                order.ArchivedAt == null)
             .OrderBy(order => order.PreferredDate)
             .ThenBy(order => order.CreatedAt)
             .Select(order => new NewBookingRequestResponse(
                 order.Id,
                 order.OrderCode,
-                order.Customer.FullName,
+                order.ContactName,
                 order.Customer.MobileNumber,
                 order.ServiceName,
                 order.FulfillmentType,

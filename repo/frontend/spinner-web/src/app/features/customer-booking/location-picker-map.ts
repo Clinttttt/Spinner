@@ -185,15 +185,41 @@ export class LocationPickerMap implements AfterViewInit, OnDestroy {
         zoomControl: true,
       });
 
-      const tiles = leaflet.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      const streets = leaflet.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap',
         maxZoom: 19,
       });
+
+      // Satellite imagery with road and place labels drawn over it. Rural purok
+      // addresses have no house numbers, so recognising your own roof is the most
+      // reliable way to place the pin. Esri's basemaps need no key, which keeps the
+      // no-paid-API constraint.
+      const satellite = leaflet.layerGroup([
+        leaflet.tileLayer(
+          'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+          { attribution: 'Imagery &copy; Esri', maxNativeZoom: 19, maxZoom: 21 },
+        ),
+        leaflet.tileLayer(
+          'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+          { attribution: '', maxNativeZoom: 19, maxZoom: 21 },
+        ),
+      ]);
+
+      const tiles = streets;
 
       // A blocked or offline tile server must say so rather than look empty.
       tiles.on('tileerror', () => this.tilesFailed.set(true));
       tiles.on('load', () => this.tilesFailed.set(false));
       tiles.addTo(map);
+
+      // Named so the customer knows what they are switching to, rather than a
+      // generic layers icon.
+      leaflet.control
+        .layers({ Map: streets, Satellite: satellite }, undefined, {
+          collapsed: false,
+          position: 'topright',
+        })
+        .addTo(map);
 
       map.on('moveend', () => {
         if (this.applyingExternalCentre) return;

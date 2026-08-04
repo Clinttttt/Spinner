@@ -104,6 +104,7 @@ public sealed class AppDbContext : DbContext
             entity.Property(order => order.OnlinePaymentCheckoutUrl).HasMaxLength(500);
             entity.Property(order => order.ServiceName).HasMaxLength(160).IsRequired();
             entity.Property(order => order.UnitLabel).HasMaxLength(80).IsRequired();
+            entity.Property(order => order.ContactName).HasMaxLength(160).IsRequired();
             entity.Property(order => order.Address).HasMaxLength(500).IsRequired();
             entity.Property(order => order.PreferredTimeWindow).HasMaxLength(120).IsRequired();
             entity.Property(order => order.AdditionalNotes).HasMaxLength(1000);

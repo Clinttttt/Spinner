@@ -39,7 +39,7 @@ public sealed class ExportOrderHistoryHandler
             query = query.Where(order =>
                 order.OrderCode.ToLower().Contains(search) ||
                 order.TrackingCode.ToLower().Contains(search) ||
-                order.Customer.FullName.ToLower().Contains(search) ||
+                order.ContactName.ToLower().Contains(search) ||
                 order.Customer.MobileNumber.ToLower().Contains(search));
         }
 
@@ -50,7 +50,7 @@ public sealed class ExportOrderHistoryHandler
                 order.Id,
                 order.OrderCode,
                 order.Source,
-                order.Customer.FullName,
+                order.ContactName,
                 order.Customer.MobileNumber,
                 order.ServiceName,
                 order.PreferredDate,

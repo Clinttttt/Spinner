@@ -89,7 +89,7 @@ public sealed class CreateManualOrderHandler
             if (existingBooking is not null)
             {
                 return Result<OrderDetailsResponse>.PossibleDuplicate(
-                    $"{existingBooking.Customer.FullName} already has customer booking " +
+                    $"{existingBooking.ContactName} already has customer booking " +
                     $"{existingBooking.OrderCode} for {existingBooking.PreferredDate:MMM d} " +
                     $"({existingBooking.PreferredTimeWindow}). Update that booking instead of " +
                     "creating a second order, or create this order anyway if it is a separate job.");

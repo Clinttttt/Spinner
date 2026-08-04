@@ -16,7 +16,7 @@ public sealed record DeliveryScheduleItemResponse(
     public static DeliveryScheduleItemResponse FromEntity(LaundryOrder order) => new(
         order.Id,
         order.OrderCode,
-        order.Customer.FullName,
+        order.ContactName,
         ToShortAddress(order.Address),
         order.PaymentStatus == PaymentStatus.Paid ? 0m : order.EstimatedTotalAmount,
         order.PaymentStatus,

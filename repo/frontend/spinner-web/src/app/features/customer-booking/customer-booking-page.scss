@@ -1054,6 +1054,9 @@ input[type='date'].field-control::-webkit-clear-button {
 
 .confirmation-footer {
   border-top: 1px solid var(--line);
+  /* Stacked so a second action never sits half off a narrow screen. */
+  display: grid;
+  gap: 8px;
   padding: 14px 22px 18px;
 }
 

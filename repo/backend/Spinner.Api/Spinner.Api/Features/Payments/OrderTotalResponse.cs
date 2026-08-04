@@ -16,7 +16,7 @@ public sealed record OrderTotalResponse(
     public static OrderTotalResponse FromEntity(LaundryOrder order) => new(
         order.Id,
         order.OrderCode,
-        order.Customer.FullName,
+        order.ContactName,
         order.PaymentMethod,
         order.PaymentStatus,
         order.EstimatedServiceAmount,

@@ -15,7 +15,7 @@ public sealed record PaymentConfirmationResponse(
     public static PaymentConfirmationResponse FromEntity(LaundryOrder order) => new(
         order.Id,
         order.OrderCode,
-        order.Customer.FullName,
+        order.ContactName,
         order.PaymentMethod,
         order.PaymentStatus,
         order.PaidAt,

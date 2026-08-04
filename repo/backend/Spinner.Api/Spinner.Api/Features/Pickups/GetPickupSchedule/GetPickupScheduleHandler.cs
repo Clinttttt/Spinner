@@ -48,7 +48,7 @@ public sealed class GetPickupScheduleHandler
         var totalCount = await query.CountAsync(cancellationToken);
         var pickupOrders = await query
             .OrderBy(order => order.PreferredTimeWindow)
-            .ThenBy(order => order.Customer.FullName)
+            .ThenBy(order => order.ContactName)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);

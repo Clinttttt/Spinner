@@ -27,7 +27,7 @@ public sealed class GetLaundryStatusBoardHandler
                 order.Status == OrderStatus.BeingProcessed ||
                 order.Status == OrderStatus.ReadyForDelivery)
             .OrderBy(order => order.UpdatedAt)
-            .ThenBy(order => order.Customer.FullName)
+            .ThenBy(order => order.ContactName)
             .ToListAsync(cancellationToken);
 
         var items = orders

@@ -21,7 +21,7 @@ public sealed record ReceiptResponse(
         "Digital Receipt",
         order.ReceiptCode ?? string.Empty,
         order.OrderCode,
-        order.Customer.FullName,
+        order.ContactName,
         order.ServiceName,
         order.LoadCount,
         order.UnitLabel,

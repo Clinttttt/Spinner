@@ -54,7 +54,7 @@ public sealed record OrderDetailsResponse(
         order.TrackingCode,
         order.Source,
         order.CustomerId,
-        order.Customer.FullName,
+        order.ContactName,
         order.Customer.MobileNumber,
         order.Customer.EmailAddress,
         order.ServiceId,

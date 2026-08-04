@@ -28,7 +28,7 @@ public sealed record PickupDetailsResponse(
         order.Id,
         order.OrderCode,
         order.TrackingCode,
-        order.Customer.FullName,
+        order.ContactName,
         order.Customer.MobileNumber,
         order.Customer.EmailAddress,
         order.ServiceName,
