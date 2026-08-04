@@ -322,6 +322,98 @@ describe('CustomerBookingPage pickup location', () => {
     });
   });
 
+  describe('dismissing the suggestions', () => {
+    it('closes when the customer taps outside the address block', () => {
+      const { fixture, page } = createPage();
+      page.suggestions.set([schoolSuggestion]);
+      page.suggestionsOpen.set(true);
+      fixture.detectChanges();
+
+      // The list used to sit over the payment section with no way past it.
+      document
+        .querySelector('.form-section')
+        ?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      fixture.detectChanges();
+
+      expect(page.suggestionsOpen()).toBe(false);
+    });
+
+    it('stays open while the customer is still working in the address block', () => {
+      const { fixture, page } = createPage();
+      page.suggestions.set([schoolSuggestion]);
+      page.suggestionsOpen.set(true);
+      fixture.detectChanges();
+
+      fixture.nativeElement
+        .querySelector('.address-field')
+        ?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      fixture.detectChanges();
+
+      expect(page.suggestionsOpen()).toBe(true);
+    });
+
+    it('offers an explicit way to hide the list', () => {
+      const { fixture, page } = createPage();
+      page.suggestions.set([schoolSuggestion]);
+      page.suggestionsOpen.set(true);
+      fixture.detectChanges();
+
+      (fixture.nativeElement.querySelector('.suggestion-dismiss') as HTMLButtonElement).click();
+      fixture.detectChanges();
+
+      expect(page.suggestionsOpen()).toBe(false);
+    });
+  });
+
+  describe('after a booking is confirmed', () => {
+    it('clears the form so the next customer starts fresh', () => {
+      const { page } = createPage();
+      page.onMapPointChosen({ latitude: 9.24101, longitude: 125.96712 });
+      flushReverseIfAny();
+
+      page.submitBooking();
+      submittedPayload();
+      expect(page.bookingComplete()).toBe(true);
+
+      page.closeConfirmation();
+
+      // A shared phone at the counter must not keep the last customer's details.
+      expect(page.bookingForm.controls.fullName.value).toBe('');
+      expect(page.bookingForm.controls.mobileNumber.value).toBe('');
+      expect(page.bookingForm.controls.address.value).toBe('');
+      expect(page.bookingForm.controls.preferredDate.value).toBe('');
+      expect(page.pickupPin()).toBeNull();
+      expect(page.mapVisible()).toBe(false);
+      expect(page.submittedSummary()).toBeNull();
+      // Untouched, so a blank form does not show required errors.
+      expect(page.bookingForm.controls.fullName.touched).toBe(false);
+    });
+
+    it('goes back to the top of the page', () => {
+      const { page } = createPage();
+      const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
+
+      page.submitBooking();
+      submittedPayload();
+      page.closeConfirmation();
+
+      // The confirmation closes with the viewport near the bottom, which reads as a
+      // half-filled form rather than a new one.
+      expect(scrollTo).toHaveBeenCalledWith({ behavior: 'smooth', top: 0 });
+      scrollTo.mockRestore();
+    });
+
+    it('reselects the first service, matching a freshly loaded page', () => {
+      const { page } = createPage();
+      page.submitBooking();
+      submittedPayload();
+      page.closeConfirmation();
+
+      expect(page.selectedServiceIds()).toEqual([service.id]);
+      expect(page.serviceLoadCount(service.id)).toBe(1);
+    });
+  });
+
   describe('form field behaviour', () => {
     it('says nothing about suggestions until there are some', () => {
       const { fixture, page } = createPage();

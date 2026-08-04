@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  Animated,
   Modal,
   Pressable,
   ScrollView,
@@ -8,6 +9,8 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { useSheetEntrance } from "../../../components/common/useSheetEntrance";
 
 import { colors } from "../../../theme/colors";
 import type {
@@ -129,6 +132,7 @@ export function BookingsFilterModal({
   statusFilter,
 }: BookingsFilterModalProps) {
   const insets = useSafeAreaInsets();
+  const entrance = useSheetEntrance();
   const [draftAdvancedFilters, setDraftAdvancedFilters] =
     useState(advancedFilters);
   const [draftStatusFilter, setDraftStatusFilter] = useState(statusFilter);
@@ -140,7 +144,7 @@ export function BookingsFilterModal({
 
   return (
     <Modal
-      animationType="slide"
+      animationType="fade"
       onRequestClose={onClose}
       presentationStyle="overFullScreen"
       transparent
@@ -153,9 +157,13 @@ export function BookingsFilterModal({
           onPress={onClose}
           style={styles.backdrop}
         />
-        <View
+        <Animated.View
           accessibilityViewIsModal
-          style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}
+          style={[
+            styles.sheet,
+            entrance,
+            { paddingBottom: Math.max(insets.bottom, 16) },
+          ]}
         >
           <View style={styles.handle} />
           <View style={styles.sheetHeading}>
@@ -240,7 +248,7 @@ export function BookingsFilterModal({
           >
             <Text style={styles.applyButtonText}>Apply Filters</Text>
           </Pressable>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );

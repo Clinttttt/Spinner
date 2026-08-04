@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  Animated,
   Modal,
   Pressable,
   ScrollView,
@@ -8,6 +9,8 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { useSheetEntrance } from "../../../components/common/useSheetEntrance";
 
 import { colors } from "../../../theme/colors";
 import { defaultReportFilters } from "../data/reportsConfig";
@@ -74,6 +77,7 @@ export function ReportsFilterModal({
   services,
 }: ReportsFilterModalProps) {
   const insets = useSafeAreaInsets();
+  const entrance = useSheetEntrance();
   const [draft, setDraft] = useState(filters);
   const serviceOptions = [
     { label: "All", value: "all" },
@@ -85,7 +89,7 @@ export function ReportsFilterModal({
 
   return (
     <Modal
-      animationType="slide"
+      animationType="fade"
       onRequestClose={onClose}
       presentationStyle="overFullScreen"
       transparent
@@ -98,9 +102,13 @@ export function ReportsFilterModal({
           onPress={onClose}
           style={styles.backdrop}
         />
-        <View
+        <Animated.View
           accessibilityViewIsModal
-          style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}
+          style={[
+            styles.sheet,
+            entrance,
+            { paddingBottom: Math.max(insets.bottom, 16) },
+          ]}
         >
           <View style={styles.handle} />
           <View style={styles.heading}>
@@ -177,7 +185,7 @@ export function ReportsFilterModal({
           >
             <Text style={styles.applyText}>Apply Filters</Text>
           </Pressable>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );

@@ -132,7 +132,7 @@ export function ServiceEditorModal({
 
   return (
     <Modal
-      animationType="slide"
+      animationType="fade"
       onRequestClose={onClose}
       presentationStyle="pageSheet"
       visible

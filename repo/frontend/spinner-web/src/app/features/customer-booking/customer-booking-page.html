@@ -318,52 +318,63 @@
               }
 
               @if (suggestionsOpen() && suggestions().length) {
-                <ul
-                  class="suggestion-list"
-                  id="address-suggestions"
-                  role="listbox"
-                  aria-label="Nearby places"
-                >
-                  @for (
-                    suggestion of suggestions();
-                    track suggestion.formattedAddress;
-                    let index = $index
-                  ) {
-                    <li role="presentation">
-                      <button
-                        class="suggestion"
-                        type="button"
-                        role="option"
-                        [class.active]="activeSuggestionIndex() === index"
-                        [attr.aria-selected]="activeSuggestionIndex() === index"
-                        (click)="applySuggestion(suggestion)"
-                      >
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                          <path d="M12 21s-7-5.686-7-11a7 7 0 1 1 14 0c0 5.314-7 11-7 11Z" />
-                          <circle cx="12" cy="10" r="2.5" />
-                        </svg>
-                        <span>
-                          <strong>{{ suggestion.primaryText }}</strong>
-                          @if (suggestion.secondaryText) {
-                            <small>{{ suggestion.secondaryText }}</small>
+                <div class="suggestion-panel">
+                  <div class="suggestion-head">
+                    <span>Nearby places</span>
+                    <!-- The list sits between the address and the next section, so it
+                         has to be closable: without this it covered the rest of the
+                         form and there was no way past it. -->
+                    <button
+                      class="suggestion-dismiss"
+                      type="button"
+                      aria-label="Hide nearby places"
+                      (click)="closeSuggestions()"
+                    >
+                      Hide
+                    </button>
+                  </div>
+                  <ul
+                    class="suggestion-list"
+                    id="address-suggestions"
+                    role="listbox"
+                    aria-label="Nearby places"
+                  >
+                    @for (
+                      suggestion of suggestions();
+                      track suggestion.formattedAddress;
+                      let index = $index
+                    ) {
+                      <li role="presentation">
+                        <button
+                          class="suggestion"
+                          type="button"
+                          role="option"
+                          [class.active]="activeSuggestionIndex() === index"
+                          [attr.aria-selected]="activeSuggestionIndex() === index"
+                          (click)="applySuggestion(suggestion)"
+                        >
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M12 21s-7-5.686-7-11a7 7 0 1 1 14 0c0 5.314-7 11-7 11Z" />
+                            <circle cx="12" cy="10" r="2.5" />
+                          </svg>
+                          <span>
+                            <strong>{{ suggestion.primaryText }}</strong>
+                            @if (suggestion.secondaryText) {
+                              <small>{{ suggestion.secondaryText }}</small>
+                            }
+                          </span>
+                          @if (suggestion.distanceKm !== null) {
+                            <em class="suggestion-distance">{{ suggestion.distanceKm }} km</em>
                           }
-                        </span>
-                        @if (suggestion.distanceKm !== null) {
-                          <em class="suggestion-distance">{{ suggestion.distanceKm }} km</em>
-                        }
-                      </button>
-                    </li>
-                  }
-                </ul>
-              }
-              <!-- Only worth explaining when there is something to choose. With no
-                   results it was three lines of instructions about a list that
-                   wasn't there. -->
-              @if (suggestionsOpen() && suggestions().length) {
-                <p class="address-hint">
-                  Choosing one only moves the map pin — your written address stays exactly as you
-                  typed it.
-                </p>
+                        </button>
+                      </li>
+                    }
+                  </ul>
+                  <p class="suggestion-note">
+                    Choosing one only moves the map pin — your written address stays exactly as you
+                    typed it.
+                  </p>
+                </div>
               }
             </div>
 
@@ -445,6 +456,11 @@
                 <div class="pin-card warning" role="alert">
                   <strong>We could not detect your location</strong>
                   <small>{{ locationError() }}</small>
+                  @if (offerExternalBrowser()) {
+                    <button class="link-button" type="button" (click)="openInDeviceBrowser()">
+                      Open this page in my browser
+                    </button>
+                  }
                 </div>
               }
               @default {

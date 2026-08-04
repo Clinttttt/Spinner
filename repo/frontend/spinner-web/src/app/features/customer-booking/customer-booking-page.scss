@@ -594,12 +594,36 @@ select.field-control {
   text-overflow: ellipsis;
 }
 
-/* The native indicator is drawn at the right edge of the content box, so it sat
-   almost against the border while the select next to it had a comfortable inset.
-   A margin on the trailing side is what moves it, not extra padding. */
+/* The date input draws its own indicator hard against the content edge, and margin
+   on it is ignored by the Android WebView that Messenger uses. So the native one is
+   made invisible but stretched across the field — which keeps a tap anywhere on the
+   field opening the picker — and the same chevron the select uses is drawn on top.
+   That is what makes the two fields line up. */
+input[type='date'].field-control {
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230d2a52' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-position: right 14px center;
+  background-repeat: no-repeat;
+  background-size: 16px 16px;
+  padding-right: 42px;
+  position: relative;
+}
+
 input[type='date'].field-control::-webkit-calendar-picker-indicator {
-  margin-inline-end: 6px;
-  opacity: 0.65;
+  cursor: pointer;
+  height: 100%;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  position: absolute;
+  width: 100%;
+}
+
+/* Chrome reserves space for these even when empty, which pushes the value off
+   centre next to the drawn chevron. */
+input[type='date'].field-control::-webkit-inner-spin-button,
+input[type='date'].field-control::-webkit-clear-button {
+  display: none;
 }
 
 /* Wraps the date input so the prompt can sit over it. */
@@ -645,22 +669,66 @@ input[type='date'].field-control::-webkit-calendar-picker-indicator {
   position: relative;
 }
 
+/* Wraps the list so it reads as one dismissible panel rather than a list that has
+   appeared over the rest of the form with no way to get past it. */
+.suggestion-panel {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 10px 26px rgba(8, 35, 71, 0.08);
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+.suggestion-head {
+  align-items: center;
+  background: var(--surface-soft);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 10px 8px 12px;
+}
+
+.suggestion-head span {
+  color: var(--ink-soft);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.suggestion-dismiss {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--navy);
+  font-size: 11.5px;
+  font-weight: 700;
+  min-height: 30px;
+  padding: 0 12px;
+}
+
+.suggestion-note {
+  border-top: 1px solid var(--line);
+  color: var(--ink-soft);
+  font-size: 10.5px;
+  line-height: 1.5;
+  margin: 0;
+  padding: 8px 12px 10px;
+}
+
 .suggestion-list {
   background: #fff;
-  border: 1px solid #dfe4ea;
-  border-radius: 16px;
-  box-shadow: 0 18px 44px rgba(8, 35, 71, 0.16);
+  /* In flow rather than absolutely positioned. As an overlay anchored under the
+     address field it sat on top of the payment section, so taps landed on the list
+     instead of the form and there was no way to continue. The panel around it
+     supplies the border and shadow. */
   display: grid;
-  left: 0;
   list-style: none;
-  margin: 6px 0 0;
+  margin: 0;
   max-height: 268px;
   overflow-y: auto;
   padding: 6px;
-  position: absolute;
-  right: 0;
-  top: 100%;
-  z-index: 8;
 }
 
 .suggestion {

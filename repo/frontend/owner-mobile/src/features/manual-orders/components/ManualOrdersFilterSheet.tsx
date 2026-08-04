@@ -1,5 +1,14 @@
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Animated,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { useSheetEntrance } from "../../../components/common/useSheetEntrance";
 
 import { colors } from "../../../theme/colors";
 import type { ManualOrderFilter } from "../models/manualOrder";
@@ -25,9 +34,10 @@ export function ManualOrdersFilterSheet({
   value,
 }: ManualOrdersFilterSheetProps) {
   const insets = useSafeAreaInsets();
+  const entrance = useSheetEntrance();
 
   return (
-    <Modal animationType="slide" onRequestClose={onClose} transparent visible>
+    <Modal animationType="fade" onRequestClose={onClose} transparent visible>
       <View style={styles.root}>
         <Pressable
           accessibilityLabel="Close manual order filters"
@@ -35,9 +45,13 @@ export function ManualOrdersFilterSheet({
           onPress={onClose}
           style={styles.backdrop}
         />
-        <View
+        <Animated.View
           accessibilityViewIsModal
-          style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 18) }]}
+          style={[
+            styles.sheet,
+            entrance,
+            { paddingBottom: Math.max(insets.bottom, 18) },
+          ]}
         >
           <View style={styles.handle} />
           <Text style={styles.title}>Filter manual orders</Text>
@@ -72,7 +86,7 @@ export function ManualOrdersFilterSheet({
               );
             })}
           </View>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );

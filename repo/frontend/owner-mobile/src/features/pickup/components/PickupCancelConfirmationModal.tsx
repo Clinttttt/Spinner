@@ -1,5 +1,14 @@
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Animated,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { useSheetEntrance } from "../../../components/common/useSheetEntrance";
 
 import { colors } from "../../../theme/colors";
 import type { PickupTask } from "../models/pickup";
@@ -16,10 +25,11 @@ export function PickupCancelConfirmationModal({
   onConfirm,
 }: PickupCancelConfirmationModalProps) {
   const insets = useSafeAreaInsets();
+  const entrance = useSheetEntrance();
 
   return (
     <Modal
-      animationType="slide"
+      animationType="fade"
       onRequestClose={onClose}
       presentationStyle="overFullScreen"
       transparent
@@ -32,9 +42,13 @@ export function PickupCancelConfirmationModal({
           onPress={onClose}
           style={styles.backdrop}
         />
-        <View
+        <Animated.View
           accessibilityViewIsModal
-          style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 18) }]}
+          style={[
+            styles.sheet,
+            entrance,
+            { paddingBottom: Math.max(insets.bottom, 18) },
+          ]}
         >
           <View style={styles.handle} />
           <Text style={styles.title}>Cancel pickup?</Text>
@@ -66,7 +80,7 @@ export function PickupCancelConfirmationModal({
               <Text style={styles.cancelButtonText}>Cancel Pickup</Text>
             </Pressable>
           </View>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );

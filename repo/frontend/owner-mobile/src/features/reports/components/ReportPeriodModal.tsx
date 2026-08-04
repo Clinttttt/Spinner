@@ -1,5 +1,14 @@
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Animated,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { useSheetEntrance } from "../../../components/common/useSheetEntrance";
 
 import { colors } from "../../../theme/colors";
 import { reportPeriodOptions } from "../data/reportsConfig";
@@ -17,9 +26,10 @@ export function ReportPeriodModal({
   value,
 }: ReportPeriodModalProps) {
   const insets = useSafeAreaInsets();
+  const entrance = useSheetEntrance();
   return (
     <Modal
-      animationType="slide"
+      animationType="fade"
       onRequestClose={onClose}
       presentationStyle="overFullScreen"
       transparent
@@ -32,9 +42,13 @@ export function ReportPeriodModal({
           onPress={onClose}
           style={styles.backdrop}
         />
-        <View
+        <Animated.View
           accessibilityViewIsModal
-          style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 18) }]}
+          style={[
+            styles.sheet,
+            entrance,
+            { paddingBottom: Math.max(insets.bottom, 18) },
+          ]}
         >
           <View style={styles.handle} />
           <Text style={styles.title}>Reporting period</Text>
@@ -71,7 +85,7 @@ export function ReportPeriodModal({
               );
             })}
           </View>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );

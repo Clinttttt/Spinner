@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  Animated,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -11,6 +12,8 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { useSheetEntrance } from "../../../components/common/useSheetEntrance";
 
 import { colors } from "../../../theme/colors";
 
@@ -29,6 +32,7 @@ interface AdjustChargesSheetProps extends ChargeAdjustments {
 
 export function AdjustChargesSheet(props: AdjustChargesSheetProps) {
   const insets = useSafeAreaInsets();
+  const entrance = useSheetEntrance();
   const [draft, setDraft] = useState<ChargeAdjustments>({
     additionalCharge: props.additionalCharge,
     additionalChargeReason: props.additionalChargeReason,
@@ -59,7 +63,7 @@ export function AdjustChargesSheet(props: AdjustChargesSheetProps) {
 
   return (
     <Modal
-      animationType="slide"
+      animationType="fade"
       onRequestClose={props.onClose}
       transparent
       visible
@@ -69,8 +73,12 @@ export function AdjustChargesSheet(props: AdjustChargesSheetProps) {
         style={styles.root}
       >
         <Pressable onPress={props.onClose} style={styles.backdrop} />
-        <View
-          style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 18) }]}
+        <Animated.View
+          style={[
+            styles.sheet,
+            entrance,
+            { paddingBottom: Math.max(insets.bottom, 18) },
+          ]}
         >
           <View style={styles.handle} />
           <Text style={styles.title}>Adjust Charges</Text>
@@ -150,7 +158,7 @@ export function AdjustChargesSheet(props: AdjustChargesSheetProps) {
               <Text style={styles.applyText}>Apply Changes</Text>
             </Pressable>
           </View>
-        </View>
+        </Animated.View>
       </KeyboardAvoidingView>
     </Modal>
   );

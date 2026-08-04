@@ -4,6 +4,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  HostListener,
   computed,
   inject,
   signal,
@@ -138,6 +139,8 @@ export class CustomerBookingPage {
 
   readonly locationStatus = signal<LocationStatus>('idle');
   readonly locationError = signal('');
+  /** True when the failure can only be resolved outside this browser. */
+  readonly offerExternalBrowser = signal(false);
   readonly pickupPin = signal<PickupPin | null>(null);
   /**
    * The map is hidden until the customer asks for it.
@@ -436,6 +439,24 @@ export class CustomerBookingPage {
     this.activeSuggestionIndex.set(-1);
   }
 
+  /**
+   * Closes the list when the customer taps anywhere outside it.
+   *
+   * Bound on the document because the list sits between the address field and the
+   * next section: leaving it open covered the rest of the form, and tapping past it
+   * is the reflex people already have.
+   */
+  @HostListener('document:pointerdown', ['$event'])
+  protected onDocumentPointerDown(event: Event): void {
+    if (!this.suggestionsOpen()) return;
+
+    const target = event.target as HTMLElement | null;
+    // A tap inside the address block is either editing or choosing, so leave it.
+    if (target?.closest('.address-field')) return;
+
+    this.closeSuggestions();
+  }
+
   /** The customer dragged the map; the centre is now the pickup point. */
   onMapPointChosen(point: MapPoint): void {
     const previous = this.pickupPin();
@@ -513,10 +534,35 @@ export class CustomerBookingPage {
       this.locationError.set(
         error instanceof GeolocationUnavailableError
           ? error.message
-          : 'Your location could not be captured. Move the map pin to your pickup point instead.',
+          : 'Your location could not be captured. Point out your pickup point on the map instead.',
+      );
+      // Only offered when opening a real browser is genuinely the fix, so it does
+      // not appear for someone who simply denied the prompt in Chrome.
+      this.offerExternalBrowser.set(
+        error instanceof GeolocationUnavailableError && error.suggestExternalBrowser,
       );
       this.mapVisible.set(true);
     }
+  }
+
+  /**
+   * Hands the page to the device browser.
+   *
+   * The in-app browser only receives a position when the host app itself holds the
+   * OS location permission, and a web page can neither request nor read that. So
+   * the only real fix is to leave, and on Android an intent URL is the one link
+   * that reliably does it.
+   */
+  openInDeviceBrowser(): void {
+    const link = this.deviceLocation.externalBrowserLink();
+    if (!link.href) return;
+
+    if (link.isIntent) {
+      window.location.href = link.href;
+      return;
+    }
+
+    window.open(link.href, '_blank', 'noopener');
   }
 
   /** The customer asked for the map, so a pan from here on is deliberate. */
@@ -697,6 +743,57 @@ export class CustomerBookingPage {
 
   closeConfirmation(): void {
     this.bookingComplete.set(false);
+    this.startFreshBooking();
+  }
+
+  /**
+   * Returns the page to how it looked before anything was typed.
+   *
+   * The form is usually a shared phone at the counter, so leaving the previous
+   * customer's name, number, and address on screen is both confusing and a privacy
+   * problem. Scrolling back to the top matters as much as clearing the fields:
+   * after the confirmation closes the viewport is near the bottom, which looks like
+   * a half-filled form rather than a new one.
+   */
+  private startFreshBooking(): void {
+    this.bookingForm.reset({
+      address: '',
+      email: '',
+      fullName: '',
+      landmark: '',
+      mobileNumber: '',
+      notes: '',
+      orderMethod: 'pickupDelivery',
+      paymentMethod: 'cod',
+      preferredDate: '',
+      preferredTime: '',
+    });
+
+    // reset() marks controls pristine but leaves them untouched, so the required
+    // errors would otherwise show on a form nobody has filled in yet.
+    this.bookingForm.markAsUntouched();
+
+    this.clearPin();
+    this.mapVisible.set(false);
+    this.closeSuggestions();
+    this.suggestions.set([]);
+    this.offerExternalBrowser.set(false);
+    this.errorMessage.set('');
+    this.submittedSummary.set(null);
+
+    // Back to the first service, matching a freshly loaded page.
+    const services = this.services();
+    if (services.length) {
+      this.selectedServiceIds.set([services[0].id]);
+      this.serviceLoads.set({ [services[0].id]: 1 });
+    } else {
+      this.selectedServiceIds.set([]);
+      this.serviceLoads.set({});
+    }
+
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ behavior: 'smooth', top: 0 });
+    }
   }
 
   private setPin(pin: PickupPin): void {
