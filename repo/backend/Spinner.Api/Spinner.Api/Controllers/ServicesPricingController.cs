@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Spinner.Api.Common.Security;
 using Spinner.Api.Features.ServicesPricing;
 using Spinner.Api.Features.ServicesPricing.CreateService;
 using Spinner.Api.Features.ServicesPricing.DisableService;
@@ -12,7 +13,9 @@ using Spinner.Api.Features.ServicesPricing.UpdateService;
 namespace Spinner.Api.Controllers;
 
 [Route("api/services-pricing/services")]
-[Authorize]
+// Owner only: this is what the shop charges. The service list read below stays
+// anonymous so the customer site can show prices before anyone logs in.
+[Authorize(Policy = AuthorizationPolicies.OwnerOnly)]
 public sealed class ServicesPricingController : ApiControllerBase
 {
     public ServicesPricingController(ISender sender)

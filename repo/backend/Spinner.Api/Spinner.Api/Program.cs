@@ -1,5 +1,6 @@
 using FluentValidation;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -7,6 +8,7 @@ using Spinner.Api.Common.Configuration;
 using Spinner.Api.Common.Health;
 using Spinner.Api.Common.Middleware;
 using Spinner.Api.Common.Security;
+using Spinner.Api.Domain.Users;
 using Spinner.Api.Common.Time;
 using Spinner.Api.Common.Validation;
 using Spinner.Api.Database;
@@ -79,6 +81,21 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("Jwt:Key is missing.")))
         };
     });
+
+// Authenticated by default. Anonymous access is now something an endpoint has to
+// ask for with [AllowAnonymous], rather than what it gets by forgetting to say
+// otherwise — which is how the whole API came to be reachable without a role check.
+builder.Services.AddAuthorizationBuilder()
+    .SetFallbackPolicy(new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build())
+    .AddPolicy(AuthorizationPolicies.OwnerOnly, policy =>
+        policy.RequireAuthenticatedUser().RequireRole(nameof(StaffRole.Owner)))
+    .AddPolicy(AuthorizationPolicies.StaffOrOwner, policy =>
+        policy.RequireAuthenticatedUser()
+            .RequireRole(nameof(StaffRole.Owner), nameof(StaffRole.Staff)));
+
+builder.Services.AddSpinnerRateLimiting();
 builder.Services.AddMediatR(configuration =>
     configuration.RegisterServicesFromAssembly(typeof(Program).Assembly));
 builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly);
@@ -147,11 +164,16 @@ if (!app.Environment.IsDevelopment())
 
 app.UseCors("Frontend");
 
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-app.MapHealthChecks("/health");
+
+// Explicitly anonymous because authentication is now the default. The container
+// platform's liveness probe is unauthenticated, so requiring a token here would
+// make every deployment look unhealthy and roll back.
+app.MapHealthChecks("/health").AllowAnonymous();
 app.MapGet("/health/ready", async (
     IDatabaseReadinessProbe readinessProbe,
     CancellationToken ct) =>

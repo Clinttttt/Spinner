@@ -38,6 +38,8 @@ public sealed class AppDbContext : DbContext
 
     public DbSet<AccountActionCode> AccountActionCodes => Set<AccountActionCode>();
 
+    public DbSet<StaffInvitation> StaffInvitations => Set<StaffInvitation>();
+
     public DbSet<ActivityLogEntry> ActivityLogEntries => Set<ActivityLogEntry>();
     public DbSet<PendingBooking> PendingBookings => Set<PendingBooking>();
 
@@ -96,6 +98,10 @@ public sealed class AppDbContext : DbContext
         {
             entity.ToTable("LaundryOrders");
             entity.HasKey(order => order.Id);
+
+            // Guards settlement: two people confirming the same payment at once can no
+            // longer both succeed and both send the customer a receipt.
+            entity.Property(order => order.PaymentConcurrencyStamp).IsConcurrencyToken();
 
             entity.Property(order => order.OrderCode).HasMaxLength(40).IsRequired();
             entity.Property(order => order.TrackingCode).HasMaxLength(80).IsRequired();
@@ -229,6 +235,13 @@ public sealed class AppDbContext : DbContext
             entity.ToTable("NotificationOutbox");
             entity.HasKey(message => message.Id);
 
+            // Guards the claim: two workers reading the same waiting message cannot
+            // both save it as theirs, so a customer cannot be sent the same message
+            // twice.
+            entity.Property(message => message.ConcurrencyStamp).IsConcurrencyToken();
+
+            entity.HasIndex(message => new { message.Status, message.LockedUntil });
+
             entity.Property(message => message.Recipient).HasMaxLength(254).IsRequired();
             entity.Property(message => message.Subject).HasMaxLength(200);
             entity.Property(message => message.Message).HasMaxLength(1000).IsRequired();
@@ -301,6 +314,26 @@ public sealed class AppDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(code => code.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<StaffInvitation>(entity =>
+        {
+            entity.ToTable("StaffInvitations");
+            entity.HasKey(invitation => invitation.Id);
+
+            entity.Property(invitation => invitation.EmailAddress).HasMaxLength(256).IsRequired();
+            entity.Property(invitation => invitation.CodeHash).HasMaxLength(500).IsRequired();
+            entity.Property(invitation => invitation.Role).IsRequired();
+            entity.Property(invitation => invitation.ExpiresAt).IsRequired();
+            entity.Property(invitation => invitation.CreatedAt).IsRequired();
+
+            entity.HasIndex(invitation => invitation.EmailAddress);
+            entity.HasIndex(invitation => invitation.ExpiresAt);
+
+            entity.HasOne<StaffUser>()
+                .WithMany()
+                .HasForeignKey(invitation => invitation.InvitedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<ActivityLogEntry>(entity =>

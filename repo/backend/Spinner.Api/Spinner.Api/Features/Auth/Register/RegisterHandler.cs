@@ -53,13 +53,43 @@ public sealed class RegisterHandler
         }
 
         var now = DateTimeOffset.UtcNow;
+
+        // The shop's own first account. Registration cannot require an invitation
+        // here because there is nobody to issue one, so this single case stays open
+        // and takes ownership. Every account after it is invitation-only.
+        var isFirstAccount = !await _dbContext.StaffUsers.AnyAsync(cancellationToken);
+
+        StaffRole role;
+        StaffInvitation? invitation = null;
+
+        if (isFirstAccount)
+        {
+            role = StaffRole.Owner;
+        }
+        else
+        {
+            var invitationResult = await ResolveInvitationAsync(
+                emailAddress,
+                request.InvitationCode,
+                now,
+                cancellationToken);
+
+            if (!invitationResult.IsSuccess)
+                return Result<RegisterResponse>.Validation(invitationResult.Error.Message);
+
+            invitation = invitationResult.Value!;
+            role = invitation.Role;
+        }
+
         var user = new StaffUser(
             request.FullName,
             emailAddress,
             mobileNumber,
             _passwordHasher.Hash(request.Password),
-            StaffRole.Owner,
+            role,
             now);
+
+        invitation?.Accept(user.Id, now);
 
         var code = _codeGenerator.Generate();
         var expiresInMinutes = Math.Max(1, _options.VerificationCodeMinutes);
@@ -74,7 +104,7 @@ public sealed class RegisterHandler
         _dbContext.NotificationOutboxMessages.Add(new NotificationOutboxMessage(
             NotificationChannel.Email,
             user.EmailAddress,
-            "Verify your Spinner owner account",
+            "Verify your Spinner account",
             $"Your Spinner verification code is {code}. It expires in {expiresInMinutes} minutes.",
             now));
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -83,5 +113,52 @@ public sealed class RegisterHandler
             user.EmailAddress,
             true,
             expiresInMinutes));
+    }
+
+    /// <summary>
+    /// Finds and validates the invitation this registration is claiming.
+    /// </summary>
+    /// <remarks>
+    /// The invitation is tied to the email address it was issued for, so a leaked
+    /// code cannot be redeemed by somebody else. Attempts are counted for the same
+    /// reason they are counted on verification codes: otherwise a short code can be
+    /// guessed at leisure.
+    /// </remarks>
+    private async Task<Result<StaffInvitation>> ResolveInvitationAsync(
+        string emailAddress,
+        string? submittedCode,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(submittedCode))
+        {
+            return Result<StaffInvitation>.Validation(
+                "An invitation code is required. Ask the shop owner to invite this email address.");
+        }
+
+        var candidates = await _dbContext.StaffInvitations
+            .Where(invitation =>
+                invitation.EmailAddress == emailAddress &&
+                invitation.AcceptedAt == null &&
+                invitation.RevokedAt == null)
+            .ToListAsync(cancellationToken);
+
+        var trimmedCode = submittedCode.Trim();
+        var maxAttempts = Math.Max(1, _options.MaxCodeAttempts);
+
+        foreach (var candidate in candidates.Where(c => c.CanAttempt(now, maxAttempts)))
+        {
+            if (_passwordHasher.Verify(trimmedCode, candidate.CodeHash))
+                return Result<StaffInvitation>.Success(candidate);
+
+            candidate.RecordFailedAttempt();
+        }
+
+        // Saved so failed attempts actually accumulate rather than being discarded
+        // with the rejected request.
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return Result<StaffInvitation>.Validation(
+            "This invitation code is not valid for this email address, or it has expired.");
     }
 }

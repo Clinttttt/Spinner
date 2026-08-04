@@ -123,6 +123,7 @@ export function LoginScreen() {
   const [mobileNumber, setMobileNumber] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [invitationCode, setInvitationCode] = useState("");
   const [code, setCode] = useState("");
   const [pendingLogin, setPendingLogin] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -165,6 +166,7 @@ export function LoginScreen() {
     setPassword("");
     setConfirmPassword("");
     setShowPassword(false);
+    setInvitationCode("");
     setShowConfirmPassword(false);
   };
 
@@ -229,6 +231,9 @@ export function LoginScreen() {
           confirmPassword,
           emailAddress: emailAddress.trim(),
           fullName: fullName.trim(),
+          // Left off entirely when blank, so the shop's first account — which has
+          // nobody to invite it — is not asked for one.
+          invitationCode: invitationCode.trim() || undefined,
           mobileNumber: mobileNumber.trim(),
           password,
         });
@@ -466,6 +471,19 @@ export function LoginScreen() {
                       placeholder="09xx xxx xxxx"
                       value={mobileNumber}
                     />
+                    <AuthField
+                      autoCapitalize="none"
+                      editable={!submitting}
+                      icon="ticket-outline"
+                      label="Invitation code"
+                      onChangeText={setInvitationCode}
+                      placeholder="From the shop owner"
+                      value={invitationCode}
+                    />
+                    <Text style={styles.subtitle}>
+                      Staff accounts need a code from the owner. Leave this
+                      empty if you are setting up the shop for the first time.
+                    </Text>
                   </>
                 ) : isSignIn ? (
                   <AuthField

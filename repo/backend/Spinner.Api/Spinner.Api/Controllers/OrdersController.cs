@@ -1,6 +1,8 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Spinner.Api.Common.Security;
 using Spinner.Api.Features.Orders;
 using Spinner.Api.Features.Orders.ArchiveOrder;
 using Spinner.Api.Features.Orders.CancelOrder;
@@ -26,6 +28,7 @@ public sealed class OrdersController : ApiControllerBase
         return HandleResponse(result);
     }
 
+    [EnableRateLimiting(RateLimitPolicies.PublicLookup)]
     [HttpGet("track/{trackingCode}")]
     [AllowAnonymous]
     public async Task<ActionResult<CustomerTrackingResponse>> Track(string trackingCode, CancellationToken ct)

@@ -39,7 +39,7 @@ public sealed class ReportHandlerTests
             reportDate,
             OrderSeedState.Rejected);
 
-        var result = await new GetDailySalesReportHandler(dbContext)
+        var result = await new GetDailySalesReportHandler(dbContext, new TestBusinessClock())
             .Handle(new GetDailySalesReportQuery(reportDate), CancellationToken.None);
 
         Assert.True(result.IsSuccess);

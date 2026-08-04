@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Spinner.Api.Common.Security;
 using Spinner.Api.Features.BusinessSettings;
 using Spinner.Api.Features.BusinessSettings.GetBusinessSettings;
 using Spinner.Api.Features.BusinessSettings.UpdateBusinessProfile;
@@ -13,7 +14,10 @@ using Spinner.Api.Features.BusinessSettings.UpdatePickupTimes;
 namespace Spinner.Api.Controllers;
 
 [Route("api/business-settings")]
-[Authorize]
+// Owner only. These endpoints set prices, service area and payment methods, which
+// is the shop's commercial configuration rather than day-to-day work. The read
+// below stays anonymous because the customer site needs it before anyone logs in.
+[Authorize(Policy = AuthorizationPolicies.OwnerOnly)]
 public sealed class BusinessSettingsController : ApiControllerBase
 {
     public BusinessSettingsController(ISender sender)

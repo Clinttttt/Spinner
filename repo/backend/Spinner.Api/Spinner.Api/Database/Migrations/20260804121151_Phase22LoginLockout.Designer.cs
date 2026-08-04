@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Spinner.Api.Database;
@@ -11,9 +12,11 @@ using Spinner.Api.Database;
 namespace Spinner.Api.Database.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260804121151_Phase22LoginLockout")]
+    partial class Phase22LoginLockout
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -199,22 +202,12 @@ namespace Spinner.Api.Database.Migrations
                     b.Property<int>("Channel")
                         .HasColumnType("integer");
 
-                    b.Property<Guid?>("ClaimId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ConcurrencyStamp")
-                        .IsConcurrencyToken()
-                        .HasColumnType("uuid");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("LastError")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
-
-                    b.Property<DateTimeOffset?>("LockedUntil")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Message")
                         .IsRequired()
@@ -246,8 +239,6 @@ namespace Spinner.Api.Database.Migrations
                     b.HasIndex("OrderId");
 
                     b.HasIndex("Status");
-
-                    b.HasIndex("Status", "LockedUntil");
 
                     b.ToTable("NotificationOutbox", (string)null);
                 });
@@ -340,10 +331,6 @@ namespace Spinner.Api.Database.Migrations
 
                     b.Property<DateTimeOffset?>("PaidAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("PaymentConcurrencyStamp")
-                        .IsConcurrencyToken()
-                        .HasColumnType("uuid");
 
                     b.Property<int>("PaymentMethod")
                         .HasColumnType("integer");

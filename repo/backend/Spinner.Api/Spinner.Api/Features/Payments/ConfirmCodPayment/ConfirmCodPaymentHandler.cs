@@ -50,7 +50,18 @@ public sealed class ConfirmCodPaymentHandler
             $"COD payment was confirmed for order {order.OrderCode}.",
             now);
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Somebody else confirmed this payment first. Reported as a conflict rather
+            // than an error, because nothing is wrong: the payment is recorded, and the
+            // receipt they queued is the one the customer should get.
+            return Result<PaymentConfirmationResponse>.Conflict(
+                "This payment was just confirmed by someone else. Reload the order to see it.");
+        }
 
         return Result<PaymentConfirmationResponse>.Success(PaymentConfirmationResponse.FromEntity(order));
     }

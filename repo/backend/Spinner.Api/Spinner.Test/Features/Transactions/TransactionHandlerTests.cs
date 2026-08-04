@@ -47,7 +47,7 @@ public sealed class TransactionHandlerTests
             DateTimeOffset.UtcNow));
         await dbContext.SaveChangesAsync();
 
-        var result = await new GetTransactionHistoryHandler(dbContext).Handle(
+        var result = await new GetTransactionHistoryHandler(dbContext, new TestBusinessClock()).Handle(
             new GetTransactionHistoryQuery(null, null, null, null, TransactionSort.Latest),
             CancellationToken.None);
 

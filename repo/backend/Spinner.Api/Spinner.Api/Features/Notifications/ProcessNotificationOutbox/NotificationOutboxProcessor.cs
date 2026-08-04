@@ -25,24 +25,33 @@ public sealed class NotificationOutboxProcessor
         _logger = logger;
     }
 
+    /// <summary>
+    /// Sends whatever is waiting, claiming each message before it goes out.
+    /// </summary>
+    /// <remarks>
+    /// The claim is the point of this method. Messages used to be selected as
+    /// Pending, sent, and only then marked, which left two ways for a customer to
+    /// receive the same message twice: a second worker could select the same rows
+    /// while the first was still sending, and a crash between sending and saving left
+    /// the row Pending so it was sent again on the next tick.
+    ///
+    /// Claiming is a single conditional UPDATE, so exactly one worker's claim id can
+    /// land on a row. The lease means a worker that dies does not stall the message
+    /// for ever — it becomes claimable again once the lease lapses.
+    /// </remarks>
     public async Task<int> ProcessPendingAsync(CancellationToken cancellationToken)
     {
         var batchSize = Math.Max(1, _options.BatchSize);
         var maxAttempts = Math.Max(1, _options.MaxAttempts);
+        var now = DateTimeOffset.UtcNow;
 
-        var messages = await _dbContext.NotificationOutboxMessages
-            .Where(message =>
-                message.Status == NotificationStatus.Pending ||
-                (message.Status == NotificationStatus.Failed && message.AttemptCount < maxAttempts))
-            .OrderBy(message => message.CreatedAt)
-            .Take(batchSize)
-            .ToListAsync(cancellationToken);
+        var messages = await ClaimBatchAsync(batchSize, maxAttempts, now, cancellationToken);
 
         foreach (var message in messages)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var now = DateTimeOffset.UtcNow;
+            var sentAt = DateTimeOffset.UtcNow;
 
             try
             {
@@ -50,11 +59,11 @@ public sealed class NotificationOutboxProcessor
 
                 if (result.IsSuccess)
                 {
-                    message.MarkSent(now);
+                    message.MarkSent(sentAt);
                 }
                 else
                 {
-                    message.MarkFailed(result.ErrorMessage ?? "Notification provider rejected the message.", now);
+                    message.MarkFailed(result.ErrorMessage ?? "Notification provider rejected the message.", sentAt);
                 }
             }
             catch (Exception ex)
@@ -64,12 +73,65 @@ public sealed class NotificationOutboxProcessor
                     "Notification {NotificationId} failed while sending.",
                     message.Id);
 
-                message.MarkFailed(ex.Message, now);
+                message.MarkFailed(ex.Message, sentAt);
             }
 
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
 
         return messages.Count;
+    }
+
+    /// <summary>
+    /// Takes ownership of up to <paramref name="batchSize"/> waiting messages.
+    /// </summary>
+    /// <remarks>
+    /// Claimed one at a time on purpose. Two workers can read the same waiting
+    /// message, but the concurrency stamp means only the first save succeeds; the
+    /// loser is told so and moves on. Claiming the whole batch in one save would make
+    /// a single conflict throw away the rest of the batch.
+    /// </remarks>
+    private async Task<List<NotificationOutboxMessage>> ClaimBatchAsync(
+        int batchSize,
+        int maxAttempts,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var lockedUntil = now.AddMinutes(Math.Max(1, _options.ClaimMinutes));
+
+        var candidates = await _dbContext.NotificationOutboxMessages
+            .Where(message =>
+                message.Status == NotificationStatus.Pending ||
+                (message.Status == NotificationStatus.Failed && message.AttemptCount < maxAttempts) ||
+                (message.Status == NotificationStatus.Processing &&
+                    (message.LockedUntil == null || message.LockedUntil <= now)))
+            .OrderBy(message => message.CreatedAt)
+            .Take(batchSize)
+            .ToListAsync(cancellationToken);
+
+        var claimed = new List<NotificationOutboxMessage>(candidates.Count);
+
+        foreach (var message in candidates)
+        {
+            message.Claim(Guid.NewGuid(), lockedUntil);
+
+            try
+            {
+                await _dbContext.SaveChangesAsync(cancellationToken);
+                claimed.Add(message);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                // Another worker got there first. Not an error worth alarming about:
+                // the message is being handled, just not by this run.
+                _logger.LogDebug(
+                    "Notification {NotificationId} was claimed by another worker.",
+                    message.Id);
+
+                await _dbContext.Entry(message).ReloadAsync(cancellationToken);
+            }
+        }
+
+        return claimed;
     }
 }

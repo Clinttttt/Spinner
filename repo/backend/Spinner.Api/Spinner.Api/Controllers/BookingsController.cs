@@ -1,6 +1,8 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Spinner.Api.Common.Security;
 using Spinner.Api.Common.Pagination;
 using Spinner.Api.Domain.Orders;
 using Spinner.Api.Features.Bookings;
@@ -40,6 +42,7 @@ public sealed class BookingsController : ApiControllerBase
         return HandleResponse(result);
     }
 
+    [EnableRateLimiting(RateLimitPolicies.Booking)]
     [HttpPost]
     [AllowAnonymous]
     public async Task<ActionResult<BookingConfirmationResponse>> Create(
@@ -56,6 +59,7 @@ public sealed class BookingsController : ApiControllerBase
     /// Opens a paid checkout for a QR booking. The order is created only once the
     /// payment is confirmed, so an abandoned checkout leaves nothing behind.
     /// </summary>
+    [EnableRateLimiting(RateLimitPolicies.Booking)]
     [HttpPost("checkout")]
     [AllowAnonymous]
     public async Task<ActionResult<BookingCheckoutResponse>> StartCheckout(
@@ -70,6 +74,7 @@ public sealed class BookingsController : ApiControllerBase
     /// Backs the customer's payment-complete page. Anonymous by design, which is why
     /// the reference carries random characters rather than being sequential.
     /// </summary>
+    [EnableRateLimiting(RateLimitPolicies.PublicLookup)]
     [HttpGet("checkout/{reference}")]
     [AllowAnonymous]
     public async Task<ActionResult<BookingCheckoutStatusResponse>> GetCheckoutStatus(
@@ -96,6 +101,7 @@ public sealed class BookingsController : ApiControllerBase
             request.PickupLocation,
             request.Services);
 
+    [EnableRateLimiting(RateLimitPolicies.PublicLookup)]
     [HttpGet("{orderCode}/confirmation")]
     [AllowAnonymous]
     public async Task<ActionResult<BookingConfirmationResponse>> GetConfirmation(

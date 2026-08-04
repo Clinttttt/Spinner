@@ -1,6 +1,8 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Spinner.Api.Common.Security;
 using Spinner.Api.Features.Payments;
 using Spinner.Api.Features.Payments.CalculateOrderTotal;
 using Spinner.Api.Features.Payments.ConfirmCodPayment;
@@ -45,6 +47,7 @@ public sealed class PaymentsController : ApiControllerBase
     }
 
     [HttpGet("online/{paymentReference}/status")]
+    [EnableRateLimiting(RateLimitPolicies.PublicLookup)]
     [AllowAnonymous]
     public async Task<ActionResult<OnlinePaymentStatusResponse>> GetOnlinePaymentStatus(
         string paymentReference,

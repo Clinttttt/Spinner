@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Spinner.Api.Common.Security;
 using Spinner.Api.Common.Pagination;
 using Spinner.Api.Features.Reports.ExportOrderHistory;
 using Spinner.Api.Features.Reports.GetDailySalesReport;
@@ -9,7 +10,7 @@ using Spinner.Api.Features.Reports.GetOrderHistory;
 namespace Spinner.Api.Controllers;
 
 [Route("api/reports")]
-[Authorize]
+[Authorize(Policy = AuthorizationPolicies.OwnerOnly)]
 public sealed class ReportsController : ApiControllerBase
 {
     public ReportsController(ISender sender)

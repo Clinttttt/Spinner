@@ -1,13 +1,14 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Spinner.Api.Common.Security;
 using Spinner.Api.Common.Pagination;
 using Spinner.Api.Features.ActivityLogs.GetActivityLogs;
 
 namespace Spinner.Api.Controllers;
 
 [Route("api/activity-logs")]
-[Authorize]
+[Authorize(Policy = AuthorizationPolicies.OwnerOnly)]
 public sealed class ActivityLogsController : ApiControllerBase
 {
     public ActivityLogsController(ISender sender)

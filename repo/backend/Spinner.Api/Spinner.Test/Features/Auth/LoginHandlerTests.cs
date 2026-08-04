@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Options;
 using Spinner.Api.Common.Security;
 using Spinner.Api.Domain.Users;
 using Spinner.Api.Features.Auth.Login;
@@ -115,6 +116,7 @@ public sealed class LoginHandlerTests
             passwordHasher,
             new StubJwtTokenService(),
             new StubRefreshTokenService(),
-            configuration);
+            configuration,
+            new OptionsWrapper<AccountSecurityOptions>(new AccountSecurityOptions()));
     }
 }

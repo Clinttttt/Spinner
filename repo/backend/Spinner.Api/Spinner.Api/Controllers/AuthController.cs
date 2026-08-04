@@ -1,6 +1,8 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Spinner.Api.Common.Security;
 using Spinner.Api.Common.Results;
 using Spinner.Api.Features.Auth;
 using Spinner.Api.Features.Auth.Login;
@@ -26,6 +28,7 @@ public sealed class AuthController : ApiControllerBase
     {
     }
 
+    [EnableRateLimiting(RateLimitPolicies.Authentication)]
     [HttpPost("login")]
     [AllowAnonymous]
     public async Task<ActionResult<LoginResponse>> Login(
@@ -36,6 +39,7 @@ public sealed class AuthController : ApiControllerBase
         return HandleResponse(result);
     }
 
+    [EnableRateLimiting(RateLimitPolicies.AccountCodes)]
     [HttpPost("register")]
     [AllowAnonymous]
     public async Task<ActionResult<RegisterResponse>> Register(
@@ -51,6 +55,7 @@ public sealed class AuthController : ApiControllerBase
         return HandleResponse(result);
     }
 
+    [EnableRateLimiting(RateLimitPolicies.Authentication)]
     [HttpPost("verify-email")]
     [AllowAnonymous]
     public async Task<ActionResult<LoginResponse>> VerifyEmail(
@@ -63,6 +68,7 @@ public sealed class AuthController : ApiControllerBase
         return HandleResponse(result);
     }
 
+    [EnableRateLimiting(RateLimitPolicies.AccountCodes)]
     [HttpPost("resend-verification")]
     [AllowAnonymous]
     public async Task<ActionResult<AccountCodeDeliveryResponse>> ResendVerification(
@@ -75,6 +81,7 @@ public sealed class AuthController : ApiControllerBase
         return HandleResponse(result);
     }
 
+    [EnableRateLimiting(RateLimitPolicies.AccountCodes)]
     [HttpPost("forgot-password")]
     [AllowAnonymous]
     public async Task<ActionResult<AccountCodeDeliveryResponse>> ForgotPassword(
@@ -87,6 +94,7 @@ public sealed class AuthController : ApiControllerBase
         return HandleResponse(result);
     }
 
+    [EnableRateLimiting(RateLimitPolicies.Authentication)]
     [HttpPost("reset-password")]
     [AllowAnonymous]
     public async Task<ActionResult> ResetPassword(
@@ -101,6 +109,7 @@ public sealed class AuthController : ApiControllerBase
         return HandleResponse(result);
     }
 
+    [EnableRateLimiting(RateLimitPolicies.Authentication)]
     [HttpPost("refresh")]
     [AllowAnonymous]
     public async Task<ActionResult<LoginResponse>> Refresh(

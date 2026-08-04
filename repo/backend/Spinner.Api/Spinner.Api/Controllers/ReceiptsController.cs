@@ -1,6 +1,8 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Spinner.Api.Common.Security;
 using Spinner.Api.Features.Receipts;
 using Spinner.Api.Features.Receipts.CreatePaymentInstructionMessage;
 using Spinner.Api.Features.Receipts.GetReceipt;
@@ -19,6 +21,7 @@ public sealed class ReceiptsController : ApiControllerBase
     }
 
     [HttpGet("{receiptCode}")]
+    [EnableRateLimiting(RateLimitPolicies.PublicLookup)]
     [AllowAnonymous]
     public async Task<ActionResult<ReceiptResponse>> Get(string receiptCode, CancellationToken ct)
     {

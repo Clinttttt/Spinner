@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Spinner.Api.Common.Pagination;
 using Spinner.Api.Common.Results;
+using Spinner.Api.Common.Time;
 using Spinner.Api.Database;
 using Spinner.Api.Domain.Orders;
 using Spinner.Api.Domain.Transactions;
@@ -12,10 +13,12 @@ public sealed class GetTransactionHistoryHandler
     : IRequestHandler<GetTransactionHistoryQuery, Result<PagedResponse<TransactionHistoryResponse>>>
 {
     private readonly AppDbContext _dbContext;
+    private readonly IBusinessClock _businessClock;
 
-    public GetTransactionHistoryHandler(AppDbContext dbContext)
+    public GetTransactionHistoryHandler(AppDbContext dbContext, IBusinessClock businessClock)
     {
         _dbContext = dbContext;
+        _businessClock = businessClock;
     }
 
     public async Task<Result<PagedResponse<TransactionHistoryResponse>>> Handle(
@@ -58,11 +61,15 @@ public sealed class GetTransactionHistoryHandler
         if (request.Kind is not null)
             rows = rows.Where(row => row.Kind == request.Kind);
 
+        // Filtered in the shop's own time, not UTC. The shop is UTC+8, so a payment
+        // taken at 00:30 local is stored as 16:30Z the previous day; comparing the
+        // stored instant's UTC date filed the whole early-morning shift under
+        // yesterday, and a day's takings never matched what the owner had counted.
         if (request.From is not null)
-            rows = rows.Where(row => DateOnly.FromDateTime(row.OccurredAt.Date) >= request.From.Value);
+            rows = rows.Where(row => _businessClock.ToBusinessDate(row.OccurredAt) >= request.From.Value);
 
         if (request.To is not null)
-            rows = rows.Where(row => DateOnly.FromDateTime(row.OccurredAt.Date) <= request.To.Value);
+            rows = rows.Where(row => _businessClock.ToBusinessDate(row.OccurredAt) <= request.To.Value);
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {

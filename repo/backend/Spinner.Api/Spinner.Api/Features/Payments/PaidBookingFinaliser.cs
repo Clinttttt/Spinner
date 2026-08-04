@@ -131,8 +131,22 @@ public sealed class PaidBookingFinaliser
             return Result<Guid>.Conflict(attached.Error.Message);
         }
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // The order's payment stamp moved under us, so another caller settled this
+            // booking first. Rolled back and reported as a conflict rather than allowed
+            // to escape: the caller here may be the payment provider's webhook, and an
+            // unhandled exception would answer it with a server error. Repeated
+            // failures make the provider disable the endpoint, which would leave later
+            // real payments unfulfilled.
+            await transaction.RollbackAsync(cancellationToken);
+            return Result<Guid>.Conflict("This booking was just settled by another request.");
+        }
 
         return Result<Guid>.Success(orderId);
     }

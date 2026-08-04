@@ -56,12 +56,49 @@ public sealed class GetOperationsDashboardHandler
             CompletedToday: await _dbContext.LaundryOrders.CountAsync(
                 order => order.Status == OrderStatus.Completed && order.PreferredDate == today,
                 cancellationToken),
-            SalesToday: await _dbContext.LaundryOrders
-                .Where(order => order.Status == OrderStatus.Completed &&
-                    order.PaymentStatus == PaymentStatus.Paid &&
-                    order.PreferredDate == today)
-                .SumAsync(order => order.EstimatedTotalAmount, cancellationToken));
+
+            // Money taken today, by when it arrived rather than by the job's preferred
+            // date. The preferred date is reschedulable, so keying on it let today's
+            // takings change when the owner moved an already-paid job, and disagreed
+            // with the transaction history. Completion is no longer required either:
+            // a prepaid booking is real money in hand before the laundry is done.
+            SalesToday: await SumPaidOnAsync(today, cancellationToken));
 
         return Result<OperationsDashboardResponse>.Success(response);
+    }
+
+    /// <summary>
+    /// Total paid on the given business date.
+    /// </summary>
+    /// <remarks>
+    /// The window is widened by a day either side and then narrowed in business time,
+    /// because the shop is UTC+8 and a stored instant does not line up with a UTC day
+    /// boundary. Rejected orders are excluded: a turned-down job is not takings.
+    /// </remarks>
+    private async Task<decimal> SumPaidOnAsync(
+        DateOnly businessDate,
+        CancellationToken cancellationToken)
+    {
+        var windowStart = new DateTimeOffset(
+            businessDate.ToDateTime(TimeOnly.MinValue).AddDays(-1),
+            TimeSpan.Zero);
+        var windowEnd = new DateTimeOffset(
+            businessDate.ToDateTime(TimeOnly.MinValue).AddDays(2),
+            TimeSpan.Zero);
+
+        var candidates = await _dbContext.LaundryOrders
+            .AsNoTracking()
+            .Where(order =>
+                order.PaymentStatus == PaymentStatus.Paid &&
+                order.Status != OrderStatus.Rejected &&
+                order.PaidAt != null &&
+                order.PaidAt >= windowStart &&
+                order.PaidAt < windowEnd)
+            .Select(order => new { order.PaidAt, order.EstimatedTotalAmount })
+            .ToListAsync(cancellationToken);
+
+        return candidates
+            .Where(order => _clock.ToBusinessDate(order.PaidAt!.Value) == businessDate)
+            .Sum(order => order.EstimatedTotalAmount);
     }
 }

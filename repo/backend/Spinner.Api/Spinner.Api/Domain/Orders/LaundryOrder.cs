@@ -257,6 +257,23 @@ public sealed class LaundryOrder
     public PaymentMethod PaymentMethod { get; private set; }
     public PaymentStatus PaymentStatus { get; private set; }
     public DateTimeOffset? PaidAt { get; private set; }
+
+    /// <summary>
+    /// Changes whenever payment is settled, and is configured as a concurrency token.
+    /// </summary>
+    /// <remarks>
+    /// The payment methods already refuse to settle an order twice, but that check
+    /// only holds within one request. Two staff members confirming the same cash
+    /// payment at the same moment both read the order as unpaid, both passed the
+    /// check, and both queued the customer a receipt while only one receipt code
+    /// survived. With this stamp the second save finds nothing to update and fails
+    /// loudly instead.
+    ///
+    /// Deliberately scoped to payment rather than every order change: it exists to
+    /// protect money, and a wider token would make ordinary status edits fail
+    /// whenever two staff worked on the same order at once.
+    /// </remarks>
+    public Guid PaymentConcurrencyStamp { get; private set; } = Guid.NewGuid();
     public string? ReceiptCode { get; private set; }
     public string? OnlinePaymentReference { get; private set; }
     public string? OnlinePaymentCheckoutUrl { get; private set; }
@@ -489,6 +506,7 @@ public sealed class LaundryOrder
         PaidAt = now;
         ReceiptCode = receiptCode.Trim();
         UpdatedAt = now;
+        PaymentConcurrencyStamp = Guid.NewGuid();
 
         return Result.Success();
     }
@@ -535,6 +553,7 @@ public sealed class LaundryOrder
         PaidAt = now;
         ReceiptCode = receiptCode.Trim();
         UpdatedAt = now;
+        PaymentConcurrencyStamp = Guid.NewGuid();
 
         return Result.Success();
     }
@@ -576,6 +595,7 @@ public sealed class LaundryOrder
         PaidAt = now;
         ReceiptCode = receiptCode.Trim();
         UpdatedAt = now;
+        PaymentConcurrencyStamp = Guid.NewGuid();
 
         return Result.Success();
     }

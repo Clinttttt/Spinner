@@ -5,4 +5,5 @@ public sealed record RegisterRequest(
     string EmailAddress,
     string MobileNumber,
     string Password,
-    string ConfirmPassword);
+    string ConfirmPassword,
+    string? InvitationCode = null);

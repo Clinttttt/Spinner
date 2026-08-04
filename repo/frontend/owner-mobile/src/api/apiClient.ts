@@ -205,6 +205,11 @@ export interface RegisterAccountRequest {
   confirmPassword: string;
   emailAddress: string;
   fullName: string;
+  /**
+   * Required for every account except the shop's first one, which has nobody to
+   * invite it. The owner issues codes from staff settings.
+   */
+  invitationCode?: string;
   mobileNumber: string;
   password: string;
 }
