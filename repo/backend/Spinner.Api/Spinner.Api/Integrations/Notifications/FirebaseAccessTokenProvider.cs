@@ -37,7 +37,7 @@ public sealed class FirebaseAccessTokenProvider : IFirebaseAccessTokenProvider
         // Built once and reused. The credential caches the token itself and renews it
         // before expiry, so asking it on every send costs nothing after the first.
         _credential ??= GoogleCredential
-            .FromJson(_options.ServiceAccountJson)
+            .FromJson(_options.ResolveServiceAccountJson())
             .CreateScoped(MessagingScope)
             .UnderlyingCredential;
 
