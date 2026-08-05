@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { RootTabParamList } from "../../../navigation/types";
+import { appNotifications } from "../../notifications/components/NotificationsProvider";
 import { colors } from "../../../theme/colors";
 import { OrderHistoryHeader } from "../components/OrderHistoryHeader";
 import { OrderHistoryRow } from "../components/OrderHistoryRow";
@@ -139,11 +140,6 @@ export function OrderHistoryScreen({
     () => navigation.navigate("TransactionHistory"),
     [navigation],
   );
-
-  const goToOrders = useCallback(
-    () => navigation.navigate("Orders"),
-    [navigation],
-  );
   const goToSettings = useCallback(
     () => navigation.navigate("Settings"),
     [navigation],
@@ -169,7 +165,7 @@ export function OrderHistoryScreen({
           horizontalPadding={pagePadding}
           onBackPress={goBack}
           onFilterChange={setFilter}
-          onNotificationsPress={goToOrders}
+          onNotificationsPress={appNotifications.open}
           onProfilePress={goToSettings}
           onQueryChange={setQuery}
           query={query}
@@ -227,7 +223,6 @@ export function OrderHistoryScreen({
       compact,
       filter,
       goBack,
-      goToOrders,
       goToSettings,
       hasMore,
       hasRows,

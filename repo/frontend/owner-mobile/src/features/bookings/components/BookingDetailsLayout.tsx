@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { appNotifications } from "../../notifications/components/NotificationsProvider";
 import { colors } from "../../../theme/colors";
 import { BookingDetailsHeader } from "./BookingDetailsHeader";
 import { bookingDetailsColors } from "./bookingDetailsTheme";
@@ -73,7 +74,7 @@ export function BookingDetailsLayout({
             <BookingDetailsHeader
               bookingCode={bookingCode}
               onBackPress={onBackPress}
-              onNotificationsPress={() => undefined}
+              onNotificationsPress={appNotifications.open}
               onProfilePress={onProfilePress}
               title={title}
             />

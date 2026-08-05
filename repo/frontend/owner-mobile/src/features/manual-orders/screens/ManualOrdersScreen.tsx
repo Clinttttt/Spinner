@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import type { RootTabParamList } from "../../../navigation/types";
+import { appNotifications } from "../../notifications/components/NotificationsProvider";
 import { colors } from "../../../theme/colors";
 import { ManualOrderCard } from "../components/ManualOrderCard";
 import { ManualOrdersFilterSheet } from "../components/ManualOrdersFilterSheet";
@@ -139,7 +140,7 @@ export function ManualOrdersScreen({
           Keyboard.dismiss();
           setFilterVisible(true);
         }}
-        onNotificationsPress={() => undefined}
+        onNotificationsPress={appNotifications.open}
         onProfilePress={() => navigation.navigate("Settings")}
         onQueryChange={setQuery}
         query={query}

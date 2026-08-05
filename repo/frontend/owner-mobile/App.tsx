@@ -10,6 +10,7 @@ import { AppTabs } from "./src/navigation/AppTabs";
 import { DialogProvider } from "./src/components/common/DialogProvider";
 import { AuthProvider, useAuth } from "./src/features/auth/AuthContext";
 import { LoginScreen } from "./src/features/auth/screens/LoginScreen";
+import { NotificationsProvider } from "./src/features/notifications/components/NotificationsProvider";
 import { colors } from "./src/theme/colors";
 import { OfflineNotice } from "./src/offline/OfflineNotice";
 
@@ -46,7 +47,11 @@ function AppContent() {
   return (
     <NavigationContainer theme={navigationTheme}>
       <StatusBar style="dark" />
-      <AppTabs />
+      {/* Inside the signed-in tree, so the sheet is only ever mounted for someone who
+          is allowed to read the shop's messages. */}
+      <NotificationsProvider>
+        <AppTabs />
+      </NotificationsProvider>
       <OfflineNotice />
     </NavigationContainer>
   );

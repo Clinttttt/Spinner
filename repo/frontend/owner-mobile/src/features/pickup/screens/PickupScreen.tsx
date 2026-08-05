@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { describeApiError } from "../../../api/apiClient";
 import { useDialog } from "../../../components/common/DialogProvider";
 import type { RootTabParamList } from "../../../navigation/types";
+import { appNotifications } from "../../notifications/components/NotificationsProvider";
 import { colors } from "../../../theme/colors";
 import { PickupCancelConfirmationModal } from "../components/PickupCancelConfirmationModal";
 import { PickupCard } from "../components/PickupCard";
@@ -296,7 +297,7 @@ export function PickupScreen({ navigation }: PickupScreenProps) {
               title: "Pickup filters",
             })
           }
-          onNotificationsPress={() => undefined}
+          onNotificationsPress={appNotifications.open}
           onProfilePress={() =>
             navigation
               .getParent<BottomTabNavigationProp<RootTabParamList>>()

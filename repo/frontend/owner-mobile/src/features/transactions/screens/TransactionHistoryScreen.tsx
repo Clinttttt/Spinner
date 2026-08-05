@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { appDialog } from "../../../components/common/DialogProvider";
 import type { RootTabParamList } from "../../../navigation/types";
+import { appNotifications } from "../../notifications/components/NotificationsProvider";
 import { colors } from "../../../theme/colors";
 import { TransactionHistoryHeader } from "../components/TransactionHistoryHeader";
 import { TransactionRow } from "../components/TransactionRow";
@@ -127,10 +128,6 @@ export function TransactionHistoryScreen({
 
   // Stable identities, so the memoised header is not rebuilt — with its images,
   // icons and filter chips — every time the list re-renders.
-  const goToOrders = useCallback(
-    () => navigation.navigate("Orders"),
-    [navigation],
-  );
   const goToSettings = useCallback(
     () => navigation.navigate("Settings"),
     [navigation],
@@ -175,7 +172,7 @@ export function TransactionHistoryScreen({
           filter={filter}
           onFilterChange={setFilter}
           onFilterPress={showFilterHint}
-          onNotificationsPress={goToOrders}
+          onNotificationsPress={appNotifications.open}
           onProfilePress={goToSettings}
           onQueryChange={setQuery}
           pageHorizontalPadding={pageHorizontalPadding}
@@ -223,7 +220,6 @@ export function TransactionHistoryScreen({
     [
       compact,
       filter,
-      goToOrders,
       goToSettings,
       handleRetry,
       hasRows,

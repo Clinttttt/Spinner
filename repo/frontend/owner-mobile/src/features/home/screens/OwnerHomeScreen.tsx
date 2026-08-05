@@ -20,6 +20,7 @@ import { PriorityCard } from "../../../components/home/PriorityCard";
 import { SpinlyAssistantCard } from "../../../components/home/SpinlyAssistantCard";
 import { useAuth } from "../../auth/AuthContext";
 import type { RootTabParamList } from "../../../navigation/types";
+import { appNotifications } from "../../notifications/components/NotificationsProvider";
 import { colors } from "../../../theme/colors";
 import { spacing } from "../../../theme/spacing";
 import type {
@@ -171,7 +172,7 @@ export function OwnerHomeScreen({ navigation }: OwnerHomeScreenProps) {
                 ]}
               >
                 <HomeHeader
-                  onNotificationsPress={() => navigation.navigate("Orders")}
+                  onNotificationsPress={appNotifications.open}
                   onProfilePress={() => navigation.navigate("Settings")}
                 />
                 <View style={styles.greeting}>

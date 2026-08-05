@@ -2,6 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { HomeHeader } from "../../../components/home/HomeHeader";
+import { appNotifications } from "../../notifications/components/NotificationsProvider";
 import { colors } from "../../../theme/colors";
 
 const headerWaves = require("../../../../assets/backgrounds/home-header-waves.webp");
@@ -50,7 +51,7 @@ export function ManualOrderPageHeader({
         }}
       >
         <HomeHeader
-          onNotificationsPress={() => undefined}
+          onNotificationsPress={appNotifications.open}
           onProfilePress={onProfilePress ?? (() => undefined)}
         />
         <View style={styles.titleRow}>

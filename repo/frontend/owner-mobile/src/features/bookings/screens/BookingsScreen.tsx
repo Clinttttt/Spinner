@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { describeApiError } from "../../../api/apiClient";
 import { useDialog } from "../../../components/common/DialogProvider";
 import type { RootTabParamList } from "../../../navigation/types";
+import { appNotifications } from "../../notifications/components/NotificationsProvider";
 import { colors } from "../../../theme/colors";
 import { BookingCard } from "../components/BookingCard";
 import { BookingsEmptyState } from "../components/BookingsEmptyState";
@@ -257,7 +258,7 @@ export function BookingsScreen({
           Keyboard.dismiss();
           setFilterModalVisible(true);
         }}
-        onNotificationsPress={() => undefined}
+        onNotificationsPress={appNotifications.open}
         onProfilePress={() => navigation.navigate("Settings")}
         onQueryChange={setQuery}
         onStatusChange={setStatusFilter}
