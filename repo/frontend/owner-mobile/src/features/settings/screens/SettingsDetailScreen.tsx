@@ -34,6 +34,14 @@ import {
 } from "../components/SettingsControls";
 import { SettingsField } from "../components/SettingsField";
 import { SettingsPageScaffold } from "../components/SettingsPageScaffold";
+import {
+  getStaffInvitations,
+  inviteStaff,
+  revokeStaffInvitation,
+  type IssuedInvitationDto,
+  type StaffInvitationDto,
+  type StaffRole,
+} from "../services/staffService";
 import { ServiceEditorModal } from "../components/ServiceEditorModal";
 import {
   operatingDays,
@@ -104,6 +112,10 @@ const pageCopy: Record<SettingsPageId, { title: string; subtitle: string }> = {
     title: "Pickup Service Area",
     subtitle: "Set the centre and reach of your pickups",
   },
+  staff: {
+    title: "Staff Accounts",
+    subtitle: "Invite staff and control who can sign in",
+  },
   help: { title: "Help Center", subtitle: "Find answers and get support" },
   terms: { title: "Terms of Service", subtitle: "Effective May 1, 2025" },
   privacy: {
@@ -133,6 +145,7 @@ export function SettingsDetailScreen({
       {page === "hours" ? <OperatingHoursPage /> : null}
       {page === "payments" ? <PaymentMethodsPage /> : null}
       {page === "pickupArea" ? <PickupServiceAreaPage /> : null}
+      {page === "staff" ? <StaffAccountsPage /> : null}
       {page === "help" ? <HelpCenterPage /> : null}
       {page === "terms" ? <TermsPage /> : null}
       {page === "privacy" ? <PrivacyPage /> : null}
@@ -1223,6 +1236,252 @@ const frequentlyAskedQuestions = [
   },
 ];
 
+/**
+ * Issues and manages the codes that let a new account be created.
+ *
+ * Registration is invitation-only after the shop's first account, so without this
+ * screen the only way to add staff was to call the API by hand.
+ */
+function StaffAccountsPage() {
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<StaffRole>("Staff");
+  const [inviting, setInviting] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [invitations, setInvitations] = useState<StaffInvitationDto[]>([]);
+  const [issued, setIssued] = useState<IssuedInvitationDto | null>(null);
+
+  // Bumped to refetch. A token rather than a callback in the effect's dependencies,
+  // because the React compiler rejects an effect that reaches straight for a state
+  // setter, and the rest of this screen loads the same way.
+  const [reloadToken, setReloadToken] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+
+    getStaffInvitations()
+      .then((rows) => {
+        if (!active) return;
+        setInvitations(rows);
+        setLoadFailed(false);
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        setLoadFailed(true);
+        showApiError("Unable to load invitations", error);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [reloadToken]);
+
+  const reload = () => setReloadToken((token) => token + 1);
+
+  const issueInvitation = async () => {
+    if (inviting) return;
+
+    const address = email.trim();
+
+    if (!address || !address.includes("@")) {
+      showValidation(
+        "Email address needed",
+        "Enter the email address of the person you are inviting. The code only works for that address.",
+      );
+      return;
+    }
+
+    setInviting(true);
+    try {
+      const invitation = await inviteStaff({ emailAddress: address, role });
+
+      // Held on screen rather than shown in a toast: the code is stored hashed, so
+      // this is the only time it can be read. Clearing it away would mean issuing a
+      // replacement.
+      setIssued(invitation);
+      setEmail("");
+      reload();
+    } catch (error) {
+      showApiError("Unable to create the invitation", error);
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  const revoke = async (invitation: StaffInvitationDto) => {
+    const accepted = await appDialog.confirm({
+      confirmLabel: "Revoke",
+      message: `The code sent to ${invitation.emailAddress} will stop working. You can issue a new one at any time.`,
+      title: "Revoke this invitation?",
+      tone: "warning",
+    });
+
+    if (!accepted) return;
+
+    try {
+      await revokeStaffInvitation(invitation.invitationId);
+      if (issued?.invitationId === invitation.invitationId) setIssued(null);
+      reload();
+    } catch (error) {
+      showApiError("Unable to revoke the invitation", error);
+    }
+  };
+
+  return (
+    <>
+      <InlineNotice>
+        Anyone creating an account needs a code you issued for their email
+        address. Staff can run the day&apos;s work; only an owner can change
+        prices, settings and reports.
+      </InlineNotice>
+
+      <SettingsSectionTitle subtitle="The code is shown once, so pass it on before leaving this screen.">
+        Invite someone
+      </SettingsSectionTitle>
+      <SettingsCard>
+        <SettingsField
+          keyboardType="email-address"
+          label="Email address"
+          onChangeText={setEmail}
+          placeholder="name@example.com"
+          value={email}
+        />
+        <View style={styles.roleRow}>
+          {(["Staff", "Owner"] as StaffRole[]).map((option) => (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected: role === option }}
+              key={option}
+              onPress={() => setRole(option)}
+              style={({ pressed }) => [
+                styles.roleOption,
+                role === option && styles.roleOptionActive,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Ionicons
+                color={role === option ? colors.navy : colors.textSecondary}
+                name={
+                  option === "Owner" ? "briefcase-outline" : "person-outline"
+                }
+                size={16}
+              />
+              <Text
+                style={[
+                  styles.roleLabel,
+                  role === option && styles.roleLabelActive,
+                ]}
+              >
+                {option}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        {role === "Owner" ? (
+          <Text style={styles.roleWarning}>
+            An owner account can change prices and see all sales.
+          </Text>
+        ) : null}
+      </SettingsCard>
+      <PrimaryButton
+        disabled={inviting}
+        icon="mail-outline"
+        label={inviting ? "Creating..." : "Create Invitation"}
+        loading={inviting}
+        onPress={() => void issueInvitation()}
+      />
+
+      {issued ? (
+        <>
+          <SettingsSectionTitle
+            subtitle={`For ${issued.emailAddress}. It will not be shown again.`}
+          >
+            Invitation code
+          </SettingsSectionTitle>
+          <SettingsCard>
+            <Text selectable style={styles.inviteCode}>
+              {issued.invitationCode}
+            </Text>
+            <Text style={styles.inviteCodeHelp}>
+              They enter this on the sign-up screen along with this exact email
+              address. It expires on {formatInviteDate(issued.expiresAt)}.
+            </Text>
+          </SettingsCard>
+          <SecondaryButton label="Done" onPress={() => setIssued(null)} />
+        </>
+      ) : null}
+
+      <SettingsSectionTitle subtitle="Codes that have not been used yet.">
+        Pending invitations
+      </SettingsSectionTitle>
+      <SettingsCard>
+        {loading ? (
+          <Text style={styles.inviteEmpty}>Loading...</Text>
+        ) : loadFailed ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={reload}
+            style={({ pressed }) => [pressed && styles.pressed]}
+          >
+            <Text style={styles.inviteRetry}>
+              Invitations could not be loaded. Tap to try again.
+            </Text>
+          </Pressable>
+        ) : invitations.length === 0 ? (
+          <Text style={styles.inviteEmpty}>
+            No invitations are waiting to be used.
+          </Text>
+        ) : (
+          invitations.map((invitation, index) => (
+            <View
+              key={invitation.invitationId}
+              style={[
+                styles.inviteRow,
+                index < invitations.length - 1 && styles.inviteRowDivider,
+              ]}
+            >
+              <View style={styles.inviteRowCopy}>
+                <Text numberOfLines={1} style={styles.inviteEmail}>
+                  {invitation.emailAddress}
+                </Text>
+                <Text style={styles.inviteMeta}>
+                  {invitation.role} · expires{" "}
+                  {formatInviteDate(invitation.expiresAt)}
+                </Text>
+              </View>
+              <Pressable
+                accessibilityLabel={`Revoke the invitation for ${invitation.emailAddress}`}
+                accessibilityRole="button"
+                onPress={() => void revoke(invitation)}
+                style={({ pressed }) => [
+                  styles.revokeButton,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={styles.revokeLabel}>Revoke</Text>
+              </Pressable>
+            </View>
+          ))
+        )}
+      </SettingsCard>
+    </>
+  );
+}
+
+function formatInviteDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return date.toLocaleDateString("en-PH", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 function HelpCenterPage() {
   const [expandedQuestion, setExpandedQuestion] = useState<string | null>(
     "confirm",
@@ -1790,6 +2049,83 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   paymentActions: { flexDirection: "row", gap: 8 },
+  roleRow: {
+    flexDirection: "row",
+    gap: spacing.xs,
+    paddingBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  roleOption: {
+    alignItems: "center",
+    borderColor: colors.border,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 6,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  roleOptionActive: {
+    backgroundColor: colors.blueSoft,
+    borderColor: colors.navy,
+  },
+  roleLabel: { color: colors.textSecondary, fontSize: 13, fontWeight: "600" },
+  roleLabelActive: { color: colors.navy },
+  roleWarning: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 17,
+    paddingBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  inviteCode: {
+    color: colors.navy,
+    fontSize: 26,
+    fontVariant: ["tabular-nums"],
+    fontWeight: "700",
+    letterSpacing: 4,
+    paddingTop: spacing.md,
+    textAlign: "center",
+  },
+  inviteCodeHelp: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 18,
+    padding: spacing.md,
+    textAlign: "center",
+  },
+  inviteEmpty: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 19,
+    padding: spacing.md,
+  },
+  inviteRetry: {
+    color: colors.navy,
+    fontSize: 13,
+    fontWeight: "600",
+    lineHeight: 19,
+    padding: spacing.md,
+  },
+  inviteRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing.sm,
+    padding: spacing.md,
+  },
+  inviteRowDivider: { borderBottomColor: colors.divider, borderBottomWidth: 1 },
+  inviteRowCopy: { flex: 1, gap: 3 },
+  inviteEmail: { color: colors.navy, fontSize: 14, fontWeight: "600" },
+  inviteMeta: { color: colors.textSecondary, fontSize: 12 },
+  revokeButton: {
+    borderColor: colors.border,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    minHeight: 36,
+    justifyContent: "center",
+    paddingHorizontal: spacing.sm,
+  },
+  revokeLabel: { color: colors.danger, fontSize: 13, fontWeight: "600" },
   pressed: { opacity: 0.72 },
   profileCard: {
     alignItems: "center",

@@ -61,6 +61,12 @@ export const settingsMenuSections: SettingsMenuSection[] = [
         title: "Pickup Service Area",
         subtitle: "Set how far you collect laundry",
       },
+      {
+        id: "staff",
+        icon: "people-outline",
+        title: "Staff Accounts",
+        subtitle: "Invite staff and manage their access",
+      },
     ],
   },
   {

@@ -9,6 +9,7 @@ export type SettingsPageId =
   | "hours"
   | "payments"
   | "pickupArea"
+  | "staff"
   | "help"
   | "terms"
   | "privacy"
