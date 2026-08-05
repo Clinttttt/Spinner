@@ -100,6 +100,9 @@ public sealed class NotificationOutboxProcessor
         var lockedUntil = now.AddMinutes(Math.Max(1, _options.ClaimMinutes));
 
         var candidates = await _dbContext.NotificationOutboxMessages
+            // The order is needed so a push can carry its code, which is what lets
+            // tapping the notification open that order rather than a bare list.
+            .Include(message => message.Order)
             .Where(message =>
                 message.Status == NotificationStatus.Pending ||
                 (message.Status == NotificationStatus.Failed && message.AttemptCount < maxAttempts) ||

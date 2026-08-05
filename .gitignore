@@ -19,3 +19,7 @@ dist/
 # Local dev server logs
 *.out.log
 *.err.log
+
+# Firebase client config. Carries the project's Android API key and this repository
+# is public, so EAS supplies it as a file secret at build time instead.
+google-services.json

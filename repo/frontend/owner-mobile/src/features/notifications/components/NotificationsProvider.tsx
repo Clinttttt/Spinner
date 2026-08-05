@@ -6,6 +6,7 @@ import {
   useState,
 } from "react";
 
+import { useNotificationNavigation } from "../hooks/useNotificationNavigation";
 import { NotificationsSheet } from "./NotificationsSheet";
 
 interface NotificationsApi {
@@ -28,6 +29,10 @@ export const appNotifications: NotificationsApi = {
 
 export function NotificationsProvider({ children }: { children: ReactNode }) {
   const [visible, setVisible] = useState(false);
+
+  // Sits here because this provider is already mounted inside the navigator, which is
+  // what a tap needs in order to navigate.
+  useNotificationNavigation();
 
   const close = useCallback(() => setVisible(false), []);
 

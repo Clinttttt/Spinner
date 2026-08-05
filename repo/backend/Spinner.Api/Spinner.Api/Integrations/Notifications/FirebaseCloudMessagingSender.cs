@@ -143,10 +143,14 @@ public sealed class FirebaseCloudMessagingSender
                 title = string.IsNullOrWhiteSpace(message.Subject) ? "Spinner" : message.Subject,
                 body = message.Message,
             },
-            // Carried so tapping the notification can open the order it refers to.
+            // Carried so tapping the notification can open the order it refers to. The
+            // code rather than only the id, because that is what the order ledger can be
+            // searched by; an id alone would open the list and leave the owner to find
+            // the booking themselves.
             data = new Dictionary<string, string>
             {
                 ["orderId"] = message.OrderId?.ToString() ?? string.Empty,
+                ["orderCode"] = message.Order?.OrderCode ?? string.Empty,
             },
             android = new
             {

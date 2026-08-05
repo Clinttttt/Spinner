@@ -25,6 +25,10 @@ import {
   updateStoredApiSessionIdentity,
   verifyEmail,
 } from "../../api/apiClient";
+import {
+  registerForPushNotificationsAsync,
+  releasePushNotificationsAsync,
+} from "../notifications/services/pushRegistration";
 
 interface AuthContextValue {
   loading: boolean;
@@ -83,6 +87,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logIn = useCallback(async (login: string, password: string) => {
     const authenticated = await signIn(login, password);
     setSession(authenticated);
+
+    // Registered on every sign-in, not once, because the operating system can rotate the
+    // device token at any time and a stale one stops receiving anything silently. Not
+    // awaited: the owner should reach the app immediately, and a phone that refuses
+    // notifications must not hold up or fail signing in.
+    void registerForPushNotificationsAsync();
   }, []);
 
   const register = useCallback(async (request: RegisterAccountRequest) => {
@@ -92,6 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const verify = useCallback(async (emailAddress: string, code: string) => {
     const authenticated = await verifyEmail(emailAddress, code);
     setSession(authenticated);
+    void registerForPushNotificationsAsync();
   }, []);
 
   const resendVerification = useCallback(
@@ -116,6 +127,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logOut = useCallback(async () => {
     try {
+      // Released before the session is revoked, because the call needs the token that is
+      // about to stop working. Someone handing the counter phone back should not keep
+      // being told how busy the shop is.
+      await releasePushNotificationsAsync();
       await revokeApiSession();
     } finally {
       setSession(undefined);

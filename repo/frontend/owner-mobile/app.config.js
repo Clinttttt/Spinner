@@ -23,6 +23,12 @@ module.exports = {
     },
     android: {
       package: "com.engrspin.owner",
+      // Firebase client configuration, which is what lets Cloud Messaging issue this
+      // app a device token. Kept out of the repository because it is public and the
+      // file carries the project's Android API key: EAS supplies it as a file secret
+      // during a build, and the local path is the fallback for building here.
+      googleServicesFile:
+        process.env.GOOGLE_SERVICES_JSON ?? "./google-services.json",
       softwareKeyboardLayoutMode: "resize",
       adaptiveIcon: {
         backgroundColor: "#FFFFFF",
@@ -38,6 +44,16 @@ module.exports = {
       "expo-status-bar",
       "expo-font",
       "expo-video",
+      [
+        "expo-notifications",
+        {
+          // Android draws the status bar notification icon as a silhouette, so a full
+          // colour logo comes out as a white square. The monochrome asset already used
+          // for the adaptive icon is exactly the right shape for this.
+          icon: "./assets/android-icon-monochrome.png",
+          color: "#0D2A52",
+        },
+      ],
       "@react-native-community/datetimepicker",
       [
         "react-native-maps",

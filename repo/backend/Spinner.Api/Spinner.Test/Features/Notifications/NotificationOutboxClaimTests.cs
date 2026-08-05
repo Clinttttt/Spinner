@@ -93,6 +93,48 @@ public sealed class NotificationOutboxClaimTests
         Assert.Equal(0, sender.SendCount);
     }
 
+    [Fact]
+    public async Task Should_Give_The_Sender_The_Order_So_A_Push_Can_Reference_It()
+    {
+        // Two contexts on purpose. Within one context the in-memory provider fills in
+        // navigation properties from whatever it is already tracking, which would make
+        // this pass whether or not the order is actually loaded. A second context has
+        // nothing tracked, so the order arrives only if the query asked for it — which is
+        // how PostgreSQL behaves in either case.
+        var (seeding, processing) = AppDbContextFactory.CreatePair();
+        await using var seedingContext = seeding;
+        await using var processingContext = processing;
+
+        await BookingTestData.CreateBookingAsync(seedingContext);
+        var order = await seedingContext.LaundryOrders.AsNoTracking().FirstAsync();
+
+        // A push carries the order code so tapping the notification can open that order.
+        // The code lives on the order rather than the message, so without it being loaded
+        // the sender would quietly send an empty code and the tap would open a bare list.
+        var sender = new CapturingSender();
+        await Processor(processingContext, sender).ProcessPendingAsync(CancellationToken.None);
+
+        var withOrder = sender.Seen.Where(message => message.OrderId is not null).ToList();
+
+        Assert.NotEmpty(withOrder);
+        Assert.All(
+            withOrder,
+            message => Assert.Equal(order.OrderCode, message.Order?.OrderCode));
+    }
+
+    private sealed class CapturingSender : INotificationSender
+    {
+        public List<NotificationOutboxMessage> Seen { get; } = [];
+
+        public Task<NotificationSendResult> SendAsync(
+            NotificationOutboxMessage message,
+            CancellationToken cancellationToken)
+        {
+            Seen.Add(message);
+            return Task.FromResult(NotificationSendResult.Success());
+        }
+    }
+
     private static async Task AddPendingAsync(Spinner.Api.Database.AppDbContext dbContext)
     {
         dbContext.NotificationOutboxMessages.Add(new NotificationOutboxMessage(
