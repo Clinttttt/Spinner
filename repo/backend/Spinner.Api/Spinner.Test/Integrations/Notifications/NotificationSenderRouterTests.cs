@@ -46,12 +46,32 @@ public sealed class NotificationSenderRouterTests
 
         return new NotificationSenderRouter(
             emailSender,
+            // Unconfigured on purpose: this test is about which sender is chosen, and an
+            // unconfigured Firebase reports that for itself rather than reaching out.
+            new FirebaseCloudMessagingSender(
+                new HttpClient(),
+                new UnusedAccessTokenProvider(),
+                new UnusedDeviceRegistry(),
+                Options.Create(new FirebaseMessagingOptions()),
+                NullLogger<FirebaseCloudMessagingSender>.Instance),
             loggingSender,
             Options.Create(new NotificationDeliveryOptions
             {
                 EmailProvider = NotificationDeliveryOptions.ResendProvider,
                 SmsProvider = NotificationDeliveryOptions.LoggingProvider
             }));
+    }
+
+    private sealed class UnusedAccessTokenProvider : IFirebaseAccessTokenProvider
+    {
+        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("Should not be reached.");
+    }
+
+    private sealed class UnusedDeviceRegistry : IStaffDeviceRegistry
+    {
+        public Task RetireAsync(string registrationToken, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
     }
 
     private static NotificationOutboxMessage CreateMessage(

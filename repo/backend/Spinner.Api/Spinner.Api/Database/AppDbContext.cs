@@ -40,6 +40,8 @@ public sealed class AppDbContext : DbContext
 
     public DbSet<StaffInvitation> StaffInvitations => Set<StaffInvitation>();
 
+    public DbSet<StaffDevice> StaffDevices => Set<StaffDevice>();
+
     public DbSet<ActivityLogEntry> ActivityLogEntries => Set<ActivityLogEntry>();
     public DbSet<PendingBooking> PendingBookings => Set<PendingBooking>();
 
@@ -316,6 +318,28 @@ public sealed class AppDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        modelBuilder.Entity<StaffDevice>(entity =>
+        {
+            entity.ToTable("StaffDevices");
+            entity.HasKey(device => device.Id);
+
+            entity.Property(device => device.RegistrationToken).HasMaxLength(512).IsRequired();
+            entity.Property(device => device.DeviceName).HasMaxLength(160);
+            entity.Property(device => device.Platform).IsRequired();
+            entity.Property(device => device.CreatedAt).IsRequired();
+            entity.Property(device => device.LastSeenAt).IsRequired();
+
+            // One row per token. A shared phone signed into by someone else reassigns
+            // the existing row, so the shop cannot end up sending two notifications to
+            // the same handset.
+            entity.HasIndex(device => device.RegistrationToken).IsUnique();
+            entity.HasIndex(device => new { device.UserId, device.IsActive });
+
+            entity.HasOne(device => device.User)
+                .WithMany()
+                .HasForeignKey(device => device.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
         modelBuilder.Entity<StaffInvitation>(entity =>
         {
             entity.ToTable("StaffInvitations");

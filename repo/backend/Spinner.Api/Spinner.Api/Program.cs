@@ -129,6 +129,16 @@ builder.Services.AddHttpClient<IEmailNotificationSender, ResendNotificationSende
         httpClient.BaseAddress = new Uri(options.BaseUrl);
         httpClient.Timeout = TimeSpan.FromSeconds(15);
     });
+builder.Services.Configure<FirebaseMessagingOptions>(
+    builder.Configuration.GetSection(FirebaseMessagingOptions.SectionName));
+builder.Services.AddSingleton<IFirebaseAccessTokenProvider, FirebaseAccessTokenProvider>();
+builder.Services.AddScoped<IStaffDeviceRegistry, StaffDeviceRegistry>();
+builder.Services.AddHttpClient<FirebaseCloudMessagingSender>(client =>
+{
+    // Short on purpose. A push that has not gone through in ten seconds should be left
+    // for the outbox to retry rather than holding the worker up.
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
 builder.Services.AddScoped<INotificationSender, NotificationSenderRouter>();
 builder.Services.AddHostedService<NotificationOutboxWorker>();
 builder.Services.Configure<OnlinePaymentOptions>(

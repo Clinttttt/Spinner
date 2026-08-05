@@ -8,6 +8,7 @@ using Spinner.Api.Domain.Notifications;
 using Spinner.Api.Domain.Orders;
 using Spinner.Api.Domain.Services;
 using Spinner.Api.Features.BusinessSettings;
+using Spinner.Api.Features.Notifications;
 using Spinner.Api.Features.Orders;
 using Spinner.Api.Features.ServiceArea;
 
@@ -118,6 +119,16 @@ public sealed class CreateBookingHandler : IRequestHandler<CreateBookingCommand,
 
         if (settings.IsSmsBookingReceivedEnabled)
             _dbContext.NotificationOutboxMessages.Add(CreateBookingReceivedSms(order, customer, settings.BusinessName, now));
+
+        // The shop's own phones. Not gated on a setting: a booking nobody is told about
+        // is the problem this exists to solve, and the owner controls it by registering
+        // or signing the device out.
+        await StaffAlertQueue.QueueNewBookingAsync(
+            _dbContext,
+            order,
+            settings.BusinessName,
+            now,
+            cancellationToken);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
