@@ -1,5 +1,5 @@
 import { apiRequest } from "../../../api/apiClient";
-import { getAllPages } from "../../../api/pagination";
+import { type PagedResponse, withPage } from "../../../api/pagination";
 import type { HomeActivity, HomeDashboardData } from "../models/homeDashboard";
 
 interface OperationsDashboardDto {
@@ -9,6 +9,7 @@ interface OperationsDashboardDto {
 interface BookingDto {
   customerName: string;
   fulfillmentType: string;
+  orderCode: string;
   orderId: string;
   preferredTimeWindow: string;
   status: string;
@@ -19,8 +20,18 @@ interface TransactionDto {
   id: string;
   kind: string;
   occurredAt: string;
+  orderCode?: string;
   title: string;
 }
+
+/**
+ * How many rows to look through for something to show.
+ *
+ * Only the first match of each kind is ever used, so this read one page instead of
+ * every page. Fetching the shop's whole booking and transaction history to fill two
+ * rows was work that grew every month for no gain.
+ */
+const SCAN_PAGE_SIZE = 50;
 
 function currency(value: number) {
   return `₱${value.toLocaleString("en-PH", {
@@ -39,8 +50,12 @@ function timeLabel(value: string) {
 export async function getHomeDashboard(): Promise<HomeDashboardData> {
   const [dashboard, bookings, transactions] = await Promise.all([
     apiRequest<OperationsDashboardDto>("/api/operations/dashboard"),
-    getAllPages<BookingDto>("/api/bookings", undefined, 20),
-    getAllPages<TransactionDto>("/api/transactions?sort=Latest", undefined, 20),
+    apiRequest<PagedResponse<BookingDto>>(
+      withPage("/api/bookings", 1, SCAN_PAGE_SIZE),
+    ).then((response) => response.items),
+    apiRequest<PagedResponse<TransactionDto>>(
+      withPage("/api/transactions?sort=Latest", 1, SCAN_PAGE_SIZE),
+    ).then((response) => response.items),
   ]);
 
   const activities: HomeActivity[] = [];
@@ -54,6 +69,8 @@ export async function getHomeDashboard(): Promise<HomeDashboardData> {
     activities.push({
       badge: "Pickup",
       id: pickup.orderId,
+      // Carried so tapping the row can open that order rather than the work list.
+      orderCode: pickup.orderCode,
       subtitle: `Pickup at ${pickup.preferredTimeWindow}`,
       title: pickup.customerName,
       type: "pickup",
@@ -67,6 +84,7 @@ export async function getHomeDashboard(): Promise<HomeDashboardData> {
     activities.push({
       id: sale.id,
       meta: timeLabel(sale.occurredAt),
+      orderCode: sale.orderCode,
       subtitle: `Total ${currency(sale.amount)}`,
       title: sale.title,
       type: "receipt",

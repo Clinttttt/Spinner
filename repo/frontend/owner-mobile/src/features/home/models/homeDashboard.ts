@@ -6,6 +6,8 @@ export interface HomeActivity {
   title: string;
   subtitle: string;
   meta?: string;
+  /** The order this activity refers to, so the row can open it. */
+  orderCode?: string;
   badge?: string;
 }
 

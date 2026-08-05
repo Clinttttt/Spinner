@@ -114,8 +114,13 @@ export function TransactionHistoryScreen({
 
   const openTransaction = useCallback(
     (item: TransactionHistoryItem) => {
-      if (item.kind === "bookingSale") navigation.navigate("Orders");
-      if (item.kind === "manualOrderSale") navigation.navigate("ManualOrders");
+      // Opens the order in the history ledger, with its details showing. This used to
+      // navigate to the Bookings or Orders tab, which lists current work — so the
+      // order being looked for had usually already been cleared from it, and the tap
+      // appeared to do nothing useful.
+      if (item.orderCode) {
+        navigation.navigate("OrderHistory", { orderCode: item.orderCode });
+      }
     },
     [navigation],
   );

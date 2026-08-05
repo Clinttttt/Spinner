@@ -24,6 +24,7 @@ import { colors } from "../../../theme/colors";
 import { spacing } from "../../../theme/spacing";
 import type {
   DashboardViewState,
+  HomeActivity,
   HomeDashboardData,
 } from "../models/homeDashboard";
 import { getHomeDashboard } from "../services/homeDashboardService";
@@ -66,6 +67,24 @@ export function OwnerHomeScreen({ navigation }: OwnerHomeScreenProps) {
         active = false;
       };
     }, []),
+  );
+
+  // Recent activity used to send every tap to the Bookings tab, which lists current
+  // work — so a finished job, which is most of what appears here, was nowhere to be
+  // found. Both now open the order in the history ledger.
+  const openActivity = useCallback(
+    (activity: HomeActivity) => {
+      navigation.navigate(
+        "OrderHistory",
+        activity.orderCode ? { orderCode: activity.orderCode } : undefined,
+      );
+    },
+    [navigation],
+  );
+
+  const openOrderHistory = useCallback(
+    () => navigation.navigate("OrderHistory"),
+    [navigation],
   );
 
   const handleRetry = async () => {
@@ -201,8 +220,8 @@ export function OwnerHomeScreen({ navigation }: OwnerHomeScreenProps) {
                   <View style={styles.activityGap}>
                     <ActivitySection
                       activities={dashboard?.recentActivities ?? []}
-                      onActivityPress={() => navigation.navigate("Orders")}
-                      onViewAllPress={() => navigation.navigate("Orders")}
+                      onActivityPress={openActivity}
+                      onViewAllPress={openOrderHistory}
                     />
                   </View>
                 </View>

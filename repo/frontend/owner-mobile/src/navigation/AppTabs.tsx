@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BookingsFlowScreen } from "../features/bookings/screens/BookingsFlowScreen";
 import { OwnerHomeScreen } from "../features/home/screens/OwnerHomeScreen";
 import { ManualOrdersFlowScreen } from "../features/manual-orders/screens/ManualOrdersFlowScreen";
+import { OrderHistoryScreen } from "../features/order-history/screens/OrderHistoryScreen";
 import { PickupFlowScreen } from "../features/pickup/screens/PickupFlowScreen";
 import { ReportsFlowScreen } from "../features/reports/screens/ReportsFlowScreen";
 import { SettingsFlowScreen } from "../features/settings/screens/SettingsFlowScreen";
@@ -28,6 +29,7 @@ const tabIcons: Record<
   ManualOrders: { active: "receipt", inactive: "receipt-outline" },
   Orders: { active: "calendar", inactive: "calendar-outline" },
   Schedule: { active: "car", inactive: "car-outline" },
+  OrderHistory: { active: "albums", inactive: "albums-outline" },
   TransactionHistory: { active: "time", inactive: "time-outline" },
   Reports: { active: "receipt", inactive: "receipt-outline" },
   Settings: { active: "settings", inactive: "settings-outline" },
@@ -38,6 +40,7 @@ const tabLabels: Record<keyof RootTabParamList, string> = {
   ManualOrders: "Orders",
   Orders: "Bookings",
   Schedule: "Pickup",
+  OrderHistory: "Orders",
   TransactionHistory: "History",
   Reports: "Insights",
   Settings: "Settings",
@@ -119,6 +122,17 @@ export function AppTabs() {
       <Tab.Screen
         component={TransactionHistoryScreen}
         name="TransactionHistory"
+      />
+      <Tab.Screen
+        component={OrderHistoryScreen}
+        name="OrderHistory"
+        options={{
+          // Reached from Transaction History rather than the tab bar, like Orders and
+          // Insights. The bar stays visible so the owner is not stranded here.
+          tabBarButton: () => null,
+          tabBarItemStyle: styles.hiddenTabItem,
+          tabBarStyle: visibleTabBarStyle,
+        }}
       />
       <Tab.Screen
         component={ReportsFlowScreen}
