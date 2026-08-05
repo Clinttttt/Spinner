@@ -1,10 +1,7 @@
 import { apiRequest } from "../../../api/apiClient";
 import { type PagedResponse, withPage } from "../../../api/pagination";
+import { refreshOperationsCounts } from "../../operations/operationsCountsStore";
 import type { HomeActivity, HomeDashboardData } from "../models/homeDashboard";
-
-interface OperationsDashboardDto {
-  newBookings: number;
-}
 
 interface BookingDto {
   customerName: string;
@@ -49,7 +46,9 @@ function timeLabel(value: string) {
 
 export async function getHomeDashboard(): Promise<HomeDashboardData> {
   const [dashboard, bookings, transactions] = await Promise.all([
-    apiRequest<OperationsDashboardDto>("/api/operations/dashboard"),
+    // Through the shared store, so the tab bar and this screen do not each ask the
+    // server for the same counts.
+    refreshOperationsCounts(),
     apiRequest<PagedResponse<BookingDto>>(
       withPage("/api/bookings", 1, SCAN_PAGE_SIZE),
     ).then((response) => response.items),

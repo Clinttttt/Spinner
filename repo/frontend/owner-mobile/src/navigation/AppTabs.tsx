@@ -1,6 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { getFocusedRouteNameFromRoute } from "@react-navigation/native";
+import { useEffect } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -12,11 +13,25 @@ import { PickupFlowScreen } from "../features/pickup/screens/PickupFlowScreen";
 import { ReportsFlowScreen } from "../features/reports/screens/ReportsFlowScreen";
 import { SettingsFlowScreen } from "../features/settings/screens/SettingsFlowScreen";
 import { TransactionHistoryScreen } from "../features/transactions/screens/TransactionHistoryScreen";
+import {
+  invalidateOperationsCounts,
+  refreshOperationsCounts,
+  useOperationsCounts,
+} from "../features/operations/operationsCountsStore";
 import { colors } from "../theme/colors";
 import { typography } from "../theme/typography";
 import type { RootTabParamList } from "./types";
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
+
+/**
+ * How often the tab counts are refreshed while the app is open.
+ *
+ * A minute is often enough that the numbers feel live during a shift, and rare enough
+ * that leaving the app open all day is not a stream of requests. Pulling to refresh on
+ * any screen updates them immediately.
+ */
+const COUNT_REFRESH_MS = 60_000;
 
 const tabIcons: Record<
   keyof RootTabParamList,
@@ -46,9 +61,55 @@ const tabLabels: Record<keyof RootTabParamList, string> = {
   Settings: "Settings",
 };
 
+/**
+ * A small count on a tab icon.
+ *
+ * Shows what is waiting without the owner opening each tab. Capped at 99 so a busy
+ * day cannot widen the icon and push the tab bar out of alignment, and hidden
+ * entirely at zero rather than drawn as a "0", which would read as a fault.
+ */
+function TabBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+
+  return (
+    <View
+      // Not announced separately: the tab's own label already carries the count.
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={[styles.badge, count > 9 && styles.badgeWide]}
+    >
+      <Text style={styles.badgeText}>{count > 99 ? "99+" : count}</Text>
+    </View>
+  );
+}
+
 export function AppTabs() {
   const insets = useSafeAreaInsets();
+  const counts = useOperationsCounts();
   const tabBarBottomInset = insets.bottom;
+
+  // Refreshed here because the tab bar is mounted for the whole session, so the counts
+  // stay current no matter which screen the owner is on.
+  useEffect(() => {
+    void refreshOperationsCounts().catch(() => undefined);
+
+    const timer = setInterval(
+      () => void refreshOperationsCounts().catch(() => undefined),
+      COUNT_REFRESH_MS,
+    );
+
+    return () => clearInterval(timer);
+  }, []);
+
+  // Only counts that mean work is waiting. Bookings are requests to approve, Pickup is
+  // laundry still to collect, and History carries the unpaid total because money owed
+  // is the one thing in the ledger that still needs acting on.
+  const badgeCounts: Partial<Record<keyof RootTabParamList, number>> = {
+    Orders: counts.newBookings,
+    Schedule: counts.forPickup,
+    TransactionHistory: counts.unpaidOrders,
+  };
+
   const visibleTabBarStyle = [
     styles.tabBar,
     {
@@ -59,6 +120,13 @@ export function AppTabs() {
 
   return (
     <Tab.Navigator
+      screenListeners={{
+        // Refreshed on every screen focus, so the badges settle as soon as the owner
+        // moves on from whatever they just did. Doing this here rather than after each
+        // action keeps the services free of any knowledge of the tab bar, and covers
+        // every path that changes an order without having to find them all.
+        focus: () => invalidateOperationsCounts(),
+      }}
       screenOptions={({ route }) => ({
         animation: "fade",
         headerShown: false,
@@ -93,6 +161,7 @@ export function AppTabs() {
               }
               size={21}
             />
+            <TabBadge count={badgeCounts[route.name] ?? 0} />
           </View>
         ),
       })}
@@ -179,6 +248,26 @@ const styles = StyleSheet.create({
   },
   inactiveTabLabel: {
     fontWeight: "400",
+  },
+  badge: {
+    alignItems: "center",
+    backgroundColor: colors.danger,
+    borderRadius: 999,
+    justifyContent: "center",
+    minWidth: 17,
+    paddingHorizontal: 4,
+    position: "absolute",
+    right: -5,
+    top: -2,
+    height: 17,
+  },
+  badgeWide: { minWidth: 22 },
+  badgeText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontVariant: ["tabular-nums"],
+    fontWeight: "700",
+    lineHeight: 13,
   },
   iconSlot: {
     alignItems: "center",
