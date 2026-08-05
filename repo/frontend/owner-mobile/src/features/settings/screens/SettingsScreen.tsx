@@ -21,7 +21,7 @@ import { spacing } from "../../../theme/spacing";
 import { SettingsCard } from "../components/SettingsCard";
 import { SettingsOverviewHeader } from "../components/SettingsHeaders";
 import { SettingsMenuRow } from "../components/SettingsMenuRow";
-import { settingsDefaults, settingsMenuSections } from "../data/settingsConfig";
+import { settingsMenuSections } from "../data/settingsConfig";
 import type { SettingsPageId } from "../models/settings";
 import {
   getBusinessSettings,
@@ -40,13 +40,20 @@ export function SettingsScreen({ onOpenPage }: SettingsScreenProps) {
   const [logoutVisible, setLogoutVisible] = useState(false);
   const [business, setBusiness] = useState<BusinessSettingsDto | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const { logOut } = useAuth();
 
   const loadBusiness = useCallback(async (showRefresh = false) => {
     if (showRefresh) setRefreshing(true);
     try {
       setBusiness(await getBusinessSettings());
+      setLoadFailed(false);
     } catch (error) {
+      // Recorded so the card can say the details are unavailable. It used to fall
+      // back to a hardcoded sample name, which presented someone else's shop as the
+      // owner's own and looked like their settings had been silently changed.
+      setLoadFailed(true);
+
       if (showRefresh) {
         void appDialog.notify({
           message: describeApiError(error, "Please try again."),
@@ -60,10 +67,38 @@ export function SettingsScreen({ onOpenPage }: SettingsScreenProps) {
   }, []);
 
   useEffect(() => {
+    let active = true;
+
+    // Goes through loadBusiness so the failure is handled the same way as a pull to
+    // refresh. This used to be a second, unguarded call that discarded its error and
+    // set state after the screen had gone.
     void getBusinessSettings()
-      .then(setBusiness)
-      .catch(() => undefined);
+      .then((settings) => {
+        if (!active) return;
+        setBusiness(settings);
+        setLoadFailed(false);
+      })
+      .catch(() => {
+        if (active) setLoadFailed(true);
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
+
+  // Nothing is invented when the load fails. Until the real details arrive the card
+  // says so, rather than showing a placeholder shop name that the owner would read as
+  // their own settings having changed.
+  const showLoadFailure = loadFailed && business === null;
+
+  const businessName =
+    business?.businessName ??
+    (showLoadFailure ? "Business details unavailable" : "Loading…");
+
+  const businessAddress =
+    business?.address ??
+    (showLoadFailure ? "Check your connection and try again" : "");
 
   return (
     <View style={styles.screen}>
@@ -103,7 +138,7 @@ export function SettingsScreen({ onOpenPage }: SettingsScreenProps) {
             </View>
             <View style={styles.businessCopy}>
               <Text numberOfLines={1} style={styles.businessName}>
-                {business?.businessName ?? settingsDefaults.business.name}
+                {businessName}
               </Text>
               <View style={styles.addressRow}>
                 <Ionicons
@@ -112,10 +147,18 @@ export function SettingsScreen({ onOpenPage }: SettingsScreenProps) {
                   size={17}
                 />
                 <Text numberOfLines={2} style={styles.businessAddress}>
-                  {business?.address ??
-                    `${settingsDefaults.business.addressLine}\n${settingsDefaults.business.cityProvince}`}
+                  {businessAddress}
                 </Text>
               </View>
+              {showLoadFailure ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => void loadBusiness(true)}
+                  style={({ pressed }) => [pressed && styles.pressed]}
+                >
+                  <Text style={styles.retryText}>Tap to try again</Text>
+                </Pressable>
+              ) : null}
             </View>
             <Pressable
               accessibilityRole="button"
@@ -354,6 +397,12 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(8,35,71,0.28)",
     flex: 1,
     justifyContent: "center",
+  },
+  retryText: {
+    color: colors.navy,
+    fontSize: 12,
+    fontWeight: "600",
+    marginTop: 4,
   },
   pressed: { opacity: 0.74 },
   screen: { backgroundColor: colors.background, flex: 1 },

@@ -103,7 +103,7 @@ public sealed class ReportHandlerTests
             reportDate,
             OrderSeedState.CompletedPaid);
 
-        var result = await new ExportOrderHistoryHandler(dbContext)
+        var result = await new ExportOrderHistoryHandler(dbContext, new TestBusinessClock())
             .Handle(new ExportOrderHistoryQuery(null, reportDate, reportDate), CancellationToken.None);
 
         Assert.True(result.IsSuccess);

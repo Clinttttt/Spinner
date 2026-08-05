@@ -39,12 +39,13 @@ public sealed class TransactionsController : ApiControllerBase
         [FromQuery] DateOnly? from,
         [FromQuery] DateOnly? to,
         [FromQuery] TransactionSort sort,
+        [FromQuery] TransactionDirection? direction,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = PageRequest.DefaultPageSize,
         CancellationToken ct = default)
     {
         var result = await Sender.Send(
-            new GetTransactionHistoryQuery(search, kind, from, to, sort, page, pageSize),
+            new GetTransactionHistoryQuery(search, kind, from, to, sort, page, pageSize, direction),
             ct);
         return HandleResponse(result);
     }

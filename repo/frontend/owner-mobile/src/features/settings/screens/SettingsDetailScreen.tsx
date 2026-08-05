@@ -481,28 +481,49 @@ function NotificationPreferencesPage() {
 
 function BusinessInformationPage() {
   const [saving, setSaving] = useState(false);
-  const [name, setName] = useState<string>(settingsDefaults.business.name);
-  const [address, setAddress] = useState<string>(
-    settingsDefaults.business.addressLine,
-  );
-  const [phone, setPhone] = useState<string>(settingsDefaults.business.phone);
+  // Deliberately empty rather than seeded with the sample business. Pre-filling meant
+  // that if the load failed the form still showed a plausible-looking name and
+  // address, and saving would write that sample over the shop's real profile.
+  const [name, setName] = useState("");
+  const [address, setAddress] = useState("");
+  const [phone, setPhone] = useState("");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
+    let active = true;
+
     void getBusinessSettings()
       .then((settings) => {
+        if (!active) return;
         setName(settings.businessName);
         setPhone(settings.phoneNumber);
         setAddress(settings.address);
         setLogoUrl(settings.logoUrl);
+        setLoaded(true);
       })
-      .catch((error: unknown) =>
-        showApiError("Unable to load business information", error),
-      );
+      .catch((error: unknown) => {
+        if (active) showApiError("Unable to load business information", error);
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   const saveBusiness = async () => {
     if (saving) return;
+
+    // Saving before the current details are known would replace them with whatever is
+    // in an unloaded form.
+    if (!loaded) {
+      showValidation(
+        "Details not loaded",
+        "Your business information has not loaded yet. Pull down to retry before saving.",
+      );
+      return;
+    }
+
     if (!name.trim() || !phone.trim() || !address.trim()) {
       showValidation(
         "Required information",

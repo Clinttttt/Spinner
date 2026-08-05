@@ -13,4 +13,24 @@ public interface IBusinessClock
     DateOnly Today { get; }
 
     DateOnly ToBusinessDate(DateTimeOffset instant);
+
+    /// <summary>
+    /// The instant a business date begins.
+    /// </summary>
+    /// <remarks>
+    /// The counterpart to <see cref="ToBusinessDate"/>, and what lets a date filter be
+    /// applied in the database instead of in memory. Converting the boundaries once is
+    /// the only way to compare a stored instant against a local calendar day in SQL,
+    /// since the database has no idea which time zone the shop trades in.
+    /// </remarks>
+    DateTimeOffset StartOfBusinessDay(DateOnly businessDate);
+
+    /// <summary>
+    /// The instant the day after <paramref name="businessDate"/> begins.
+    /// </summary>
+    /// <remarks>
+    /// Exclusive upper bound, so a comparison never has to guess at the last
+    /// representable moment of a day.
+    /// </remarks>
+    DateTimeOffset EndOfBusinessDay(DateOnly businessDate);
 }

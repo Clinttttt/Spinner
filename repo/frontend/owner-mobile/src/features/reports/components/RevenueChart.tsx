@@ -13,6 +13,26 @@ interface RevenueChartProps {
 const lineColor = "#1769E0";
 const gridColor = "#EEF1F4";
 
+/**
+ * Formats an axis value so that neighbouring ticks stay distinguishable.
+ *
+ * A single laundromat's daily takings are in the hundreds, so rounding everything to
+ * thousands collapsed the whole axis to ₱0K and ₱1K. Below ten thousand the value is
+ * shown in full pesos; above it, thousands are used but only rounded away once they
+ * are large enough for it not to matter.
+ */
+function axisLabel(value: number) {
+  if (value < 1000) return `₱${Math.round(value)}`;
+
+  if (value < 10_000) {
+    const thousands = value / 1000;
+    // One decimal, and no trailing ".0" on a whole number.
+    return `₱${thousands.toFixed(1).replace(/\.0$/, "")}K`;
+  }
+
+  return `₱${Math.round(value / 1000)}K`;
+}
+
 export function RevenueChart({ compact, points }: RevenueChartProps) {
   const [width, setWidth] = useState(0);
   const height = compact ? 176 : 194;
@@ -29,6 +49,10 @@ export function RevenueChart({ compact, points }: RevenueChartProps) {
     const axisMax = Math.ceil(maxValue / 1000) * 1000;
     const coordinates = points.map((point, index) => ({
       ...point,
+      // Kept so the marks can be keyed by position. The label is not reliably
+      // unique — a period spanning more than a month repeats day names — and a
+      // duplicate key makes React reuse the wrong mark.
+      index,
       x: left + (index / Math.max(points.length - 1, 1)) * plotWidth,
       y: top + plotHeight - (point.value / axisMax) * plotHeight,
     }));
@@ -36,8 +60,15 @@ export function RevenueChart({ compact, points }: RevenueChartProps) {
       .map((point, index) => `${index === 0 ? "M" : "L"}${point.x},${point.y}`)
       .join(" ");
     const areaPath = `${linePath} L${coordinates.at(-1)?.x ?? left},${top + plotHeight} L${left},${top + plotHeight} Z`;
-    const ticks = [0, 0.33, 0.66, 1].map((ratio) => ({
-      label: ratio === 0 ? "₱0" : `₱${Math.round((axisMax * ratio) / 1000)}K`,
+
+    // Evenly spaced quarters rather than 0.33/0.66, so the values land on round
+    // numbers. The ratio is carried through as the key because the label is not
+    // unique: rounding to thousands produced "₱0K" and two identical "₱1K" entries
+    // for any shop taking under about ₱2,000 in a period, which collided as React
+    // keys and left the axis unreadable.
+    const ticks = [0, 0.25, 0.5, 0.75, 1].map((ratio) => ({
+      label: axisLabel(axisMax * ratio),
+      ratio,
       y: top + plotHeight - ratio * plotHeight,
     }));
 
@@ -55,7 +86,7 @@ export function RevenueChart({ compact, points }: RevenueChartProps) {
         <Svg height={height} width={width}>
           {plot.ticks.map((tick) => (
             <Line
-              key={tick.label}
+              key={tick.ratio}
               stroke={gridColor}
               strokeWidth={1}
               x1={32}
@@ -68,7 +99,7 @@ export function RevenueChart({ compact, points }: RevenueChartProps) {
             <SvgText
               fill={colors.textSecondary}
               fontSize={8.5}
-              key={`label-${tick.label}`}
+              key={`label-${tick.ratio}`}
               textAnchor="start"
               x={0}
               y={tick.y + 3}
@@ -89,7 +120,7 @@ export function RevenueChart({ compact, points }: RevenueChartProps) {
           {plot.coordinates.map((point) => (
             <Circle
               fill={lineColor}
-              key={point.label}
+              key={point.index}
               cx={point.x}
               cy={point.y}
               r={3}
@@ -99,7 +130,7 @@ export function RevenueChart({ compact, points }: RevenueChartProps) {
             <SvgText
               fill={colors.textSecondary}
               fontSize={9}
-              key={`day-${point.label}`}
+              key={`day-${point.index}`}
               textAnchor="middle"
               x={point.x}
               y={height - 7}

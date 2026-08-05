@@ -7,6 +7,16 @@ using Spinner.Api.Domain.Orders;
 
 namespace Spinner.Api.Features.Customers.GetCustomerList;
 
+/// <summary>
+/// The shop's customers, busiest first.
+/// </summary>
+/// <remarks>
+/// Counted, aggregated, sorted and paged in the database. It used to read every
+/// customer and then effectively the entire orders table — every column of every
+/// order ever placed — to work out three numbers per customer, then sort and page the
+/// result in memory. That is the single heaviest read in the application and it grows
+/// with every order the shop takes.
+/// </remarks>
 public sealed class GetCustomerListHandler
     : IRequestHandler<GetCustomerListQuery, Result<PagedResponse<CustomerListItemResponse>>>
 {
@@ -21,65 +31,54 @@ public sealed class GetCustomerListHandler
         GetCustomerListQuery request,
         CancellationToken cancellationToken)
     {
-        var query = _dbContext.Customers.AsNoTracking().AsQueryable();
+        var customers = _dbContext.Customers.AsNoTracking();
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
             var search = request.Search.Trim().ToLowerInvariant();
 
-            query = query.Where(customer =>
+            customers = customers.Where(customer =>
                 customer.FullName.ToLower().Contains(search) ||
                 customer.MobileNumber.ToLower().Contains(search) ||
                 (customer.EmailAddress != null && customer.EmailAddress.ToLower().Contains(search)));
         }
 
-        var customers = await query
-            .OrderBy(customer => customer.FullName)
-            .ToListAsync(cancellationToken);
-
-        var customerIds = customers.Select(customer => customer.Id).ToList();
-        var orders = await _dbContext.LaundryOrders
-            .AsNoTracking()
-            .Where(order => customerIds.Contains(order.CustomerId))
-            .ToListAsync(cancellationToken);
-
-        var sortedCustomers = customers
-            .Select(customer =>
-            {
-                var customerOrders = orders
-                    .Where(order => order.CustomerId == customer.Id)
-                    .ToList();
-
-                return new CustomerListItemResponse(
-                    customer.Id,
-                    customer.FullName,
-                    customer.MobileNumber,
-                    customer.EmailAddress,
-                    customerOrders.Count,
-                    customerOrders
-                        .OrderByDescending(order => order.CreatedAt)
-                        .Select(order => (DateTimeOffset?)order.CreatedAt)
-                        .FirstOrDefault(),
-                    customerOrders
-                        .Where(order => order.PaymentStatus == PaymentStatus.Paid)
-                        .Sum(order => order.EstimatedTotalAmount));
-            })
-            .OrderByDescending(customer => customer.TotalOrders)
-            .ThenBy(customer => customer.FullName)
-            .ToList();
+        // The three figures are computed as correlated subqueries against the orders
+        // table, so the database returns one row per customer with the totals already
+        // worked out. Only the page being displayed is ever materialised.
+        var rows = customers.Select(customer => new CustomerListItemResponse(
+            customer.Id,
+            customer.FullName,
+            customer.MobileNumber,
+            customer.EmailAddress,
+            _dbContext.LaundryOrders.Count(order => order.CustomerId == customer.Id),
+            _dbContext.LaundryOrders
+                .Where(order => order.CustomerId == customer.Id)
+                .Max(order => (DateTimeOffset?)order.CreatedAt),
+            _dbContext.LaundryOrders
+                .Where(order =>
+                    order.CustomerId == customer.Id &&
+                    order.PaymentStatus == PaymentStatus.Paid)
+                .Sum(order => (decimal?)order.EstimatedTotalAmount) ?? 0m));
 
         var page = PageRequest.NormalizePage(request.Page);
         var pageSize = PageRequest.NormalizePageSize(request.PageSize);
-        var response = sortedCustomers
+
+        var totalCount = await customers.CountAsync(cancellationToken);
+
+        var items = await rows
+            // Busiest first, then by name, then by id. The id is a tie-break the old
+            // in-memory sort did not need but paging does: without a total order the
+            // database may place customers with the same order count differently on
+            // each page, showing one twice and hiding another.
+            .OrderByDescending(customer => customer.TotalOrders)
+            .ThenBy(customer => customer.FullName)
+            .ThenBy(customer => customer.CustomerId)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .ToList();
+            .ToListAsync(cancellationToken);
 
         return Result<PagedResponse<CustomerListItemResponse>>.Success(
-            PagedResponse<CustomerListItemResponse>.Create(
-                response,
-                page,
-                pageSize,
-                sortedCustomers.Count));
+            PagedResponse<CustomerListItemResponse>.Create(items, page, pageSize, totalCount));
     }
 }

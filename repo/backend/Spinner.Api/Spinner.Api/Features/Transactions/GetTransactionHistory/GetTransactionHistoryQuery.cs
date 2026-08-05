@@ -12,5 +12,6 @@ public sealed record GetTransactionHistoryQuery(
     DateOnly? To,
     TransactionSort Sort = TransactionSort.Latest,
     int Page = 1,
-    int PageSize = PageRequest.DefaultPageSize)
+    int PageSize = PageRequest.DefaultPageSize,
+    TransactionDirection? Direction = null)
     : IRequest<Result<PagedResponse<TransactionHistoryResponse>>>;

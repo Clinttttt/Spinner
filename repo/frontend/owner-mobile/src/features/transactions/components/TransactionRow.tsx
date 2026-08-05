@@ -1,3 +1,4 @@
+import { memo, useCallback } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -8,7 +9,12 @@ interface TransactionRowProps {
   compact?: boolean;
   isLast?: boolean;
   item: TransactionHistoryItem;
-  onPress?: () => void;
+  /**
+   * Given the item, so the list can pass one stable callback for every row.
+   * A per-row arrow would be a new function on each render and would defeat the memo
+   * below, which is the whole reason this component is memoised.
+   */
+  onPress?: (item: TransactionHistoryItem) => void;
 }
 
 export function formatPeso(value: number) {
@@ -64,7 +70,7 @@ function visual(item: TransactionHistoryItem) {
   };
 }
 
-export function TransactionRow({
+function TransactionRowComponent({
   compact = false,
   isLast = false,
   item,
@@ -73,12 +79,16 @@ export function TransactionRow({
   const palette = visual(item);
   const rowDetails = details(item);
 
+  // Bound here rather than by the caller, so the list can hand every row the same
+  // callback and the memo above actually holds.
+  const handlePress = useCallback(() => onPress?.(item), [item, onPress]);
+
   return (
     <Pressable
       accessibilityLabel={`${item.title}, ${rowDetails}, ${formatPeso(item.amount)}`}
       accessibilityRole={onPress ? "button" : "text"}
       disabled={!onPress}
-      onPress={onPress}
+      onPress={handlePress}
       style={({ pressed }) => [
         styles.row,
         compact && styles.compactRow,
@@ -164,3 +174,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 });
+
+// Memoised so scrolling and searching do not re-render every row and its icons.
+export const TransactionRow = memo(TransactionRowComponent);

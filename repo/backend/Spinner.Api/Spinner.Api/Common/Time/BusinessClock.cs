@@ -18,6 +18,21 @@ public sealed class BusinessClock : IBusinessClock
     public DateOnly ToBusinessDate(DateTimeOffset instant) =>
         DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(instant, _timeZone).Date);
 
+    public DateTimeOffset StartOfBusinessDay(DateOnly businessDate)
+    {
+        var localMidnight = businessDate.ToDateTime(TimeOnly.MinValue);
+
+        // GetUtcOffset is asked about the local time itself rather than a fixed offset,
+        // so a zone that ever changes its offset still resolves the right instant.
+        var offset = _timeZone.GetUtcOffset(
+            DateTime.SpecifyKind(localMidnight, DateTimeKind.Unspecified));
+
+        return new DateTimeOffset(localMidnight, offset);
+    }
+
+    public DateTimeOffset EndOfBusinessDay(DateOnly businessDate) =>
+        StartOfBusinessDay(businessDate.AddDays(1));
+
     private static TimeZoneInfo ResolveTimeZone(string? timeZoneId)
     {
         if (string.IsNullOrWhiteSpace(timeZoneId))

@@ -18,4 +18,16 @@ public sealed class TestBusinessClock : IBusinessClock
 
     public DateOnly ToBusinessDate(DateTimeOffset instant) =>
         DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(instant, _timeZone).Date);
+
+    public DateTimeOffset StartOfBusinessDay(DateOnly businessDate)
+    {
+        var localMidnight = businessDate.ToDateTime(TimeOnly.MinValue);
+        var offset = _timeZone.GetUtcOffset(
+            DateTime.SpecifyKind(localMidnight, DateTimeKind.Unspecified));
+
+        return new DateTimeOffset(localMidnight, offset);
+    }
+
+    public DateTimeOffset EndOfBusinessDay(DateOnly businessDate) =>
+        StartOfBusinessDay(businessDate.AddDays(1));
 }

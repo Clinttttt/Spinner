@@ -1,10 +1,11 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
+  FlatList,
   Pressable,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -32,8 +33,9 @@ import type {
   TransactionSort,
 } from "../models/transaction";
 import {
-  refreshTransactions,
-  useTransactions,
+  loadMoreTransactions,
+  loadTransactions,
+  useTransactionsState,
 } from "../services/transactionStore";
 
 type TransactionHistoryScreenProps = BottomTabScreenProps<
@@ -41,67 +43,21 @@ type TransactionHistoryScreenProps = BottomTabScreenProps<
   "TransactionHistory"
 >;
 
-function startOfWeek(value: Date) {
-  const start = new Date(value);
-  const day = start.getDay();
-  const distanceToMonday = day === 0 ? 6 : day - 1;
-  start.setDate(start.getDate() - distanceToMonday);
-  start.setHours(0, 0, 0, 0);
-  return start;
-}
+// Searching, filtering and sorting are all done by the server now, so the helpers
+// that used to do it over a full local copy of the history have been removed.
 
-function matchesFilter(
-  item: TransactionHistoryItem,
-  filter: TransactionFilter,
-) {
-  const occurredAt = new Date(item.occurredAt);
-  const now = new Date();
-
-  if (filter === "income") return item.kind !== "manualDeduction";
-  if (filter === "deduction") return item.kind === "manualDeduction";
-  if (filter === "today")
-    return occurredAt.toDateString() === now.toDateString();
-  if (filter === "thisWeek") return occurredAt >= startOfWeek(now);
-  return true;
-}
-
-function matchesQuery(item: TransactionHistoryItem, query: string) {
-  if (!query) return true;
-  const searchable = [
-    item.title,
-    item.kind,
-    item.note,
-    item.orderCode,
-    item.serviceLabel,
-    item.amount.toString(),
-    item.amount.toFixed(2),
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-  return searchable.includes(query);
-}
-
-function sortTransactions(
-  items: TransactionHistoryItem[],
-  sort: TransactionSort,
-) {
-  return [...items].sort((left, right) => {
-    if (sort === "highest") return right.amount - left.amount;
-    if (sort === "lowest") return left.amount - right.amount;
-    const difference =
-      new Date(right.occurredAt).getTime() -
-      new Date(left.occurredAt).getTime();
-    return sort === "oldest" ? -difference : difference;
-  });
-}
+const extractTransactionId = (item: TransactionHistoryItem) => item.id;
 
 export function TransactionHistoryScreen({
   navigation,
 }: TransactionHistoryScreenProps) {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const transactions = useTransactions();
+  const {
+    hasMore,
+    items: visibleTransactions,
+    loadingMore,
+  } = useTransactionsState();
   const compact = width <= 360;
   const pageHorizontalPadding = compact ? 12 : 14;
   const [query, setQuery] = useState("");
@@ -114,16 +70,6 @@ export function TransactionHistoryScreen({
     useState<TransactionHistoryViewState>("loading");
 
   useEffect(() => {
-    let active = true;
-    refreshTransactions()
-      .then(() => active && setViewState("ready"))
-      .catch(() => active && setViewState("error"));
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  useEffect(() => {
     const timeout = setTimeout(
       () => setDebouncedQuery(query.trim().toLowerCase()),
       300,
@@ -131,70 +77,101 @@ export function TransactionHistoryScreen({
     return () => clearTimeout(timeout);
   }, [query]);
 
-  const visibleTransactions = useMemo(
-    () =>
-      sortTransactions(
-        transactions.filter(
-          (item) =>
-            matchesFilter(item, filter) && matchesQuery(item, debouncedQuery),
-        ),
-        sort,
-      ),
-    [debouncedQuery, filter, sort, transactions],
-  );
+  // Searching, filtering and sorting all happen on the server, so a change to any of
+  // them is a new first page rather than a re-filter of everything downloaded so far.
+  useEffect(() => {
+    let active = true;
 
-  const handleRefresh = async () => {
+    loadTransactions({ filter, search: debouncedQuery, sort })
+      .then(() => active && setViewState("ready"))
+      .catch(() => active && setViewState("error"));
+
+    return () => {
+      active = false;
+    };
+  }, [debouncedQuery, filter, sort]);
+
+  const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await refreshTransactions();
+      await loadTransactions({ filter, search: debouncedQuery, sort });
       setViewState("ready");
     } catch {
       setViewState("error");
     } finally {
       setRefreshing(false);
     }
-  };
+  }, [debouncedQuery, filter, sort]);
 
-  const openTransaction = (item: TransactionHistoryItem) => {
-    if (item.kind === "bookingSale") navigation.navigate("Orders");
-    if (item.kind === "manualOrderSale") navigation.navigate("ManualOrders");
-  };
+  // Fetches the next page as the owner nears the end of what is loaded. A failure is
+  // swallowed deliberately: the rows already on screen are still valid, and throwing
+  // a dialog at somebody mid-scroll over a page that can simply be retried is worse
+  // than doing nothing.
+  const handleEndReached = useCallback(() => {
+    if (!hasMore || loadingMore) return;
+    void loadMoreTransactions().catch(() => undefined);
+  }, [hasMore, loadingMore]);
+
+  const openTransaction = useCallback(
+    (item: TransactionHistoryItem) => {
+      if (item.kind === "bookingSale") navigation.navigate("Orders");
+      if (item.kind === "manualOrderSale") navigation.navigate("ManualOrders");
+    },
+    [navigation],
+  );
+
+  // Stable identities, so the memoised header is not rebuilt — with its images,
+  // icons and filter chips — every time the list re-renders.
+  const goToOrders = useCallback(
+    () => navigation.navigate("Orders"),
+    [navigation],
+  );
+  const goToSettings = useCallback(
+    () => navigation.navigate("Settings"),
+    [navigation],
+  );
+  const openSort = useCallback(() => setSortVisible(true), []);
+  const closeSort = useCallback(() => setSortVisible(false), []);
+
+  const showFilterHint = useCallback(() => {
+    void appDialog.notify({
+      message: "Use the quick filters below the search field.",
+      title: "Transaction filters",
+    });
+  }, []);
+
+  const handleRetry = useCallback(() => {
+    setViewState("loading");
+    void loadTransactions({ filter, search: debouncedQuery, sort })
+      .then(() => setViewState("ready"))
+      .catch(() => setViewState("error"));
+  }, [debouncedQuery, filter, sort]);
+
+  // With filtering done on the server there is no local copy of everything to
+  // compare against, so "nothing here yet" is told apart from "nothing matched" by
+  // whether the owner has actually narrowed anything.
+  const isNarrowed = debouncedQuery.length > 0 || filter !== "all";
+  const nothingLoaded =
+    viewState === "ready" && visibleTransactions.length === 0;
 
   const showEmptyState =
-    viewState === "empty" ||
-    (viewState === "ready" && transactions.length === 0);
-  const showSearchEmpty =
-    viewState === "ready" &&
-    transactions.length > 0 &&
-    visibleTransactions.length === 0;
+    viewState === "empty" || (nothingLoaded && !isNarrowed);
+  const showSearchEmpty = nothingLoaded && isNarrowed;
+  const hasRows = viewState === "ready" && visibleTransactions.length > 0;
 
-  return (
-    <View style={styles.screen}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        contentInsetAdjustmentBehavior="never"
-        refreshControl={
-          <RefreshControl
-            colors={[colors.navy]}
-            onRefresh={handleRefresh}
-            refreshing={refreshing}
-            tintColor={colors.navy}
-          />
-        }
-        showsVerticalScrollIndicator={false}
-      >
+  // The card is drawn in three parts so its rows can be virtualised. Keeping them
+  // inside one View would mean rendering every transaction the shop has ever
+  // recorded, along with the icons in each row, on every keystroke.
+  const listHeader = useMemo(
+    () => (
+      <>
         <TransactionHistoryHeader
           compact={compact}
           filter={filter}
           onFilterChange={setFilter}
-          onFilterPress={() =>
-            void appDialog.notify({
-              message: "Use the quick filters below the search field.",
-              title: "Transaction filters",
-            })
-          }
-          onNotificationsPress={() => navigation.navigate("Orders")}
-          onProfilePress={() => navigation.navigate("Settings")}
+          onFilterPress={showFilterHint}
+          onNotificationsPress={goToOrders}
+          onProfilePress={goToSettings}
           onQueryChange={setQuery}
           pageHorizontalPadding={pageHorizontalPadding}
           query={query}
@@ -205,27 +182,19 @@ export function TransactionHistoryScreen({
         <View style={{ paddingHorizontal: pageHorizontalPadding }}>
           {viewState === "loading" ? <TransactionSkeleton /> : null}
           {viewState === "error" ? (
-            <TransactionStateCard
-              kind="error"
-              onRetry={() => {
-                setViewState("loading");
-                void refreshTransactions()
-                  .then(() => setViewState("ready"))
-                  .catch(() => setViewState("error"));
-              }}
-            />
+            <TransactionStateCard kind="error" onRetry={handleRetry} />
           ) : null}
           {showEmptyState ? <TransactionStateCard kind="empty" /> : null}
           {showSearchEmpty ? <TransactionStateCard kind="searchEmpty" /> : null}
 
-          {viewState === "ready" && visibleTransactions.length > 0 ? (
-            <View style={styles.card}>
+          {hasRows ? (
+            <View style={styles.cardTop}>
               <View style={styles.cardHeader}>
                 <Text style={styles.cardTitle}>Recent Transactions</Text>
                 <Pressable
                   accessibilityLabel={`Sort transactions, ${transactionSortLabels[sort]}`}
                   accessibilityRole="button"
-                  onPress={() => setSortVisible(true)}
+                  onPress={openSort}
                   style={({ pressed }) => [
                     styles.sortButton,
                     pressed && styles.pressed,
@@ -241,26 +210,96 @@ export function TransactionHistoryScreen({
                   />
                 </Pressable>
               </View>
-              {visibleTransactions.map((item, index) => (
-                <TransactionRow
-                  isLast={index === visibleTransactions.length - 1}
-                  item={item}
-                  key={item.id}
-                  onPress={
-                    item.kind === "bookingSale" ||
-                    item.kind === "manualOrderSale"
-                      ? () => openTransaction(item)
-                      : undefined
-                  }
-                />
-              ))}
             </View>
           ) : null}
         </View>
-      </ScrollView>
+      </>
+    ),
+    [
+      compact,
+      filter,
+      goToOrders,
+      goToSettings,
+      handleRetry,
+      hasRows,
+      insets.top,
+      openSort,
+      pageHorizontalPadding,
+      query,
+      showEmptyState,
+      showFilterHint,
+      showSearchEmpty,
+      sort,
+      viewState,
+      width,
+    ],
+  );
+
+  const listFooter = useMemo(
+    () =>
+      hasRows ? (
+        <View style={{ paddingHorizontal: pageHorizontalPadding }}>
+          <View style={styles.cardBottom}>
+            {loadingMore ? (
+              <ActivityIndicator color={colors.navy} size="small" />
+            ) : null}
+          </View>
+        </View>
+      ) : null,
+    [hasRows, loadingMore, pageHorizontalPadding],
+  );
+
+  const renderRow = useCallback(
+    ({ index, item }: { index: number; item: TransactionHistoryItem }) => (
+      <View style={{ paddingHorizontal: pageHorizontalPadding }}>
+        <View style={styles.cardBody}>
+          <TransactionRow
+            isLast={index === visibleTransactions.length - 1 && !hasMore}
+            item={item}
+            onPress={
+              item.kind === "bookingSale" || item.kind === "manualOrderSale"
+                ? openTransaction
+                : undefined
+            }
+          />
+        </View>
+      </View>
+    ),
+    [
+      hasMore,
+      openTransaction,
+      pageHorizontalPadding,
+      visibleTransactions.length,
+    ],
+  );
+
+  return (
+    <View style={styles.screen}>
+      <FlatList
+        contentContainerStyle={styles.scrollContent}
+        contentInsetAdjustmentBehavior="never"
+        data={hasRows ? visibleTransactions : []}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+        keyExtractor={extractTransactionId}
+        ListFooterComponent={listFooter}
+        ListHeaderComponent={listHeader}
+        onEndReached={handleEndReached}
+        onEndReachedThreshold={0.4}
+        renderItem={renderRow}
+        refreshControl={
+          <RefreshControl
+            colors={[colors.navy]}
+            onRefresh={handleRefresh}
+            refreshing={refreshing}
+            tintColor={colors.navy}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+      />
       <TransactionSortModal
         onChange={setSort}
-        onClose={() => setSortVisible(false)}
+        onClose={closeSort}
         value={sort}
         visible={sortVisible}
       />
@@ -276,6 +315,39 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 16,
     paddingVertical: 14,
+  },
+  // The card split into three, so its rows can live in a virtualised list while the
+  // surface still reads as one panel: a top with the rounded corners and title, a
+  // repeating body for each row, and a bottom that closes it off.
+  cardTop: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderRightWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+  },
+  cardBody: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderRightWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 16,
+  },
+  cardBottom: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderRightWidth: StyleSheet.hairlineWidth,
+    paddingBottom: 14,
+    paddingHorizontal: 16,
+    paddingTop: 4,
   },
   cardHeader: {
     alignItems: "center",
