@@ -25,7 +25,9 @@ public sealed class TestBusinessClock : IBusinessClock
         var offset = _timeZone.GetUtcOffset(
             DateTime.SpecifyKind(localMidnight, DateTimeKind.Unspecified));
 
-        return new DateTimeOffset(localMidnight, offset);
+        // UTC, matching the real clock: PostgreSQL rejects a timestamptz parameter that
+        // carries any other offset.
+        return new DateTimeOffset(localMidnight, offset).ToUniversalTime();
     }
 
     public DateTimeOffset EndOfBusinessDay(DateOnly businessDate) =>

@@ -54,6 +54,21 @@ public sealed class GetTransactionHistoryHandler
     }
 
     /// <summary>
+    /// Renders the query this handler would run, as SQL.
+    /// </summary>
+    /// <remarks>
+    /// For tests only, and internal. Exists because this query passed every in-memory
+    /// test and then failed on the first real request: the in-memory provider executes
+    /// LINQ directly and so accepts shapes that have no SQL form. Asking for the SQL
+    /// exercises the translation step that actually broke.
+    /// </remarks>
+    internal string BuildQueryForTranslationCheck(GetTransactionHistoryQuery request) =>
+        Sort(BuildQuery(request), request.Sort)
+            .Skip(0)
+            .Take(request.PageSize)
+            .ToQueryString();
+
+    /// <summary>
     /// The two sources of money movement, as one query.
     /// </summary>
     /// <remarks>
@@ -64,8 +79,43 @@ public sealed class GetTransactionHistoryHandler
     /// </remarks>
     private IQueryable<TransactionRow> BuildQuery(GetTransactionHistoryQuery request)
     {
-        var manual = _dbContext.FinancialTransactions
+        // The date range is applied to each source before they are combined, against
+        // the column each actually stores. Filtering the combined result meant
+        // comparing a value that on the sales side came from unwrapping a nullable
+        // inside a union, which PostgreSQL could not be given a query for — the
+        // in-memory provider the tests run on allows it, so this only failed in
+        // production. Per source is better anyway: each side can use its own index.
+        //
+        // The stored value is an instant while the filter is a local calendar day, so
+        // the day's boundaries are converted once. Comparing the instant's UTC date
+        // instead filed the whole 00:00 to 08:00 local shift under the previous day.
+        var from = request.From is null
+            ? (DateTimeOffset?)null
+            : _businessClock.StartOfBusinessDay(request.From.Value);
+
+        var to = request.To is null
+            ? (DateTimeOffset?)null
+            : _businessClock.EndOfBusinessDay(request.To.Value);
+
+        var manualSource = _dbContext.FinancialTransactions.AsNoTracking();
+
+        if (from is not null)
+            manualSource = manualSource.Where(transaction => transaction.OccurredAt >= from);
+
+        if (to is not null)
+            manualSource = manualSource.Where(transaction => transaction.OccurredAt < to);
+
+        var salesSource = _dbContext.LaundryOrders
             .AsNoTracking()
+            .Where(order => order.PaymentStatus == PaymentStatus.Paid && order.PaidAt != null);
+
+        if (from is not null)
+            salesSource = salesSource.Where(order => order.PaidAt >= from);
+
+        if (to is not null)
+            salesSource = salesSource.Where(order => order.PaidAt < to);
+
+        var manual = manualSource
             .Select(transaction => new TransactionRow
             {
                 Id = transaction.Id,
@@ -78,9 +128,7 @@ public sealed class GetTransactionHistoryHandler
                 ServiceName = null,
             });
 
-        var sales = _dbContext.LaundryOrders
-            .AsNoTracking()
-            .Where(order => order.PaymentStatus == PaymentStatus.Paid && order.PaidAt != null)
+        var sales = salesSource
             .Select(order => new TransactionRow
             {
                 Id = order.Id,
@@ -107,22 +155,6 @@ public sealed class GetTransactionHistoryHandler
 
         if (request.Direction == TransactionDirection.Out)
             rows = rows.Where(row => row.Kind == TransactionKind.ManualDeduction);
-
-        // The stored value is an instant; the filter is a local calendar day. The day's
-        // boundaries are converted to instants once, here, so the comparison can happen
-        // in SQL. Comparing the instant's UTC date instead — which is what this used to
-        // do — filed the whole 00:00 to 08:00 local shift under the previous day.
-        if (request.From is not null)
-        {
-            var from = _businessClock.StartOfBusinessDay(request.From.Value);
-            rows = rows.Where(row => row.OccurredAt >= from);
-        }
-
-        if (request.To is not null)
-        {
-            var to = _businessClock.EndOfBusinessDay(request.To.Value);
-            rows = rows.Where(row => row.OccurredAt < to);
-        }
 
         if (!string.IsNullOrWhiteSpace(request.Search))
             rows = ApplySearch(rows, request.Search.Trim());

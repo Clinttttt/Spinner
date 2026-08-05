@@ -27,7 +27,12 @@ public sealed class BusinessClock : IBusinessClock
         var offset = _timeZone.GetUtcOffset(
             DateTime.SpecifyKind(localMidnight, DateTimeKind.Unspecified));
 
-        return new DateTimeOffset(localMidnight, offset);
+        // Returned as UTC. The instant is the same either way, but PostgreSQL's
+        // "timestamp with time zone" only accepts a parameter whose offset is zero and
+        // rejects anything else outright, so a value carrying +08:00 fails at the point
+        // it is sent — after the query has been built, which is why it looked like a
+        // working query.
+        return new DateTimeOffset(localMidnight, offset).ToUniversalTime();
     }
 
     public DateTimeOffset EndOfBusinessDay(DateOnly businessDate) =>
