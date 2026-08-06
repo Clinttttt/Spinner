@@ -163,9 +163,9 @@ function SheetBody({
       >
         <View style={styles.header}>
           <View style={styles.headerCopy}>
-            <Text style={styles.title}>Customer Notifications</Text>
+            <Text style={styles.title}>Notifications</Text>
             <Text style={styles.subtitle}>
-              Messages the shop has sent about orders.
+              Messages sent about orders, to customers and to this shop.
             </Text>
           </View>
           <Pressable
@@ -240,6 +240,18 @@ const stateCopy: Record<NotificationEntry["state"], string> = {
   waiting: "Queued",
 };
 
+const channelIcon = {
+  email: "mail-outline",
+  push: "phone-portrait-outline",
+  sms: "chatbubble-outline",
+} as const;
+
+const channelCopy = {
+  email: "Email",
+  push: "App alert",
+  sms: "SMS",
+} as const;
+
 function NotificationRowComponent({
   isLast,
   item,
@@ -253,22 +265,28 @@ function NotificationRowComponent({
 
   return (
     <View style={[styles.row, !isLast && styles.rowDivider]}>
-      <View style={styles.rowIcon}>
+      <View
+        style={[
+          styles.rowIcon,
+          item.audience === "staff" && styles.rowIconStaff,
+        ]}
+      >
         <Ionicons
           color={colors.navy}
-          name={item.channel === "sms" ? "chatbubble-outline" : "mail-outline"}
+          name={channelIcon[item.channel]}
           size={17}
         />
       </View>
       <View style={styles.rowCopy}>
         <Text numberOfLines={1} style={styles.rowRecipient}>
-          {item.recipient}
+          {item.recipientLabel}
         </Text>
         <Text numberOfLines={2} style={styles.rowMessage}>
           {item.message}
         </Text>
         <Text style={styles.rowMeta}>
           {[
+            channelCopy[item.channel],
             stateCopy[item.state],
             item.orderCode,
             formatMoment(item.sentAt ?? item.createdAt),
@@ -353,6 +371,9 @@ const styles = StyleSheet.create({
     marginTop: 2,
     width: 34,
   },
+  // Distinguishes an alert to the shop from a message to a customer without adding a
+  // second colour: the same tile in a warmer neutral.
+  rowIconStaff: { backgroundColor: colors.surfaceGoldSoft },
   rowMessage: { color: colors.textSecondary, fontSize: 12.5, lineHeight: 17 },
   rowMeta: { color: colors.textMuted, fontSize: 11.5, marginTop: 2 },
   rowRecipient: { color: colors.navy, fontSize: 14, fontWeight: "600" },

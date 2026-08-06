@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -33,6 +33,13 @@ import type {
   TransactionHistoryViewState,
   TransactionSort,
 } from "../models/transaction";
+import {
+  hasRestoredSeenTransactions,
+  markAllTransactionsSeen,
+  markTransactionSeen,
+  restoreSeenTransactions,
+  useSeenTransactions,
+} from "../services/seenTransactionsStore";
 import {
   loadMoreTransactions,
   loadTransactions,
@@ -69,6 +76,9 @@ export function TransactionHistoryScreen({
   const [refreshing, setRefreshing] = useState(false);
   const [viewState, setViewState] =
     useState<TransactionHistoryViewState>("loading");
+  const seenTransactions = useSeenTransactions();
+  // Only the very first list becomes the baseline, not every refetch.
+  const baselineApplied = useRef(hasRestoredSeenTransactions());
 
   useEffect(() => {
     const timeout = setTimeout(
@@ -84,8 +94,25 @@ export function TransactionHistoryScreen({
     let active = true;
 
     loadTransactions({ filter, search: debouncedQuery, sort })
-      .then(() => active && setViewState("ready"))
-      .catch(() => active && setViewState("error"));
+      .then((state) => {
+        if (!active) return;
+        setViewState("ready");
+
+        // On a fresh install nothing has been opened, and marking the shop's entire
+        // trading history as unread says nothing useful — it just makes the screen look
+        // unattended. The first list the owner ever sees becomes the baseline, and only
+        // what arrives after that stands out.
+        void restoreSeenTransactions().then(() => {
+          if (!active) return;
+          if (!baselineApplied.current) {
+            baselineApplied.current = true;
+            markAllTransactionsSeen(state.items.map((item) => item.id));
+          }
+        });
+      })
+      .catch(() => {
+        if (active) setViewState("error");
+      });
 
     return () => {
       active = false;
@@ -115,6 +142,9 @@ export function TransactionHistoryScreen({
 
   const openTransaction = useCallback(
     (item: TransactionHistoryItem) => {
+      // Opened, so it stops standing out next time.
+      markTransactionSeen(item.id);
+
       // Opens the order in the history ledger, with its details showing. This used to
       // navigate to the Bookings or Orders tab, which lists current work — so the
       // order being looked for had usually already been cleared from it, and the tap
@@ -262,6 +292,7 @@ export function TransactionHistoryScreen({
                 ? openTransaction
                 : undefined
             }
+            unread={!seenTransactions.has(item.id)}
           />
         </View>
       </View>
@@ -270,6 +301,7 @@ export function TransactionHistoryScreen({
       hasMore,
       openTransaction,
       pageHorizontalPadding,
+      seenTransactions,
       visibleTransactions.length,
     ],
   );

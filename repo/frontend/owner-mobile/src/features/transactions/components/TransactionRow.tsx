@@ -10,6 +10,13 @@ interface TransactionRowProps {
   isLast?: boolean;
   item: TransactionHistoryItem;
   /**
+   * Whether the owner has opened this one yet.
+   *
+   * Shown as a faint tint and a heavier title rather than a badge or a colour: this is a
+   * ledger, and the point is only to help pick up where you left off.
+   */
+  unread?: boolean;
+  /**
    * Given the item, so the list can pass one stable callback for every row.
    * A per-row arrow would be a new function on each render and would defeat the memo
    * below, which is the whole reason this component is memoised.
@@ -75,6 +82,7 @@ function TransactionRowComponent({
   isLast = false,
   item,
   onPress,
+  unread = false,
 }: TransactionRowProps) {
   const palette = visual(item);
   const rowDetails = details(item);
@@ -85,13 +93,15 @@ function TransactionRowComponent({
 
   return (
     <Pressable
-      accessibilityLabel={`${item.title}, ${rowDetails}, ${formatPeso(item.amount)}`}
+      accessibilityLabel={`${unread ? "Unopened. " : ""}${item.title}, ${rowDetails}, ${formatPeso(item.amount)}`}
       accessibilityRole={onPress ? "button" : "text"}
       disabled={!onPress}
       onPress={handlePress}
       style={({ pressed }) => [
         styles.row,
         compact && styles.compactRow,
+        // Before the divider, so the tint does not paint over the separating line.
+        unread && styles.unreadRow,
         !isLast && styles.divider,
         pressed && styles.pressed,
       ]}
@@ -113,7 +123,10 @@ function TransactionRowComponent({
         />
       </View>
       <View style={styles.copy}>
-        <Text numberOfLines={1} style={styles.title}>
+        <Text
+          numberOfLines={1}
+          style={[styles.title, unread && styles.unreadTitle]}
+        >
           {item.title}
         </Text>
         <Text numberOfLines={compact ? 1 : 2} style={styles.details}>
@@ -167,6 +180,15 @@ const styles = StyleSheet.create({
     minHeight: 72,
     paddingVertical: 12,
   },
+  // Deliberately faint. This marks where the owner left off; it is not a warning, and
+  // a ledger where half the rows shout is worse than one with no marking at all. The
+  // negative margins let the tint reach the card edges while the row keeps its padding.
+  unreadRow: {
+    backgroundColor: colors.blueSoft,
+    marginHorizontal: -16,
+    paddingHorizontal: 16,
+  },
+  unreadTitle: { fontWeight: "700" },
   title: {
     color: colors.navy,
     fontSize: 15.5,
