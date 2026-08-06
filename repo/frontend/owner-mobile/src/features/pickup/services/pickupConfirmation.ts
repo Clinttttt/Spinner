@@ -81,7 +81,10 @@ export function confirmationSourceFromDetails(
  * Services are priced "per load", which reads as "2 per loads" if the label is
  * used verbatim after a number.
  */
-function countLabel(quantity: number, unitLabel: string | undefined): string {
+export function countLabel(
+  quantity: number,
+  unitLabel: string | undefined,
+): string {
   const noun = (unitLabel || "load").replace(/^per\s+/i, "").trim() || "load";
   return `${quantity} ${noun}${quantity === 1 ? "" : "s"}`;
 }

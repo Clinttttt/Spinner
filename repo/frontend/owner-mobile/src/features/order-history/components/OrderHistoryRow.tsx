@@ -2,6 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { memo, useCallback } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { countLabel } from "../../pickup/services/pickupConfirmation";
 import { colors } from "../../../theme/colors";
 import type { OrderHistoryEntry } from "../models/orderHistory";
 
@@ -100,22 +101,93 @@ function OrderHistoryRowComponent({
 
       {expanded ? (
         <View style={styles.detailPanel}>
-          <DetailLine label="Contact" value={item.mobileNumber} />
-          <DetailLine label="Fulfilment" value={item.fulfillmentLabel} />
-          <DetailLine label="Payment" value={item.paymentLabel} />
-          <DetailLine
-            label="Source"
-            value={
-              item.source === "manual"
-                ? "Typed in at the counter"
-                : "Customer website"
-            }
-          />
-          <DetailLine label="Booked" value={formatMoment(item.createdAt)} />
-          <DetailLine
-            label="Last updated"
-            value={formatMoment(item.updatedAt)}
-          />
+          {item.address ? (
+            <View style={[styles.detailBlock, styles.detailBlockFirst]}>
+              <Text style={styles.detailHeading}>
+                {item.source === "manual" ? "Address" : "Pickup address"}
+              </Text>
+              <Text style={styles.detailParagraph}>{item.address}</Text>
+            </View>
+          ) : null}
+
+          <View
+            style={[
+              styles.detailBlock,
+              !item.address && styles.detailBlockFirst,
+            ]}
+          >
+            <Text style={styles.detailHeading}>Services</Text>
+            {item.serviceLines.map((line, index) => (
+              <View
+                key={`${line.serviceName}-${index}`}
+                style={styles.detailLine}
+              >
+                <Text style={styles.detailLabel}>
+                  {line.serviceName}
+                  {line.quantity > 0
+                    ? ` · ${countLabel(line.quantity, line.unitLabel)}`
+                    : ""}
+                </Text>
+                <Text style={styles.detailValue}>
+                  {formatPeso(line.subtotal)}
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.detailBlock}>
+            <DetailLine
+              label="Services total"
+              value={formatPeso(item.serviceAmount)}
+            />
+            {item.deliveryFee > 0 ? (
+              <DetailLine
+                label="Delivery fee"
+                value={formatPeso(item.deliveryFee)}
+              />
+            ) : null}
+            <View style={styles.detailLine}>
+              <Text style={styles.detailTotalLabel}>Total</Text>
+              <Text style={styles.detailTotalValue}>
+                {formatPeso(item.amount)}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.detailBlock}>
+            <DetailLine label="Contact" value={item.mobileNumber} />
+            <DetailLine label="Fulfilment" value={item.fulfillmentLabel} />
+            <DetailLine label="Payment" value={item.paymentLabel} />
+            {item.receiptCode ? (
+              <DetailLine label="Receipt" value={item.receiptCode} />
+            ) : null}
+            {item.trackingCode ? (
+              <DetailLine label="Tracking" value={item.trackingCode} />
+            ) : null}
+            <DetailLine
+              label="Source"
+              value={
+                item.source === "manual"
+                  ? "Typed in at the counter"
+                  : "Customer website"
+              }
+            />
+            <DetailLine label="Booked" value={formatMoment(item.createdAt)} />
+            {item.paidAt ? (
+              <DetailLine label="Paid" value={formatMoment(item.paidAt)} />
+            ) : null}
+            <DetailLine
+              label="Last updated"
+              value={formatMoment(item.updatedAt)}
+            />
+          </View>
+
+          {item.additionalNotes ? (
+            <View style={styles.detailBlock}>
+              <Text style={styles.detailHeading}>Customer notes</Text>
+              <Text style={styles.detailParagraph}>{item.additionalNotes}</Text>
+            </View>
+          ) : null}
         </View>
       ) : null}
     </View>
@@ -158,6 +230,31 @@ const styles = StyleSheet.create({
   compactRow: { minHeight: 62, paddingVertical: 9 },
   copy: { flex: 1, gap: 2, minWidth: 0 },
   detailLabel: { color: colors.textSecondary, fontSize: 12.5 },
+  // Groups within the panel, separated by a hairline so services, money and the
+  // particulars read as three things rather than one long list.
+  detailBlock: {
+    borderTopColor: colors.border,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: 6,
+    paddingTop: 9,
+  },
+  detailHeading: {
+    color: colors.navy,
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 0.2,
+    textTransform: "uppercase",
+  },
+  detailParagraph: {
+    color: colors.textSecondary,
+    fontSize: 12.5,
+    lineHeight: 18,
+  },
+  // The panel already has its own edge, so the topmost group does not need a rule above
+  // it as well.
+  detailBlockFirst: { borderTopWidth: 0, paddingTop: 0 },
+  detailTotalLabel: { color: colors.navy, fontSize: 13, fontWeight: "700" },
+  detailTotalValue: { color: colors.navy, fontSize: 14, fontWeight: "700" },
   detailLine: {
     flexDirection: "row",
     gap: 12,
@@ -166,7 +263,7 @@ const styles = StyleSheet.create({
   detailPanel: {
     backgroundColor: colors.surfaceSoft,
     borderRadius: 12,
-    gap: 7,
+    gap: 9,
     marginBottom: 12,
     padding: 12,
   },

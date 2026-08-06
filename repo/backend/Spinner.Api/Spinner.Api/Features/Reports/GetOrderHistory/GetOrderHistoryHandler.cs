@@ -23,6 +23,9 @@ public sealed class GetOrderHistoryHandler
         var query = _dbContext.LaundryOrders
             .AsNoTracking()
             .Include(order => order.Customer)
+            // The owner needs to see every service on an order, not just the first. A
+            // multi-service booking otherwise read as though only one thing was ordered.
+            .Include(order => order.ServiceItems)
             .AsQueryable();
 
         if (request.From is not null)
@@ -65,7 +68,24 @@ public sealed class GetOrderHistoryHandler
                 order.Status,
                 order.EstimatedTotalAmount,
                 order.CreatedAt,
-                order.UpdatedAt))
+                order.UpdatedAt,
+                order.Address,
+                order.TrackingCode,
+                order.AdditionalNotes,
+                order.LoadCount,
+                order.EstimatedServiceAmount,
+                order.EstimatedDeliveryFee,
+                order.ReceiptCode,
+                order.PaidAt,
+                order.ServiceItems
+                    .OrderBy(item => item.ServiceName)
+                    .Select(item => new OrderHistoryServiceLineResponse(
+                        item.ServiceName,
+                        item.UnitLabel,
+                        item.Quantity,
+                        item.UnitPrice,
+                        item.Subtotal))
+                    .ToList()))
             .ToListAsync(cancellationToken);
 
         return Result<PagedResponse<OrderHistoryItemResponse>>.Success(

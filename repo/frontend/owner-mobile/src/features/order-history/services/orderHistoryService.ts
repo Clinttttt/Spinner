@@ -23,6 +23,21 @@ interface OrderHistoryDto {
   totalAmount: number;
   createdAt: string;
   updatedAt: string;
+  address?: string;
+  trackingCode?: string;
+  additionalNotes?: string;
+  loadCount?: number;
+  serviceAmount?: number;
+  deliveryFee?: number;
+  receiptCode?: string;
+  paidAt?: string;
+  serviceLines?: {
+    serviceName: string;
+    unitLabel: string;
+    quantity: number;
+    unitPrice: number;
+    subtotal: number;
+  }[];
 }
 
 /**
@@ -96,7 +111,27 @@ function mapEntry(dto: OrderHistoryDto): OrderHistoryEntry {
     preferredDate: dto.preferredDate,
     scheduleLabel: scheduleLabel(dto),
     serviceName: dto.serviceName,
+    additionalNotes: dto.additionalNotes ?? undefined,
+    address: dto.address ?? undefined,
+    deliveryFee: dto.deliveryFee ?? 0,
+    loadCount: dto.loadCount ?? 0,
+    paidAt: dto.paidAt ?? undefined,
+    receiptCode: dto.receiptCode ?? undefined,
+    serviceAmount: dto.serviceAmount ?? 0,
+    // Falls back to the single stored name, so an older order still reads sensibly.
+    serviceLines: dto.serviceLines?.length
+      ? dto.serviceLines
+      : [
+          {
+            quantity: dto.loadCount ?? 1,
+            serviceName: dto.serviceName,
+            subtotal: dto.serviceAmount ?? dto.totalAmount,
+            unitLabel: "load",
+            unitPrice: 0,
+          },
+        ],
     source: source(dto.source),
+    trackingCode: dto.trackingCode ?? undefined,
     statusLabel: statusLabel(dto.status),
     updatedAt: dto.updatedAt,
   };
