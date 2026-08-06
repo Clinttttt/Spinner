@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
 
 import { colors } from "../../theme/colors";
@@ -12,7 +13,7 @@ interface HomeHeaderProps {
   onProfilePress: () => void;
 }
 
-export function HomeHeader({
+function HomeHeaderComponent({
   primaryAction,
   onNotificationsPress,
   onProfilePress,
@@ -83,3 +84,7 @@ const styles = StyleSheet.create({
     lineHeight: 14,
   },
 });
+
+// Two images and two icons that have nothing to do with the search box.
+// Memoised so a keystroke in the search box does not redraw it.
+export const HomeHeader = memo(HomeHeaderComponent);

@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Pressable, ScrollView, StyleSheet, Text } from "react-native";
 
 import { colors } from "../../../theme/colors";
@@ -10,7 +11,7 @@ const filters: { label: string; value: PickupFilter }[] = [
   { label: "Completed", value: "completed" },
 ];
 
-export function PickupFilterTabs({
+function PickupFilterTabsComponent({
   onChange,
   value,
 }: {
@@ -75,3 +76,7 @@ const styles = StyleSheet.create({
   idleLabel: { color: colors.textSecondary, fontWeight: "500" },
   pressed: { opacity: 0.72 },
 });
+
+// Filter tabs that only change when the filter does.
+// Memoised so a keystroke in the search box does not redraw it.
+export const PickupFilterTabs = memo(PickupFilterTabsComponent);

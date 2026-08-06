@@ -121,13 +121,14 @@ export function ManualOrdersScreen({
     ({ item }: { item: ManualOrder }) => (
       <View style={cardWrapperStyle}>
         <ManualOrderCard
+          compact={compact}
           onClearPress={onClearOrder}
           order={item}
           onViewPress={onViewOrder}
         />
       </View>
     ),
-    [cardWrapperStyle, onClearOrder, onViewOrder],
+    [cardWrapperStyle, compact, onClearOrder, onViewOrder],
   );
 
   const listHeader = (

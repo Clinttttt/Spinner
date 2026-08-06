@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Pressable, ScrollView, StyleSheet, Text } from "react-native";
 
 import { colors } from "../../../theme/colors";
@@ -17,7 +18,7 @@ const statusOptions: { label: string; value: BookingStatusFilter }[] = [
   { label: "Completed", value: "completed" },
 ];
 
-export function BookingStatusFilters({
+function BookingStatusFiltersComponent({
   onChange,
   value,
 }: BookingStatusFiltersProps) {
@@ -97,3 +98,7 @@ const styles = StyleSheet.create({
     opacity: 0.72,
   },
 });
+
+// Six chips that only change when the status filter does.
+// Memoised so a keystroke in the search box does not redraw it.
+export const BookingStatusFilters = memo(BookingStatusFiltersComponent);

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
+import { useCallback, useState } from "react";
 import {
   RefreshControl,
   ScrollView,
@@ -54,19 +55,32 @@ export function ReportsScreen({
   const [viewState, setViewState] = useState<ReportsViewState>("loading");
   const [data, setData] = useState<ReportsDashboardData>();
 
-  useEffect(() => {
-    let active = true;
-    getReportsDashboard(periodId, filters)
-      .then((response) => {
-        if (!active) return;
-        setData(response);
-        setViewState("ready");
-      })
-      .catch(() => active && setViewState("error"));
-    return () => {
-      active = false;
-    };
-  }, [filters, periodId]);
+  // Reloaded whenever Insights is opened, not only on first mount. Every other tab
+  // refetches on focus; this one did not, so revenue could be from whenever the screen
+  // was last visited — and figures that are quietly out of date are worse than none,
+  // because there is nothing to suggest they need refreshing.
+  //
+  // useFocusEffect rather than useEffect covers both cases with one mechanism: it runs on
+  // focus, and again if the period or filters change while the screen is open. The view
+  // state is deliberately left alone, so a refresh does not flash a skeleton over figures
+  // the owner is already reading.
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+
+      getReportsDashboard(periodId, filters)
+        .then((response) => {
+          if (!active) return;
+          setData(response);
+          setViewState("ready");
+        })
+        .catch(() => active && setViewState("error"));
+
+      return () => {
+        active = false;
+      };
+    }, [filters, periodId]),
+  );
 
   const loadReport = useCallback(async () => {
     try {

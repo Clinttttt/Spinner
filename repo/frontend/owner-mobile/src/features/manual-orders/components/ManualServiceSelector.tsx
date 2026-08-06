@@ -12,7 +12,12 @@ import type { ManualServiceOption } from "../models/manualOrder";
 import { ManualOrderFormSection } from "./ManualOrderFormSection";
 
 function peso(value: number) {
-  return `₱${value.toLocaleString("en-PH")}`;
+  // Fixed to two places, matching every other price in the app. Without it a service at
+  // 75.50 rendered as "75.5", which reads like a typo on a price list.
+  return `₱${value.toLocaleString("en-PH", {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 2,
+  })}`;
 }
 
 export function ManualServiceSelector({

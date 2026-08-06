@@ -1,13 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { memo } from "react";
-import {
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-} from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { colors } from "../../../theme/colors";
 import { BookingBadge } from "../../bookings/components/BookingBadge";
@@ -41,16 +34,17 @@ function paymentStatusValue(order: ManualOrder): PaymentStatus {
 }
 
 function ManualOrderCardComponent({
+  compact = false,
   onClearPress,
   order,
   onViewPress,
 }: {
+  /** Passed in rather than measured here, so a memoised row holds no subscription. */
+  compact?: boolean;
   onClearPress?: (order: ManualOrder) => void;
   order: ManualOrder;
   onViewPress: (id: string) => void;
 }) {
-  const { width } = useWindowDimensions();
-  const compact = width <= 360;
   const canClear =
     order.apiStatus === "Completed" || order.apiStatus === "Rejected";
   const methodSummary = `${methodLabel(order.method)}${

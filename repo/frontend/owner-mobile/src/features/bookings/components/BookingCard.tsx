@@ -1,13 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { memo } from "react";
-import {
-  Pressable,
-  Platform,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-} from "react-native";
+import { Pressable, Platform, StyleSheet, Text, View } from "react-native";
 
 import { colors } from "../../../theme/colors";
 import type { BookingListItem } from "../models/booking";
@@ -20,17 +13,24 @@ import { ServiceTag } from "./ServiceTag";
 
 interface BookingCardProps {
   booking: BookingListItem;
+  /**
+   * Passed in rather than measured here.
+   *
+   * The list already knows the width, and subscribing to dimensions inside a memoised
+   * row meant every row held its own subscription and all of them re-rendered on any
+   * dimension change, which is exactly what the memo exists to prevent.
+   */
+  compact?: boolean;
   onClearPress?: (booking: BookingListItem) => void;
   onViewPress: (bookingId: string) => void;
 }
 
 function BookingCardComponent({
   booking,
+  compact = false,
   onClearPress,
   onViewPress,
 }: BookingCardProps) {
-  const { width } = useWindowDimensions();
-  const compact = width <= 360;
   const servicePalette =
     bookingServicePalettes[
       getBookingServicePaletteVariant(booking.serviceTags.length)

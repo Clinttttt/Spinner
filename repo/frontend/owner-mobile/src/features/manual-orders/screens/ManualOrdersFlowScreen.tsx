@@ -73,6 +73,25 @@ export function ManualOrdersFlowScreen({
           if (!active) return;
           setOrders(response);
           setViewState("ready");
+
+          // If the order being viewed has gone — cleared from another tab, or finished
+          // and archived — the details view has nothing to render and used to fall
+          // through to the list while still believing it was on details. That ejected
+          // the owner mid-task and left the back button apparently dead. Corrected here,
+          // where the data that invalidates it arrives, rather than during render.
+          setView((current) => {
+            if (current.name !== "details") return current;
+            if (response.some((order) => order.id === current.orderId))
+              return current;
+
+            void dialog.notify({
+              message:
+                "It was completed or cleared somewhere else, so it is no longer in this list.",
+              title: "That order has been closed",
+            });
+
+            return { name: "list" };
+          });
         })
         .catch(() => {
           if (!active) return;
@@ -81,7 +100,7 @@ export function ManualOrdersFlowScreen({
       return () => {
         active = false;
       };
-    }, []),
+    }, [dialog]),
   );
 
   const handleClearOrder = useCallback(
@@ -109,6 +128,25 @@ export function ManualOrdersFlowScreen({
     },
     [dialog],
   );
+
+  // Stable identities so the memoised list is not re-rendered, with every card and its
+  // icons, whenever anything in this flow changes.
+  const clearOrder = useCallback(
+    (order: ManualOrder) => void handleClearOrder(order),
+    [handleClearOrder],
+  );
+
+  const startCreate = useCallback(() => setView({ name: "create" }), []);
+
+  const viewOrder = useCallback(
+    (orderId: string) => setView({ name: "details", orderId }),
+    [],
+  );
+
+  const retry = useCallback(() => {
+    setViewState("loading");
+    void loadOrders();
+  }, [loadOrders]);
 
   if (view.name === "create") {
     return (
@@ -140,14 +178,11 @@ export function ManualOrdersFlowScreen({
   return (
     <ManualOrdersScreen
       navigation={navigation}
-      onClearOrder={(order) => void handleClearOrder(order)}
-      onCreateOrder={() => setView({ name: "create" })}
-      onViewOrder={(orderId) => setView({ name: "details", orderId })}
+      onClearOrder={clearOrder}
+      onCreateOrder={startCreate}
+      onViewOrder={viewOrder}
       orders={orders}
-      onRetry={() => {
-        setViewState("loading");
-        void loadOrders();
-      }}
+      onRetry={retry}
       viewState={viewState}
     />
   );

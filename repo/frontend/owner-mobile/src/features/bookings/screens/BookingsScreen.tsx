@@ -241,12 +241,13 @@ export function BookingsScreen({
       <View style={cardWrapperStyle}>
         <BookingCard
           booking={item}
+          compact={compact}
           onClearPress={onClearBookingPress}
           onViewPress={handleViewBooking}
         />
       </View>
     ),
-    [cardWrapperStyle, onClearBookingPress, handleViewBooking],
+    [cardWrapperStyle, compact, onClearBookingPress, handleViewBooking],
   );
 
   const listHeader = useMemo(
