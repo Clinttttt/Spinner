@@ -1,3 +1,4 @@
+import * as SecureStore from "expo-secure-store";
 import { useSyncExternalStore } from "react";
 
 import { apiRequest } from "../../api/apiClient";
@@ -28,12 +29,87 @@ const EMPTY: OperationsCounts = {
   unpaidOrders: 0,
 };
 
+/** Which tabs carry a badge, and therefore have something to acknowledge. */
+export type BadgedTab = "Orders" | "Schedule" | "TransactionHistory";
+
+type SeenCounts = Record<BadgedTab, number>;
+
+const NOTHING_SEEN: SeenCounts = {
+  Orders: 0,
+  Schedule: 0,
+  TransactionHistory: 0,
+};
+
+const SEEN_STORAGE_KEY = "spinner.tab-badges.seen";
+
 let counts: OperationsCounts = EMPTY;
+let seen: SeenCounts = { ...NOTHING_SEEN };
 let inFlight: Promise<OperationsCounts> | null = null;
 const listeners = new Set<() => void>();
 
 function emitChange() {
   listeners.forEach((listener) => listener());
+}
+
+/**
+ * What each tab currently reports.
+ *
+ * The dashboard gives a count of outstanding work, which does not go away by being
+ * looked at — an unpaid order stays unpaid. A badge that clears on visit has to mean
+ * "new since you last looked" instead, so what the owner has already acknowledged is
+ * subtracted and only the difference is shown.
+ */
+function currentFor(tab: BadgedTab) {
+  if (tab === "Orders") return counts.newBookings;
+  if (tab === "Schedule") return counts.forPickup;
+  return counts.unpaidOrders;
+}
+
+export function getBadgeCount(tab: BadgedTab) {
+  return Math.max(0, currentFor(tab) - seen[tab]);
+}
+
+/**
+ * Records that the owner has seen what a tab is showing.
+ *
+ * Called when the tab is opened. The badge returns on its own as soon as the count rises
+ * again, which is the behaviour that makes it worth glancing at.
+ */
+export function acknowledgeTab(tab: BadgedTab) {
+  const current = currentFor(tab);
+  if (seen[tab] === current) return;
+
+  seen = { ...seen, [tab]: current };
+  emitChange();
+  void persistSeen();
+}
+
+async function persistSeen() {
+  try {
+    await SecureStore.setItemAsync(SEEN_STORAGE_KEY, JSON.stringify(seen));
+  } catch {
+    // Not worth surfacing. Losing this only means a badge reappears after a restart.
+  }
+}
+
+/** Restores what had been acknowledged before the app was last closed. */
+export async function restoreAcknowledgements() {
+  try {
+    const stored = await SecureStore.getItemAsync(SEEN_STORAGE_KEY);
+    if (!stored) return;
+
+    const parsed = JSON.parse(stored) as Partial<SeenCounts>;
+
+    seen = {
+      Orders: Number(parsed.Orders) || 0,
+      Schedule: Number(parsed.Schedule) || 0,
+      TransactionHistory: Number(parsed.TransactionHistory) || 0,
+    };
+
+    emitChange();
+  } catch {
+    seen = { ...NOTHING_SEEN };
+  }
 }
 
 export function subscribeToOperationsCounts(listener: () => void) {
@@ -76,6 +152,20 @@ export async function refreshOperationsCounts() {
         salesToday: response.salesToday ?? 0,
         unpaidOrders: response.unpaidOrders ?? 0,
       };
+
+      // An acknowledgement cannot exceed what is actually outstanding. Without this, a
+      // count that falls — an order finally paid, a booking confirmed — would leave the
+      // old, higher figure recorded as seen, and the badge would stay hidden through the
+      // next few genuinely new arrivals.
+      seen = {
+        Orders: Math.min(seen.Orders, counts.newBookings),
+        Schedule: Math.min(seen.Schedule, counts.forPickup),
+        TransactionHistory: Math.min(
+          seen.TransactionHistory,
+          counts.unpaidOrders,
+        ),
+      };
+
       emitChange();
       return counts;
     })
@@ -100,6 +190,7 @@ export function invalidateOperationsCounts() {
 
 export function resetOperationsCounts() {
   counts = EMPTY;
+  seen = { ...NOTHING_SEEN };
   inFlight = null;
   emitChange();
 }

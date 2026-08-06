@@ -14,8 +14,12 @@ import { ReportsFlowScreen } from "../features/reports/screens/ReportsFlowScreen
 import { SettingsFlowScreen } from "../features/settings/screens/SettingsFlowScreen";
 import { TransactionHistoryScreen } from "../features/transactions/screens/TransactionHistoryScreen";
 import {
+  acknowledgeTab,
+  type BadgedTab,
+  getBadgeCount,
   invalidateOperationsCounts,
   refreshOperationsCounts,
+  restoreAcknowledgements,
   useOperationsCounts,
 } from "../features/operations/operationsCountsStore";
 import { colors } from "../theme/colors";
@@ -32,6 +36,13 @@ const Tab = createBottomTabNavigator<RootTabParamList>();
  * any screen updates them immediately.
  */
 const COUNT_REFRESH_MS = 60_000;
+
+/** The tabs that carry a badge, so a focus event can be matched against them. */
+const badgedTabs: Record<BadgedTab, true> = {
+  Orders: true,
+  Schedule: true,
+  TransactionHistory: true,
+};
 
 const tabIcons: Record<
   keyof RootTabParamList,
@@ -85,13 +96,19 @@ function TabBadge({ count }: { count: number }) {
 
 export function AppTabs() {
   const insets = useSafeAreaInsets();
-  const counts = useOperationsCounts();
+  // Subscribed for the re-render, not the value: the badges read acknowledged counts
+  // through the store, and this is what makes the bar redraw when either side changes.
+  useOperationsCounts();
   const tabBarBottomInset = insets.bottom;
 
   // Refreshed here because the tab bar is mounted for the whole session, so the counts
   // stay current no matter which screen the owner is on.
   useEffect(() => {
-    void refreshOperationsCounts().catch(() => undefined);
+    // Restored first, so a badge the owner already dealt with does not flash back on
+    // every app start.
+    void restoreAcknowledgements().finally(() => {
+      void refreshOperationsCounts().catch(() => undefined);
+    });
 
     const timer = setInterval(
       () => void refreshOperationsCounts().catch(() => undefined),
@@ -104,10 +121,13 @@ export function AppTabs() {
   // Only counts that mean work is waiting. Bookings are requests to approve, Pickup is
   // laundry still to collect, and History carries the unpaid total because money owed
   // is the one thing in the ledger that still needs acting on.
+  //
+  // Read through the store so each is the count the owner has not acknowledged yet,
+  // rather than the raw outstanding figure, which would never clear by being looked at.
   const badgeCounts: Partial<Record<keyof RootTabParamList, number>> = {
-    Orders: counts.newBookings,
-    Schedule: counts.forPickup,
-    TransactionHistory: counts.unpaidOrders,
+    Orders: getBadgeCount("Orders"),
+    Schedule: getBadgeCount("Schedule"),
+    TransactionHistory: getBadgeCount("TransactionHistory"),
   };
 
   const visibleTabBarStyle = [
@@ -125,7 +145,15 @@ export function AppTabs() {
         // moves on from whatever they just did. Doing this here rather than after each
         // action keeps the services free of any knowledge of the tab bar, and covers
         // every path that changes an order without having to find them all.
-        focus: () => invalidateOperationsCounts(),
+        //
+        // Opening a badged tab also acknowledges it, which is what makes the count clear
+        // once it has been looked at rather than sitting there until the work is done.
+        focus: (event) => {
+          invalidateOperationsCounts();
+
+          const name = event.target?.split("-")[0] as BadgedTab | undefined;
+          if (name && name in badgedTabs) acknowledgeTab(name);
+        },
       }}
       screenOptions={({ route }) => ({
         animation: "fade",

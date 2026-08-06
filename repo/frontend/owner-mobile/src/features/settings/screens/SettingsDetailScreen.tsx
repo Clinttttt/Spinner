@@ -1341,7 +1341,7 @@ function StaffAccountsPage() {
       <SettingsSectionTitle subtitle="The code is shown once, so pass it on before leaving this screen.">
         Invite someone
       </SettingsSectionTitle>
-      <SettingsCard>
+      <SettingsCard style={styles.formCard}>
         <SettingsField
           keyboardType="email-address"
           label="Email address"
@@ -2049,12 +2049,9 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   paymentActions: { flexDirection: "row", gap: 8 },
-  roleRow: {
-    flexDirection: "row",
-    gap: spacing.xs,
-    paddingBottom: spacing.sm,
-    paddingHorizontal: spacing.md,
-  },
+  // The form card supplies the padding, matching every other settings form. Adding it
+  // here as well is what pushed the label off the left edge.
+  roleRow: { flexDirection: "row", gap: spacing.xs },
   roleOption: {
     alignItems: "center",
     borderColor: colors.border,
@@ -2071,13 +2068,7 @@ const styles = StyleSheet.create({
   },
   roleLabel: { color: colors.textSecondary, fontSize: 13, fontWeight: "600" },
   roleLabelActive: { color: colors.navy },
-  roleWarning: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    lineHeight: 17,
-    paddingBottom: spacing.sm,
-    paddingHorizontal: spacing.md,
-  },
+  roleWarning: { color: colors.textSecondary, fontSize: 12, lineHeight: 17 },
   inviteCode: {
     color: colors.navy,
     fontSize: 26,

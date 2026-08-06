@@ -32,6 +32,9 @@ const welcomeMascot = require("../../../../assets/spinner-mascot.png");
 const authBackground = require("../../../../assets/backgrounds/login-background.webp");
 const MASCOT_CARD_OVERLAP = 64;
 
+/** How much larger than its container the mascot is drawn, so it overflows upwards. */
+const MASCOT_SCALE = 1.12;
+
 type AuthMode = "signIn" | "signUp" | "verify" | "forgot" | "reset";
 type IoniconName = ComponentProps<typeof Ionicons>["name"];
 
@@ -141,6 +144,19 @@ export function LoginScreen() {
   const heroHeight = useMemo(
     () => Math.min(compactHeight ? 210 : 270, width * 0.7),
     [compactHeight, width],
+  );
+
+  /**
+   * Headroom for the part of the mascot that sits above its container.
+   *
+   * The mascot is drawn larger than the hero and anchored to the bottom of it, so it
+   * deliberately overflows upwards. That overflow was landing under the status bar and
+   * clipping the top of its helmet. Derived from the actual overflow rather than a fixed
+   * number, so it holds on a short phone and a tall one alike, with a little to spare.
+   */
+  const heroTopInset = useMemo(
+    () => Math.ceil(heroHeight * (MASCOT_SCALE - 1)) + spacing.xs,
+    [heroHeight],
   );
 
   useEffect(() => {
@@ -368,6 +384,9 @@ export function LoginScreen() {
             automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
             contentContainerStyle={[
               styles.content,
+              // Only when the mascot is on screen. The other forms start at the top and
+              // would just look oddly indented.
+              !keyboardVisible && isSignIn && { paddingTop: heroTopInset },
               keyboardVisible && styles.contentKeyboard,
             ]}
             keyboardDismissMode="on-drag"
@@ -861,8 +880,8 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   mascot: {
-    height: "112%",
-    width: "112%",
+    height: `${MASCOT_SCALE * 100}%`,
+    width: `${MASCOT_SCALE * 100}%`,
     zIndex: 0,
     elevation: 0,
   },
