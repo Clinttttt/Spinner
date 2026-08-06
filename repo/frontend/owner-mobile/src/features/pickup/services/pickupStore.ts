@@ -14,7 +14,9 @@ import type {
   PickupLocationDetails,
   PickupLocationSnapshot,
   PickupLocationSource,
+  PickupRoutePreview,
 } from "../models/pickupLocation";
+import { getBusinessSettings } from "../../settings/services/settingsService";
 
 interface PickupLocationDto {
   barangay?: string;
@@ -311,6 +313,69 @@ function replaceTask(next: PickupTask) {
   emitChange();
 }
 
+/**
+ * Where the shop is, for drawing the trip on the pickup map.
+ *
+ * Cached because it changes about never and every pickup screen needs it. Read from
+ * business settings, which is where the owner sets the pickup origin.
+ */
+let businessOrigin: { latitude: number; longitude: number } | null = null;
+let businessOriginPromise: Promise<void> | null = null;
+
+async function ensureBusinessOriginAsync() {
+  if (businessOrigin || businessOriginPromise)
+    return businessOriginPromise ?? undefined;
+
+  businessOriginPromise = getBusinessSettings()
+    .then((settings) => {
+      const latitude = settings.pickupOriginLatitude;
+      const longitude = settings.pickupOriginLongitude;
+
+      if (
+        typeof latitude === "number" &&
+        typeof longitude === "number" &&
+        Number.isFinite(latitude) &&
+        Number.isFinite(longitude)
+      ) {
+        businessOrigin = { latitude, longitude };
+      }
+    })
+    .catch(() => {
+      // The map simply shows the pickup pin without a trip. Not worth an error: the
+      // rider can still see where they are going.
+    })
+    .finally(() => {
+      businessOriginPromise = null;
+    });
+
+  return businessOriginPromise;
+}
+
+/**
+ * The trip between the shop and the pickup point.
+ *
+ * A direct line rather than a driving route. Turn-by-turn directions need a paid
+ * directions service, and on a rural purok the useful information is which way and how
+ * far, which a straight line already answers. "Open in Maps" remains there for the
+ * actual navigation.
+ */
+function buildRoutePreview(item: PickupTask): PickupRoutePreview | undefined {
+  if (!businessOrigin) return undefined;
+
+  const { latitude, longitude } = item.location;
+
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude))
+    return undefined;
+
+  return {
+    coordinates: [
+      { latitude: latitude as number, longitude: longitude as number },
+      businessOrigin,
+    ],
+    origin: businessOrigin,
+  };
+}
+
 function toLocationDetails(item: PickupTask): PickupLocationDetails {
   return {
     additionalNotes: item.additionalNotes,
@@ -325,7 +390,7 @@ function toLocationDetails(item: PickupTask): PickupLocationDetails {
     pickupId: item.id,
     pickupStatus: item.pickupStatus,
     pickupTime: item.timeLabel,
-    routePreview: item.routePreview,
+    routePreview: item.routePreview ?? buildRoutePreview(item),
     serviceLines: item.serviceLines.map((line) => ({ ...line })),
     services: item.services.map((service) => ({ ...service })),
     shortAddress: item.address,
@@ -422,6 +487,10 @@ export async function advancePickupStatus(id: string) {
 export async function loadPickupLocation(
   pickupId: string,
 ): Promise<PickupLocationDetails | null> {
+  // Awaited so the trip is on the map the first time it opens, rather than appearing a
+  // moment later once the shop's own coordinates arrive.
+  await ensureBusinessOriginAsync();
+
   const existing = pickupTasks.find((item) => item.id === pickupId);
   if (existing) return toLocationDetails(existing);
   const dto = await apiRequest<OrderDetailsDto>(`/api/orders/${pickupId}`);

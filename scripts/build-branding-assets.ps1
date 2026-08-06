@@ -135,6 +135,46 @@ Write-Output ("  -> expo-splash-screen imageWidth must be {0} dp or less to avoi
 
 foreach ($bitmap in @($mascot, $splash)) { $bitmap.Dispose() }
 
+Write-Output 'Business map marker'
+# Drawn from the shop's own logo so the pickup map marks the business with the thing
+# staff already recognise. Sized for a native map marker: react-native-maps uses the
+# bitmap at its own resolution, so a full-size logo would cover half the map, and a
+# nested React Native view is unreliable on physical Android devices because the marker
+# is snapshotted to a bitmap anyway.
+$markerSide = 96
+$logoSource = Join-Path $repoRoot 'assets\logo.jpg'
+
+if (Test-Path $logoSource) {
+  $logo = [System.Drawing.Bitmap]::FromFile($logoSource)
+  $marker = New-Object System.Drawing.Bitmap $markerSide, $markerSide, ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+  $g = [System.Drawing.Graphics]::FromImage($marker)
+  $g.SmoothingMode = 'AntiAlias'
+  $g.InterpolationMode = 'HighQualityBicubic'
+  $g.PixelOffsetMode = 'HighQuality'
+
+  # A circular badge on white, so the logo reads against satellite imagery of any
+  # brightness. A bare square of photograph would disappear over a pale roof.
+  $inset = 3
+  $circle = New-Object System.Drawing.Rectangle $inset, $inset, ($markerSide - ($inset * 2)), ($markerSide - ($inset * 2))
+  $path = New-Object System.Drawing.Drawing2D.GraphicsPath
+  $path.AddEllipse($circle)
+  $g.SetClip($path)
+  $g.DrawImage($logo, $circle)
+  $g.ResetClip()
+
+  $ring = New-Object System.Drawing.Pen ([System.Drawing.Color]::White), 5
+  $g.DrawEllipse($ring, $circle)
+  $navy = New-Object System.Drawing.Pen ([System.Drawing.ColorTranslator]::FromHtml('#0D2A52')), 2
+  $g.DrawEllipse($navy, $circle)
+
+  Save-Png $marker (Join-Path $OutputDir 'branding\business-home-marker.png')
+  Write-Output ("  {0}x{0} circular badge from assets\logo.jpg" -f $markerSide)
+
+  foreach ($item in @($ring, $navy, $path, $g, $marker, $logo)) { $item.Dispose() }
+} else {
+  Write-Warning "assets\logo.jpg not found; kept the existing business marker."
+}
+
 # The launch screen, the loading screen, and the login screen share one gradient,
 # so startup reads as a single surface rather than three.
 Copy-Item (Join-Path $SourceDir 'spinner_login_background.webp') `
