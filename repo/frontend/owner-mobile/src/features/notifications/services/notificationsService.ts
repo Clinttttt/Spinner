@@ -111,3 +111,15 @@ export async function getNotificationHistoryPage(page: number) {
     totalCount: response.totalCount,
   };
 }
+
+/**
+ * Asks for a message that gave up to be tried again.
+ *
+ * Only queues it; the outbox worker does the sending, so this returns as soon as the
+ * message is back in the queue rather than waiting on a mail provider.
+ */
+export function resendNotification(notificationId: string) {
+  return apiRequest<void>(`/api/notifications/${notificationId}/resend`, {
+    method: "POST",
+  });
+}

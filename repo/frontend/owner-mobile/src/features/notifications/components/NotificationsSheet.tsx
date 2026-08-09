@@ -12,12 +12,17 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { describeApiError } from "../../../api/apiClient";
+import { appDialog } from "../../../components/common/DialogProvider";
 import { useSheetEntrance } from "../../../components/common/useSheetEntrance";
 import { colors } from "../../../theme/colors";
 import { radii } from "../../../theme/radii";
 import { spacing } from "../../../theme/spacing";
 import type { NotificationEntry } from "../services/notificationsService";
-import { getNotificationHistoryPage } from "../services/notificationsService";
+import {
+  getNotificationHistoryPage,
+  resendNotification,
+} from "../services/notificationsService";
 
 interface NotificationsSheetProps {
   onClose: () => void;
@@ -143,6 +148,53 @@ function SheetBody({
 }) {
   const entrance = useSheetEntrance();
 
+  /** Which message is being queued, so only its own control shows progress. */
+  const [resendingId, setResendingId] = useState<string | null>(null);
+
+  /**
+   * Rows the owner has just asked to send again.
+   *
+   * Held locally so the row reflects the request straight away. Refetching the whole
+   * list would be slower, would lose the scroll position, and would still show the old
+   * state until the outbox worker's next run anyway.
+   */
+  const [requeued, setRequeued] = useState<Set<string>>(new Set());
+
+  const handleResend = useCallback(async (item: NotificationEntry) => {
+    setResendingId(item.notificationId);
+
+    try {
+      await resendNotification(item.notificationId);
+      setRequeued((current) => new Set(current).add(item.notificationId));
+    } catch (error) {
+      void appDialog.notify({
+        message: describeApiError(error, "Please try again."),
+        title: "Could not send it again",
+        tone: "danger",
+      });
+    } finally {
+      setResendingId(null);
+    }
+  }, []);
+
+  const renderRow = useCallback(
+    ({ index, item }: { index: number; item: NotificationEntry }) => (
+      <NotificationRow
+        isLast={index === entries.length - 1}
+        // Shown as queued the moment the request succeeds, rather than waiting for the
+        // worker to run and the list to be refetched.
+        item={
+          requeued.has(item.notificationId)
+            ? { ...item, lastError: undefined, state: "waiting" }
+            : item
+        }
+        onResend={handleResend}
+        resending={resendingId === item.notificationId}
+      />
+    ),
+    [entries.length, handleResend, requeued, resendingId],
+  );
+
   return (
     <View style={styles.backdrop}>
       <Pressable
@@ -219,12 +271,7 @@ function SheetBody({
             }
             onEndReached={onLoadMore}
             onEndReachedThreshold={0.4}
-            renderItem={({ index, item }) => (
-              <NotificationRow
-                isLast={index === entries.length - 1}
-                item={item}
-              />
-            )}
+            renderItem={renderRow}
             showsVerticalScrollIndicator={false}
           />
         )}
@@ -255,13 +302,19 @@ const channelCopy = {
 function NotificationRowComponent({
   isLast,
   item,
+  onResend,
+  resending,
 }: {
   isLast: boolean;
   item: NotificationEntry;
+  onResend: (item: NotificationEntry) => void;
+  resending: boolean;
 }) {
   // Only a failure is tinted. Everything else is ordinary business and does not need
   // to compete for attention.
   const failedToSend = item.state === "failed";
+
+  const handleResend = useCallback(() => onResend(item), [item, onResend]);
 
   return (
     <View style={[styles.row, !isLast && styles.rowDivider]}>
@@ -298,6 +351,27 @@ function NotificationRowComponent({
           <Text numberOfLines={2} style={styles.rowError}>
             {item.lastError}
           </Text>
+        ) : null}
+        {failedToSend ? (
+          <Pressable
+            accessibilityLabel={`Send this message to ${item.recipientLabel} again`}
+            accessibilityRole="button"
+            disabled={resending}
+            onPress={handleResend}
+            style={({ pressed }) => [
+              styles.resendButton,
+              pressed && styles.pressed,
+            ]}
+          >
+            {resending ? (
+              <ActivityIndicator color={colors.navy} size="small" />
+            ) : (
+              <Ionicons color={colors.navy} name="refresh" size={14} />
+            )}
+            <Text style={styles.resendLabel}>
+              {resending ? "Queuing..." : "Send again"}
+            </Text>
+          </Pressable>
         ) : null}
       </View>
     </View>
@@ -354,6 +428,19 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingVertical: spacing.sm,
   },
+  resendButton: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    borderColor: colors.border,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 5,
+    marginTop: 7,
+    minHeight: 32,
+    paddingHorizontal: 10,
+  },
+  resendLabel: { color: colors.navy, fontSize: 12, fontWeight: "600" },
   rowCopy: { flex: 1, gap: 2 },
   rowDivider: { borderBottomColor: colors.divider, borderBottomWidth: 1 },
   rowError: {

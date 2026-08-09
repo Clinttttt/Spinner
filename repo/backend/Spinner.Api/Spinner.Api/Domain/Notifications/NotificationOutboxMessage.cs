@@ -1,3 +1,4 @@
+using Spinner.Api.Common.Results;
 using Spinner.Api.Domain.Orders;
 
 namespace Spinner.Api.Domain.Notifications;
@@ -117,5 +118,40 @@ public sealed class NotificationOutboxMessage
         ClaimId = null;
         LockedUntil = null;
         ConcurrencyStamp = Guid.NewGuid();
+    }
+
+    /// <summary>
+    /// Puts a message that gave up back in the queue.
+    /// </summary>
+    /// <remarks>
+    /// A message that exhausts its attempts is otherwise finished for good, which is
+    /// right when the address is genuinely undeliverable and wrong when the fault was
+    /// ours. Sending from an unverified domain rejected every customer receipt for weeks,
+    /// and those messages were unrecoverable even after the cause was fixed.
+    ///
+    /// The attempt count is reset rather than merely incremented, because the retry limit
+    /// exists to stop a doomed message being retried for ever — and the owner asking for
+    /// this is a deliberate act, not a loop.
+    ///
+    /// A message already sent is refused. Resending it would deliver a second copy of a
+    /// receipt the customer already has.
+    /// </remarks>
+    public Result Requeue(DateTimeOffset now)
+    {
+        if (Status == NotificationStatus.Sent)
+            return Result.Conflict("This message was already delivered.");
+
+        if (Status == NotificationStatus.Processing && LockedUntil > now)
+            return Result.Conflict("This message is being sent right now.");
+
+        Status = NotificationStatus.Pending;
+        AttemptCount = 0;
+        LastError = null;
+        SentAt = null;
+        ClaimId = null;
+        LockedUntil = null;
+        ConcurrencyStamp = Guid.NewGuid();
+
+        return Result.Success();
     }
 }
