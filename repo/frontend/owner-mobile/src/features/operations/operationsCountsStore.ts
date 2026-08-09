@@ -1,3 +1,4 @@
+import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
 import { useSyncExternalStore } from "react";
 
@@ -49,6 +50,10 @@ const listeners = new Set<() => void>();
 
 function emitChange() {
   listeners.forEach((listener) => listener());
+
+  // Driven from the single place every count and acknowledgement change passes through,
+  // so the launcher icon cannot drift out of step with the tab badges.
+  syncLauncherBadge();
 }
 
 /**
@@ -67,6 +72,34 @@ function currentFor(tab: BadgedTab) {
 
 export function getBadgeCount(tab: BadgedTab) {
   return Math.max(0, currentFor(tab) - seen[tab]);
+}
+
+/**
+ * The number shown on the app icon in the launcher.
+ *
+ * The sum of what is waiting across the badged tabs, so a glance at the home screen says
+ * whether the shop needs attention without opening anything. Derived from the same
+ * figures as the tab badges rather than counted separately, so the icon cannot disagree
+ * with what is inside the app.
+ */
+export function getLauncherBadgeCount() {
+  return (
+    getBadgeCount("Orders") +
+    getBadgeCount("Schedule") +
+    getBadgeCount("TransactionHistory")
+  );
+}
+
+/**
+ * Writes the launcher count to the operating system.
+ *
+ * Failures are ignored on purpose: Android launchers differ in whether they show a count
+ * at all, and a missing badge is a cosmetic loss rather than anything worth reporting.
+ */
+function syncLauncherBadge() {
+  void Notifications.setBadgeCountAsync(getLauncherBadgeCount()).catch(
+    () => undefined,
+  );
 }
 
 /**

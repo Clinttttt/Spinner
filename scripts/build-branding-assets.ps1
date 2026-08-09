@@ -141,7 +141,7 @@ Write-Output 'Business map marker'
 # bitmap at its own resolution, so a full-size logo would cover half the map, and a
 # nested React Native view is unreliable on physical Android devices because the marker
 # is snapshotted to a bitmap anyway.
-$markerSide = 96
+$markerSide = 64
 $logoSource = Join-Path $repoRoot 'assets\logo.jpg'
 
 if (Test-Path $logoSource) {

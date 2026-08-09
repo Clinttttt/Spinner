@@ -131,3 +131,33 @@ export async function releasePushNotificationsAsync() {
     // Firebase reports the token as unknown.
   }
 }
+
+/**
+ * Watches for the operating system replacing this device's token.
+ *
+ * Firebase reissues a token after a reinstall, a restore to a new handset, or its own
+ * housekeeping. The old one then stops working and the shop goes quiet with nothing to
+ * indicate why, so the replacement is recorded as soon as it is handed to us rather than
+ * waiting for the next sign-in.
+ */
+export function watchForPushTokenChanges() {
+  const subscription = Notifications.addPushTokenListener((token) => {
+    if (typeof token?.data !== "string" || token.data.length === 0) return;
+    if (token.data === registeredToken) return;
+
+    void apiRequest("/api/devices/register", {
+      body: {
+        deviceName: Device.deviceName ?? Device.modelName ?? null,
+        platform: platform(),
+        registrationToken: token.data,
+      },
+      method: "POST",
+    })
+      .then(() => {
+        registeredToken = token.data;
+      })
+      .catch(() => undefined);
+  });
+
+  return () => subscription.remove();
+}

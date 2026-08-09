@@ -20,7 +20,10 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
 import { describeApiError } from "../../../api/apiClient";
 import { colors } from "../../../theme/colors";
@@ -154,6 +157,8 @@ export function LoginScreen() {
    * clipping the top of its helmet. Derived from the actual overflow rather than a fixed
    * number, so it holds on a short phone and a tall one alike, with a little to spare.
    */
+  const insets = useSafeAreaInsets();
+
   const heroTopInset = useMemo(
     () => Math.ceil(heroHeight * (MASCOT_SCALE - 1)) + spacing.xs,
     [heroHeight],
@@ -375,7 +380,12 @@ export function LoginScreen() {
         source={authBackground}
         style={styles.background}
       />
-      <SafeAreaView edges={["top", "bottom"]} style={styles.safeArea}>
+      {/* Only the top edge is inset. Insetting the bottom as well ended the scrollable
+          area above the system navigation bar, which clipped the taller Create Account
+          form against a dead band of background it could not scroll into. The inset is
+          added to the scroll content instead, so the form scrolls the whole way and its
+          last field clears the navigation bar. */}
+      <SafeAreaView edges={["top"]} style={styles.safeArea}>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={styles.screen}
@@ -387,6 +397,8 @@ export function LoginScreen() {
               // Only when the mascot is on screen. The other forms start at the top and
               // would just look oddly indented.
               !keyboardVisible && isSignIn && { paddingTop: heroTopInset },
+              // Clears the system navigation bar, which the safe area no longer does.
+              { paddingBottom: spacing.xl + insets.bottom },
               keyboardVisible && styles.contentKeyboard,
             ]}
             keyboardDismissMode="on-drag"

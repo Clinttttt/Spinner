@@ -72,6 +72,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void restoreApiSession()
       .then((restored) => {
         if (active) setSession(restored);
+
+        // Registered on restore too, not only on sign-in. Reopening the app restores a
+        // stored session rather than signing in, so registration never ran again — and a
+        // reinstall rotates the device token, which meant the old one was retired as
+        // unknown and the new one was never recorded. The shop then received no booking
+        // alerts at all, silently, with nothing to indicate why.
+        if (restored) void registerForPushNotificationsAsync();
       })
       .finally(() => {
         if (active) setLoading(false);

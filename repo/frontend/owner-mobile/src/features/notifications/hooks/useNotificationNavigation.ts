@@ -5,6 +5,7 @@ import { useEffect } from "react";
 
 import type { RootTabParamList } from "../../../navigation/types";
 import { invalidateOperationsCounts } from "../../operations/operationsCountsStore";
+import { watchForPushTokenChanges } from "../services/pushRegistration";
 
 /**
  * How a notification behaves while the app is already open.
@@ -31,6 +32,10 @@ Notifications.setNotificationHandler({
  */
 export function useNotificationNavigation() {
   const navigation = useNavigation<BottomTabNavigationProp<RootTabParamList>>();
+
+  // Watches for the operating system replacing this device's token, so the shop does not
+  // fall silent after a reinstall or a restore onto a new handset.
+  useEffect(() => watchForPushTokenChanges(), []);
 
   useEffect(() => {
     let active = true;

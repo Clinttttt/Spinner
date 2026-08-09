@@ -15,7 +15,12 @@ public sealed class ReportHandlerTests
     public async Task GetDailySalesReport_Should_Return_Daily_Performance_Summary()
     {
         await using var dbContext = AppDbContextFactory.Create();
-        var reportDate = DateOnly.FromDateTime(DateTime.UtcNow.Date);
+
+        // The shop's date, not the UTC one. Revenue is reported against the business day
+        // a payment landed on, so asking for the UTC date fails for the eight hours each
+        // night when the two disagree: between midnight and 08:00 in Manila the UTC date
+        // is still yesterday while the seeded payment belongs to today.
+        var reportDate = new TestBusinessClock().Today;
 
         await SeedOrderAsync(
             dbContext,
@@ -57,7 +62,12 @@ public sealed class ReportHandlerTests
     public async Task GetOrderHistory_Should_Search_By_Customer_And_Order_Code()
     {
         await using var dbContext = AppDbContextFactory.Create();
-        var reportDate = DateOnly.FromDateTime(DateTime.UtcNow.Date);
+
+        // The shop's date, not the UTC one. Revenue is reported against the business day
+        // a payment landed on, so asking for the UTC date fails for the eight hours each
+        // night when the two disagree: between midnight and 08:00 in Manila the UTC date
+        // is still yesterday while the seeded payment belongs to today.
+        var reportDate = new TestBusinessClock().Today;
 
         await SeedOrderAsync(
             dbContext,
@@ -94,7 +104,12 @@ public sealed class ReportHandlerTests
     public async Task ExportOrderHistory_Should_Return_Csv_Content()
     {
         await using var dbContext = AppDbContextFactory.Create();
-        var reportDate = DateOnly.FromDateTime(DateTime.UtcNow.Date);
+
+        // The shop's date, not the UTC one. Revenue is reported against the business day
+        // a payment landed on, so asking for the UTC date fails for the eight hours each
+        // night when the two disagree: between midnight and 08:00 in Manila the UTC date
+        // is still yesterday while the seeded payment belongs to today.
+        var reportDate = new TestBusinessClock().Today;
         await SeedOrderAsync(
             dbContext,
             "ORD-EXPORT",
