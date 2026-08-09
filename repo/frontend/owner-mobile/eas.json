@@ -17,7 +17,7 @@
       "autoIncrement": true,
       "environment": "production",
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://spinner-api-stg.blueisland-43b2f2d0.southeastasia.azurecontainerapps.io"
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.spinlaundry.online"
       }
     },
     "production-apk": {

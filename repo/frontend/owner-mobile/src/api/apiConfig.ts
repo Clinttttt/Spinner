@@ -1,8 +1,10 @@
 import { NativeModules, Platform } from "react-native";
 
 const DEFAULT_API_PORT = 5235;
-const PRODUCTION_API_BASE_URL =
-  "https://spinner-api-stg.blueisland-43b2f2d0.southeastasia.azurecontainerapps.io";
+// The shop's own hostname rather than the generated Azure one. Only a fallback: the
+// build profile supplies EXPO_PUBLIC_API_BASE_URL, and this is what a build without it
+// would use. Kept correct so a misconfigured build fails toward the right place.
+const PRODUCTION_API_BASE_URL = "https://api.spinlaundry.online";
 
 function metroHost(): string | undefined {
   const scriptUrl = NativeModules.SourceCode?.scriptURL as string | undefined;
