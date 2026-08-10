@@ -1,6 +1,6 @@
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
-import { Platform } from "react-native";
+import { AppState, Platform } from "react-native";
 
 import { apiRequest } from "../../../api/apiClient";
 
@@ -105,6 +105,49 @@ export async function registerForPushNotificationsAsync(): Promise<
     // notifications must never stop them signing in and running the shop.
     return null;
   }
+}
+
+/**
+ * Whether this phone will actually show the shop's alerts.
+ *
+ * Exposed so the app can say so plainly. A denied permission is otherwise completely
+ * silent: registration gives up, no push is ever queued, and the owner is left thinking
+ * the feature is broken with nothing on screen to suggest why.
+ */
+export async function getPushPermissionStateAsync(): Promise<PushPermission> {
+  try {
+    if (!Device.isDevice) return "unavailable";
+
+    const status = await Notifications.getPermissionsAsync();
+    if (status.granted) return "granted";
+
+    return status.canAskAgain ? "canAsk" : "blocked";
+  } catch {
+    return "unavailable";
+  }
+}
+
+export type PushPermission = "granted" | "canAsk" | "blocked" | "unavailable";
+
+/**
+ * Retries registration when the app comes back to the foreground.
+ *
+ * Only when this phone is not already registered, so switching between apps does not
+ * mean a request every time. It exists because the two ways registration fails are both
+ * recoverable outside the app and neither raises anything: the owner declines the
+ * permission prompt and is never asked again because they are already signed in, or they
+ * grant it later in system settings and nothing notices. Sign-in is too rare an event to
+ * be the only opportunity to fix either.
+ */
+export function watchForForegroundRegistration() {
+  const subscription = AppState.addEventListener("change", (state) => {
+    if (state !== "active") return;
+    if (registeredToken) return;
+
+    void registerForPushNotificationsAsync();
+  });
+
+  return () => subscription.remove();
 }
 
 /**

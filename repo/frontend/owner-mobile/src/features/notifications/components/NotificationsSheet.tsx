@@ -19,6 +19,7 @@ import { colors } from "../../../theme/colors";
 import { radii } from "../../../theme/radii";
 import { spacing } from "../../../theme/spacing";
 import type { NotificationEntry } from "../services/notificationsService";
+import { PushPermissionNotice } from "./PushPermissionNotice";
 import {
   getNotificationHistoryPage,
   resendNotification,
@@ -232,6 +233,11 @@ function SheetBody({
             <Ionicons color={colors.navy} name="close" size={22} />
           </Pressable>
         </View>
+
+        {/* Above the log and outside its loading and error states: whether this phone can
+            alert the owner at all is more important than what was sent, and it must be
+            visible even when the log itself fails to load. */}
+        <PushPermissionNotice />
 
         {loading ? (
           <View style={styles.stateBlock}>

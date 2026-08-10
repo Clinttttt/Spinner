@@ -5,7 +5,10 @@ import { useEffect } from "react";
 
 import type { RootTabParamList } from "../../../navigation/types";
 import { invalidateOperationsCounts } from "../../operations/operationsCountsStore";
-import { watchForPushTokenChanges } from "../services/pushRegistration";
+import {
+  watchForForegroundRegistration,
+  watchForPushTokenChanges,
+} from "../services/pushRegistration";
 
 /**
  * How a notification behaves while the app is already open.
@@ -36,6 +39,11 @@ export function useNotificationNavigation() {
   // Watches for the operating system replacing this device's token, so the shop does not
   // fall silent after a reinstall or a restore onto a new handset.
   useEffect(() => watchForPushTokenChanges(), []);
+
+  // Retries registration on returning to the foreground when this phone is not
+  // registered, which is how the owner recovers from having declined the permission
+  // prompt or granted it later in system settings.
+  useEffect(() => watchForForegroundRegistration(), []);
 
   useEffect(() => {
     let active = true;

@@ -388,7 +388,13 @@ export function LoginScreen() {
           last field clears the navigation bar. */}
       <SafeAreaView edges={["top"]} style={styles.safeArea}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          // Android is left to the window's own adjustResize, which app.config.js
+          // requests through softwareKeyboardLayoutMode. This was "height", which
+          // subtracted the keyboard a second time from a window Android had already
+          // shortened, so the view ended well above the bottom of the screen and the
+          // taller Create Account form was cut off against a band of dead space it
+          // could not scroll into. Every other screen in the app already does this.
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
           style={styles.screen}
         >
           <ScrollView
