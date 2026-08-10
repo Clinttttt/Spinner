@@ -6,6 +6,7 @@ import {
   useState,
 } from "react";
 
+import { acknowledgeNotifications } from "../../operations/operationsCountsStore";
 import { useNotificationNavigation } from "../hooks/useNotificationNavigation";
 import { NotificationsSheet } from "./NotificationsSheet";
 
@@ -37,7 +38,15 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const close = useCallback(() => setVisible(false), []);
 
   const api = useMemo<NotificationsApi>(
-    () => ({ open: () => setVisible(true) }),
+    () => ({
+      open: () => {
+        // Opening the log is what marks it as seen, which is what clears the header
+        // bell's dot. Done here rather than in the sheet so every route into it counts,
+        // including a tap on a push notification.
+        acknowledgeNotifications();
+        setVisible(true);
+      },
+    }),
     [],
   );
 

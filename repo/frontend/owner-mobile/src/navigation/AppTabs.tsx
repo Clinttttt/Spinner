@@ -156,7 +156,12 @@ export function AppTabs() {
         },
       }}
       screenOptions={({ route }) => ({
-        animation: "fade",
+        // No cross-fade between tabs. Every screen draws its own copy of the header —
+        // the logo, the bell and the profile photo — so fading one scene out while the
+        // next faded in made that shared chrome visibly flicker on every tap of the bar,
+        // even though it is identical on both sides. An instant swap leaves it looking
+        // fixed in place, which is what it is meant to look like.
+        animation: "none",
         headerShown: false,
         sceneStyle: styles.scene,
         tabBarActiveTintColor: colors.navy,

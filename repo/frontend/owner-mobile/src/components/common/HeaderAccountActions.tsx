@@ -1,6 +1,10 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image, Pressable, StyleSheet, View } from "react-native";
 
+import {
+  hasUnreadNotifications,
+  useOperationsCounts,
+} from "../../features/operations/operationsCountsStore";
 import { colors } from "../../theme/colors";
 import { radii } from "../../theme/radii";
 
@@ -20,18 +24,33 @@ export function HeaderAccountActions({
 }: HeaderAccountActionsProps) {
   const isAddTransaction = primaryAction === "addTransaction";
 
+  // Subscribed for the re-render, not the value: the dot reads acknowledged counts
+  // through the store, and this is what redraws the bell when either side changes.
+  useOperationsCounts();
+
+  // The dot used to be part of the bell's styling, so it was on permanently and told
+  // the owner nothing. It now appears only when the notification log has messages that
+  // have arrived since the sheet was last opened.
+  const unread = !isAddTransaction && hasUnreadNotifications();
+
   return (
     <View style={styles.actions}>
       <Pressable
         accessibilityLabel={
-          isAddTransaction ? "Add transaction" : "Notifications"
+          isAddTransaction
+            ? "Add transaction"
+            : unread
+              ? "Notifications, new messages"
+              : "Notifications"
         }
         accessibilityRole="button"
         hitSlop={6}
         onPress={onNotificationsPress}
         style={({ pressed }) => [
           styles.primaryActionButton,
-          isAddTransaction && styles.addTransactionButton,
+          isAddTransaction
+            ? styles.addTransactionButton
+            : styles.bellButtonFrame,
           pressed && styles.pressed,
         ]}
       >
@@ -47,12 +66,10 @@ export function HeaderAccountActions({
           <Ionicons
             color={colors.navy}
             name="notifications-outline"
-            size={31}
+            size={27}
           />
         )}
-        {!isAddTransaction ? (
-          <View pointerEvents="none" style={styles.unreadDot} />
-        ) : null}
+        {unread ? <View pointerEvents="none" style={styles.unreadDot} /> : null}
       </Pressable>
 
       {!isAddTransaction ? (
@@ -97,6 +114,19 @@ const styles = StyleSheet.create({
     position: "relative",
     width: 50,
   },
+  /**
+   * A quiet ring so the bell reads as a button.
+   *
+   * It sat bare next to the gold-ringed profile photo, which made the pair look
+   * unbalanced. Deliberately neutral rather than gold: two gold rings side by side
+   * would compete, and this is chrome, not a call to action.
+   */
+  bellButtonFrame: {
+    backgroundColor: "rgba(255,255,255,0.72)",
+    borderColor: "rgba(13,42,82,0.12)",
+    borderRadius: 25,
+    borderWidth: 1,
+  },
   addTransactionButton: {
     backgroundColor: "transparent",
     borderWidth: 0,
@@ -111,8 +141,8 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     height: 13,
     position: "absolute",
-    right: 2,
-    top: 3,
+    right: -1,
+    top: -1,
     width: 13,
   },
   profileButton: {

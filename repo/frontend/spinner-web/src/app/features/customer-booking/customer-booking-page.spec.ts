@@ -56,7 +56,15 @@ describe('CustomerBookingPage pickup location', () => {
     getCurrentPosition: ReturnType<typeof vi.fn>;
   };
 
-  function createPage(catalogue: readonly (typeof service)[] = [service]) {
+  // The page now remembers a customer's details in localStorage, which jsdom shares
+  // across every test in this file. Without this, a test that submits a booking leaves a
+  // saved pin behind and the next page restores it, which is exactly what happened:
+  // "reports a geolocation failure without a pin" found a pin and reported ready.
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  function createPage(catalogue: readonly (typeof service)[] = [service], prefill = true) {
     locationStub = {
       getCurrentPosition: vi.fn(),
       isInAppBrowser: false,
@@ -92,13 +100,18 @@ describe('CustomerBookingPage pickup location', () => {
     fixture.detectChanges();
 
     const page = fixture.componentInstance;
-    page.bookingForm.patchValue({
-      address: CUSTOMER_ADDRESS,
-      fullName: 'Kendra Mae',
-      mobileNumber: '09171234567',
-      preferredDate: '2026-08-05',
-      preferredTime: '15:00-17:00',
-    });
+
+    // Skipped by the tests that assert what was restored from a previous booking, which
+    // this would otherwise overwrite.
+    if (prefill) {
+      page.bookingForm.patchValue({
+        address: CUSTOMER_ADDRESS,
+        fullName: 'Kendra Mae',
+        mobileNumber: '09171234567',
+        preferredDate: '2026-08-05',
+        preferredTime: '15:00-17:00',
+      });
+    }
 
     return { fixture, page };
   }
@@ -832,6 +845,132 @@ describe('CustomerBookingPage pickup location', () => {
 
       expect(page.serviceArea()).toBeNull();
       expect(page.outsideServiceArea()).toBe(false);
+    });
+  });
+
+  describe('remembering a returning customer', () => {
+    const STORAGE_KEY = 'spinner.customer.last-booking.v1';
+
+    function storeDetails(overrides: Record<string, unknown> = {}, savedAt = new Date()) {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          address: 'Purok 3, San Vicente, Madrid',
+          email: 'kendra@example.com',
+          fullName: 'Kendra Mae',
+          landmark: 'Third house past the blue gate',
+          mobileNumber: '09171234567',
+          orderMethod: 'pickupDelivery',
+          paymentMethod: 'cod',
+          pickupPin: null,
+          preferredTime: '15:00-17:00',
+          savedAt: savedAt.toISOString(),
+          ...overrides,
+        }),
+      );
+    }
+
+    it('fills the form from the last booking made in this browser', () => {
+      storeDetails();
+
+      const { page } = createPage([service], false);
+
+      expect(page.detailsRestored()).toBe(true);
+      expect(page.bookingForm.controls.fullName.value).toBe('Kendra Mae');
+      expect(page.bookingForm.controls.mobileNumber.value).toBe('09171234567');
+      expect(page.bookingForm.controls.email.value).toBe('kendra@example.com');
+      expect(page.bookingForm.controls.address.value).toBe('Purok 3, San Vicente, Madrid');
+      expect(page.bookingForm.controls.landmark.value).toBe('Third house past the blue gate');
+    });
+
+    it('leaves the date to be chosen again, because a remembered one is in the past', () => {
+      storeDetails();
+
+      const { page } = createPage([service], false);
+
+      expect(page.bookingForm.controls.preferredDate.value).toBe('');
+    });
+
+    it('does not let stored details change which services are selected', () => {
+      // The page preselects the first service by design so the estimate is never empty.
+      // What matters here is that a previous booking cannot add to that: a service the
+      // customer is not looking at is a charge they did not choose on this visit, and
+      // unlike a wrong name it would not be obvious on the page.
+      storeDetails();
+
+      const { page } = createPage([service, dryOnly], false);
+
+      expect(page.isServiceSelected(service.id)).toBe(true);
+      expect(page.isServiceSelected(dryOnly.id)).toBe(false);
+    });
+
+    it('restores a pickup pin and re-checks it against the area as it stands now', () => {
+      storeDetails({
+        pickupPin: {
+          accuracyMeters: null,
+          formattedAddress: 'San Vicente, Surigao del Sur',
+          latitude: 9.224,
+          longitude: 126.0079,
+          placeId: null,
+          source: 'manualPin',
+        },
+      });
+
+      const { page } = createPage([service], false);
+
+      expect(page.pickupPin()).not.toBeNull();
+      expect(page.pickupPin()!.latitude).toBeCloseTo(9.224);
+      // Asked again rather than trusting last visit's verdict: the shop can change
+      // its service area between bookings.
+      expect(page.checkingServiceArea()).toBe(true);
+    });
+
+    it('forgets the details and empties the fields when the customer is not that person', () => {
+      storeDetails();
+
+      const { page } = createPage([service], false);
+      page.forgetSavedDetails();
+
+      expect(page.detailsRestored()).toBe(false);
+      expect(page.bookingForm.controls.fullName.value).toBe('');
+      expect(page.bookingForm.controls.mobileNumber.value).toBe('');
+      expect(page.bookingForm.controls.address.value).toBe('');
+      expect(page.pickupPin()).toBeNull();
+      expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+    });
+
+    it('ignores details old enough that the address may no longer be right', () => {
+      const thirteenMonthsAgo = new Date(Date.now() - 400 * 86_400_000);
+      storeDetails({}, thirteenMonthsAgo);
+
+      const { page } = createPage([service], false);
+
+      expect(page.detailsRestored()).toBe(false);
+      expect(page.bookingForm.controls.fullName.value).toBe('');
+      // Dropped rather than left to fail again on the next visit.
+      expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+    });
+
+    it('survives hand-edited storage instead of failing to load the page', () => {
+      localStorage.setItem(STORAGE_KEY, '{ this is not json');
+
+      const { page } = createPage([service], false);
+
+      expect(page.detailsRestored()).toBe(false);
+      expect(page.bookingForm.controls.fullName.value).toBe('');
+    });
+
+    it('remembers the details once a booking is submitted', () => {
+      const { page } = createPage();
+      page.submitBooking();
+      submittedPayload();
+
+      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}');
+      expect(stored.fullName).toBe('Kendra Mae');
+      expect(stored.mobileNumber).toBe('09171234567');
+      expect(stored.address).toBe(CUSTOMER_ADDRESS);
+      // The date is deliberately not part of what is kept.
+      expect(stored.preferredDate).toBeUndefined();
     });
   });
 });

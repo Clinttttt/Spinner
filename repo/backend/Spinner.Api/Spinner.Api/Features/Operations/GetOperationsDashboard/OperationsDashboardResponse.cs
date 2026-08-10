@@ -17,4 +17,15 @@ public sealed record OperationsDashboardResponse(
     /// counted something that page does not list: an unpaid booking is not a transaction.
     /// A new booking therefore raised a badge on a screen where nothing had appeared.
     /// </remarks>
-    int TransactionCount);
+    int TransactionCount,
+    /// <summary>
+    /// How many messages the shop's notification log holds, so the header bell can show
+    /// a dot only when there is something in it the owner has not looked at.
+    /// </summary>
+    /// <remarks>
+    /// The dot used to be drawn unconditionally, so it was on permanently and told the
+    /// owner nothing. Counted here rather than from the notification history endpoint
+    /// because this response is already polled while the app is open, so the indicator
+    /// costs no extra request.
+    /// </remarks>
+    int NotificationCount);

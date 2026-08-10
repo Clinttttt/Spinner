@@ -30,6 +30,10 @@ import {
   GeolocationUnavailableError,
 } from '../../core/device-location.service';
 import {
+  type SavedBookingDetails,
+  SavedBookingDetailsService,
+} from '../../core/saved-booking-details.service';
+import {
   type BookingConfirmationDto,
   type CreateBookingPayload,
   type LaundryServiceDto,
@@ -118,8 +122,17 @@ export class CustomerBookingPage {
   private readonly api = inject(SpinnerApiService);
   private readonly addressLookup = inject(AddressLookupService);
   private readonly deviceLocation = inject(DeviceLocationService);
+  private readonly savedDetails = inject(SavedBookingDetailsService);
   private readonly addressQuery = new Subject<string>();
   private readonly serviceAreaQuery = new Subject<PickupPin>();
+
+  /**
+   * True when this visit's form was filled in from a previous booking.
+   *
+   * Shown to the customer rather than done silently: they need to know why their details
+   * are already there, and they need a way out of it on a shared phone.
+   */
+  readonly detailsRestored = signal(false);
 
   readonly bookingComplete = signal(false);
   readonly trackingNoticeVisible = signal(false);
@@ -302,6 +315,68 @@ export class CustomerBookingPage {
         this.activeSuggestionIndex.set(-1);
         this.suggestionsOpen.set(results.length > 0);
       });
+
+    // Last, so patching orderMethod runs through the subscription above and the address
+    // validator ends up matching the restored choice.
+    this.restoreSavedDetails();
+  }
+
+  /**
+   * Fills the form from the customer's previous booking on this browser.
+   *
+   * A pin is put back through setPin rather than assigned, so it is re-checked against
+   * the shop's service area as it stands today. The area is configurable, and a pin that
+   * was inside it last month is not guaranteed to be inside it now.
+   */
+  private restoreSavedDetails(): void {
+    const saved = this.savedDetails.read();
+    if (!saved) return;
+
+    this.bookingForm.patchValue({
+      address: saved.address,
+      email: saved.email,
+      fullName: saved.fullName,
+      landmark: saved.landmark,
+      mobileNumber: saved.mobileNumber,
+      orderMethod: saved.orderMethod,
+      paymentMethod: saved.paymentMethod,
+      preferredTime: saved.preferredTime,
+    });
+
+    if (saved.orderMethod === 'pickupDelivery' && saved.pickupPin) {
+      this.setPin(saved.pickupPin);
+      this.mapVisible.set(true);
+    }
+
+    this.detailsRestored.set(true);
+  }
+
+  /**
+   * Empties the remembered details and the fields they filled.
+   *
+   * Present because a phone can be shared. Someone booking for the first time on a
+   * relative's handset must be able to get a blank form without editing five fields, and
+   * without their laundry going to the previous person's address.
+   */
+  forgetSavedDetails(): void {
+    this.savedDetails.clear();
+    this.detailsRestored.set(false);
+
+    this.bookingForm.patchValue({
+      address: '',
+      email: '',
+      fullName: '',
+      landmark: '',
+      mobileNumber: '',
+    });
+
+    this.bookingForm.controls.fullName.markAsUntouched();
+    this.bookingForm.controls.mobileNumber.markAsUntouched();
+    this.bookingForm.controls.address.markAsUntouched();
+
+    this.clearPin();
+    this.mapVisible.set(false);
+    this.closeSuggestions();
   }
 
   get serviceAmount(): number {
@@ -705,6 +780,11 @@ export class CustomerBookingPage {
       })),
     };
 
+    // Remembered here rather than on a successful response, because the QR path leaves
+    // this page for the payment provider and would otherwise never get the chance. The
+    // form has already passed validation at this point, so what is stored is usable.
+    this.rememberDetails(isPickup);
+
     // QR is paid before the booking exists, so this hands off to the payment page
     // rather than creating an order the shop could start working on unpaid.
     if (value.paymentMethod === 'qr') {
@@ -857,6 +937,41 @@ export class CustomerBookingPage {
     if (typeof window !== 'undefined') {
       window.scrollTo({ behavior: 'smooth', top: 0 });
     }
+  }
+
+  /**
+   * Stores what this booking used, for the next visit on this browser.
+   *
+   * A drop-off order keeps no address or pin: the customer is bringing the laundry in, so
+   * "In-store" is not their address and remembering it would prefill nonsense next time.
+   */
+  private rememberDetails(isPickup: boolean): void {
+    const value = this.bookingForm.getRawValue();
+    const pin = this.pickupPin();
+
+    const details: SavedBookingDetails = {
+      address: isPickup ? value.address.trim() : '',
+      email: value.email.trim(),
+      fullName: value.fullName.trim(),
+      landmark: isPickup ? value.landmark.trim() : '',
+      mobileNumber: value.mobileNumber.replace(/\s+/g, ''),
+      orderMethod: value.orderMethod,
+      paymentMethod: value.paymentMethod,
+      pickupPin:
+        isPickup && pin
+          ? {
+              accuracyMeters: pin.accuracyMeters,
+              formattedAddress: pin.formattedAddress,
+              latitude: pin.latitude,
+              longitude: pin.longitude,
+              placeId: pin.placeId,
+              source: pin.source,
+            }
+          : null,
+      preferredTime: value.preferredTime,
+    };
+
+    this.savedDetails.save(details);
   }
 
   private setPin(pin: PickupPin): void {

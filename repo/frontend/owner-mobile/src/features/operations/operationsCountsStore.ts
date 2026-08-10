@@ -20,6 +20,8 @@ export interface OperationsCounts {
   salesToday: number;
   /** How many rows the transaction history holds. See currentFor. */
   transactionCount: number;
+  /** How many messages the notification log holds. Drives the header bell's dot. */
+  notificationCount: number;
 }
 
 const EMPTY: OperationsCounts = {
@@ -27,6 +29,7 @@ const EMPTY: OperationsCounts = {
   completedToday: 0,
   forPickup: 0,
   newBookings: 0,
+  notificationCount: 0,
   readyForDelivery: 0,
   salesToday: 0,
   transactionCount: 0,
@@ -36,9 +39,19 @@ const EMPTY: OperationsCounts = {
 /** Which tabs carry a badge, and therefore have something to acknowledge. */
 export type BadgedTab = "Orders" | "Schedule" | "TransactionHistory";
 
-type SeenCounts = Record<BadgedTab, number>;
+/**
+ * Everything that can be marked as seen.
+ *
+ * The header bell is not a tab but behaves identically: it shows that something has
+ * arrived since the owner last looked, and clears when they look. Sharing the mechanism
+ * means it also shares the storage, the clamping and the first-run baseline.
+ */
+type AcknowledgeableSurface = BadgedTab | "Notifications";
+
+type SeenCounts = Record<AcknowledgeableSurface, number>;
 
 const NOTHING_SEEN: SeenCounts = {
+  Notifications: 0,
   Orders: 0,
   Schedule: 0,
   TransactionHistory: 0,
@@ -76,14 +89,30 @@ function emitChange() {
  * actually lands — an online QR payment, or an order the owner marks paid — and stays
  * away for a booking that is merely received.
  */
-function currentFor(tab: BadgedTab) {
-  if (tab === "Orders") return counts.newBookings;
-  if (tab === "Schedule") return counts.forPickup;
+function currentFor(surface: AcknowledgeableSurface) {
+  if (surface === "Orders") return counts.newBookings;
+  if (surface === "Schedule") return counts.forPickup;
+  if (surface === "Notifications") return counts.notificationCount;
   return counts.transactionCount;
 }
 
 export function getBadgeCount(tab: BadgedTab) {
   return Math.max(0, currentFor(tab) - seen[tab]);
+}
+
+/**
+ * Whether the header bell should show its dot.
+ *
+ * The dot used to be part of the bell's styling, so it was always on and meant nothing.
+ * It now means the notification log has messages the owner has not opened it to see.
+ */
+export function hasUnreadNotifications() {
+  return currentFor("Notifications") > seen.Notifications;
+}
+
+/** Called when the notifications sheet is opened, which is what clears the dot. */
+export function acknowledgeNotifications() {
+  acknowledgeSurface("Notifications");
 }
 
 /**
@@ -121,10 +150,14 @@ function syncLauncherBadge() {
  * again, which is the behaviour that makes it worth glancing at.
  */
 export function acknowledgeTab(tab: BadgedTab) {
-  const current = currentFor(tab);
-  if (seen[tab] === current) return;
+  acknowledgeSurface(tab);
+}
 
-  seen = { ...seen, [tab]: current };
+function acknowledgeSurface(surface: AcknowledgeableSurface) {
+  const current = currentFor(surface);
+  if (seen[surface] === current) return;
+
+  seen = { ...seen, [surface]: current };
   emitChange();
   void persistSeen();
 }
@@ -163,6 +196,7 @@ async function readStoredAcknowledgements() {
     const parsed = JSON.parse(stored) as Partial<SeenCounts>;
 
     seen = {
+      Notifications: Number(parsed.Notifications) || 0,
       Orders: Number(parsed.Orders) || 0,
       Schedule: Number(parsed.Schedule) || 0,
       TransactionHistory: Number(parsed.TransactionHistory) || 0,
@@ -225,19 +259,25 @@ async function loadCounts() {
     completedToday: response.completedToday ?? 0,
     forPickup: response.forPickup ?? 0,
     newBookings: response.newBookings ?? 0,
+    notificationCount: response.notificationCount ?? 0,
     readyForDelivery: response.readyForDelivery ?? 0,
     salesToday: response.salesToday ?? 0,
     transactionCount: response.transactionCount ?? 0,
     unpaidOrders: response.unpaidOrders ?? 0,
   };
 
-  // The transaction count is a running total of everything the shop has ever taken, so
-  // on a first run there is nothing to compare it against and the whole history would
-  // arrive as a badge of forty-something. Treat what is already there as seen; only what
-  // arrives afterwards is new. The other two tabs count outstanding work, where the
-  // figure is meaningful on its own and worth showing immediately.
+  // The transaction and notification counts are running totals of everything the shop
+  // has ever taken or sent, so on a first run there is nothing to compare them against
+  // and the whole history would arrive as a badge of forty-something. Treat what is
+  // already there as seen; only what arrives afterwards is new. The other two surfaces
+  // count outstanding work, where the figure is meaningful on its own and worth showing
+  // immediately.
   if (!hasStoredAcknowledgements) {
-    seen = { ...seen, TransactionHistory: counts.transactionCount };
+    seen = {
+      ...seen,
+      Notifications: counts.notificationCount,
+      TransactionHistory: counts.transactionCount,
+    };
     hasStoredAcknowledgements = true;
     void persistSeen();
   }
@@ -247,6 +287,7 @@ async function loadCounts() {
   // old, higher figure recorded as seen, and the badge would stay hidden through the
   // next few genuinely new arrivals.
   seen = {
+    Notifications: Math.min(seen.Notifications, counts.notificationCount),
     Orders: Math.min(seen.Orders, counts.newBookings),
     Schedule: Math.min(seen.Schedule, counts.forPickup),
     TransactionHistory: Math.min(

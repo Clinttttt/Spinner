@@ -58,6 +58,18 @@
         </div>
       </div>
 
+      @if (detailsRestored()) {
+        <div class="restored-notice" role="status">
+          <span>
+            We filled this in from your last booking on this device. Please check your date and
+            services.
+          </span>
+          <button class="restored-clear" type="button" (click)="forgetSavedDetails()">
+            Not you? Start fresh
+          </button>
+        </div>
+      }
+
       @if (errorMessage()) {
         <div class="inline-notice" role="status">
           {{ errorMessage() }}

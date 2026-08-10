@@ -27,6 +27,14 @@ public sealed class OperationsHandlerTests
 
         // Two bookings, no money: the transaction history has nothing to show.
         Assert.Equal(0, result.Value.TransactionCount);
+
+        // A booking queues the customer's confirmation, so the notification log does
+        // have something new in it and the header bell is right to show a dot. The
+        // figure has to match the log itself, since that is what the bell's sheet lists.
+        Assert.Equal(
+            dbContext.NotificationOutboxMessages.Count(),
+            result.Value.NotificationCount);
+        Assert.True(result.Value.NotificationCount > 0);
     }
 
     [Fact]

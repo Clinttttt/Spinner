@@ -51,9 +51,9 @@ button {
 .brand img {
   border: 1px solid rgba(199, 139, 18, 0.2);
   border-radius: 50%;
-  height: 46px;
+  height: 34px;
   object-fit: cover;
-  width: 46px;
+  width: 34px;
 }
 
 .brand-copy {
@@ -298,6 +298,44 @@ button {
   border-top: 1px solid var(--line);
   margin-top: 24px;
   padding-top: 24px;
+}
+
+/**
+ * Explains why the form is already filled in.
+ *
+ * Blue rather than gold: gold carries warnings and errors on this page, and a remembered
+ * detail is neither.
+ */
+.restored-notice {
+  align-items: flex-start;
+  background: #f2f6fd;
+  border: 1px solid #d7e3f7;
+  border-radius: 14px;
+  color: #1c3c6e;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 12px;
+  gap: 6px 14px;
+  justify-content: space-between;
+  line-height: 1.5;
+  margin-top: 16px;
+  padding: 12px 14px;
+}
+
+.restored-clear {
+  background: none;
+  border: 0;
+  color: var(--navy);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  padding: 0;
+  text-decoration: underline;
+  white-space: nowrap;
+}
+
+.restored-clear:hover {
+  opacity: 0.75;
 }
 
 .section-heading {

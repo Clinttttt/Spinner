@@ -64,7 +64,12 @@ public sealed class GetOperationsDashboardHandler
             // a prepaid booking is real money in hand before the laundry is done.
             SalesToday: await SumPaidOnAsync(today, cancellationToken),
 
-            TransactionCount: await CountTransactionsAsync(cancellationToken));
+            TransactionCount: await CountTransactionsAsync(cancellationToken),
+
+            // Every message the shop has queued, which is exactly what the notifications
+            // sheet lists. The app compares it against what the owner has already seen.
+            NotificationCount: await _dbContext.NotificationOutboxMessages
+                .CountAsync(cancellationToken));
 
         return Result<OperationsDashboardResponse>.Success(response);
     }
