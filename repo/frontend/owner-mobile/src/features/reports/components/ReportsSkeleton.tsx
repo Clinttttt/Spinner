@@ -1,5 +1,6 @@
 import { StyleSheet, View } from "react-native";
 
+import { SkeletonPulse } from "../../../components/common/SkeletonPulse";
 import { colors } from "../../../theme/colors";
 
 function SkeletonBlock({
@@ -14,7 +15,7 @@ function SkeletonBlock({
 
 export function ReportsSkeleton() {
   return (
-    <View accessibilityLabel="Loading reports" style={styles.root}>
+    <SkeletonPulse accessibilityLabel="Loading reports" style={styles.root}>
       <View style={styles.controls}>
         <SkeletonBlock height={46} width="72%" />
         <SkeletonBlock height={46} width="25%" />
@@ -27,7 +28,7 @@ export function ReportsSkeleton() {
       </View>
       <SkeletonBlock height={294} />
       <SkeletonBlock height={280} />
-    </View>
+    </SkeletonPulse>
   );
 }
 

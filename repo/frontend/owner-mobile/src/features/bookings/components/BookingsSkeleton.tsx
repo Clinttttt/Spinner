@@ -1,5 +1,6 @@
 import { StyleSheet, View } from "react-native";
 
+import { SkeletonPulse } from "../../../components/common/SkeletonPulse";
 import { colors } from "../../../theme/colors";
 
 function SkeletonCard() {
@@ -28,11 +29,11 @@ function SkeletonCard() {
 
 export function BookingsSkeleton() {
   return (
-    <View accessibilityLabel="Loading bookings" style={styles.list}>
+    <SkeletonPulse accessibilityLabel="Loading bookings" style={styles.list}>
       <SkeletonCard />
       <SkeletonCard />
       <SkeletonCard />
-    </View>
+    </SkeletonPulse>
   );
 }
 

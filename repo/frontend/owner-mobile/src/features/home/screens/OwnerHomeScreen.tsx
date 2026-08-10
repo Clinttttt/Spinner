@@ -152,6 +152,7 @@ export function OwnerHomeScreen({ navigation }: OwnerHomeScreenProps) {
                 ]}
               >
                 <Image
+                  fadeDuration={0}
                   resizeMode="cover"
                   source={headerWaves}
                   style={styles.headerBackgroundImage}

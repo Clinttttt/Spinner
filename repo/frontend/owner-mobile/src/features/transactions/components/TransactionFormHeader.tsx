@@ -32,6 +32,7 @@ export function TransactionFormHeader({
           ]}
         >
           <Image
+            fadeDuration={0}
             resizeMode="cover"
             source={headerWaves}
             style={styles.background}
@@ -83,6 +84,7 @@ export function TransactionFormHeader({
         >
           <Image
             accessibilityLabel="Spinly adding a transaction"
+            fadeDuration={0}
             resizeMode="contain"
             source={addTransactionMascot}
             style={styles.mascot}

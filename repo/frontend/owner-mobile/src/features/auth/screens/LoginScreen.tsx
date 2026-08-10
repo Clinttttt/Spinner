@@ -376,6 +376,7 @@ export function LoginScreen() {
           of the screen and showed a bare strip under the card. */}
       <Image
         accessibilityIgnoresInvertColors
+        fadeDuration={0}
         resizeMode="cover"
         source={authBackground}
         style={styles.background}
@@ -412,6 +413,7 @@ export function LoginScreen() {
               <View style={[styles.hero, { height: heroHeight }]}>
                 <Image
                   accessibilityIgnoresInvertColors
+                  fadeDuration={0}
                   resizeMode="contain"
                   source={welcomeMascot}
                   style={styles.mascot}

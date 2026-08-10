@@ -24,6 +24,43 @@ public sealed class OperationsHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Equal(2, result.Value!.NewBookings);
         Assert.Equal(2, result.Value.UnpaidOrders);
+
+        // Two bookings, no money: the transaction history has nothing to show.
+        Assert.Equal(0, result.Value.TransactionCount);
+    }
+
+    [Fact]
+    public async Task GetOperationsDashboard_Should_Count_A_Transaction_Only_Once_Paid()
+    {
+        // The app badges the transaction history tab with TransactionCount. That page
+        // lists money movements, so a booking which has only been received must not
+        // raise a badge there — the owner would open the tab and find nothing new. The
+        // badge previously read UnpaidOrders, which did exactly that.
+        await using var dbContext = AppDbContextFactory.Create();
+        var service = SeedPhase2Dependencies(dbContext);
+        await CreateBookingAsync(dbContext, service.Id, "Maria Santos", "09171234567");
+
+        var afterBooking = await DashboardAsync(dbContext);
+        Assert.Equal(0, afterBooking.TransactionCount);
+
+        var order = dbContext.LaundryOrders.Single();
+        var now = DateTimeOffset.UtcNow;
+        Assert.True(order.Confirm(now).IsSuccess);
+        Assert.True(order.ConfirmCodPayment("RC-000001", now).IsSuccess);
+        await dbContext.SaveChangesAsync();
+
+        var afterPayment = await DashboardAsync(dbContext);
+        Assert.Equal(1, afterPayment.TransactionCount);
+    }
+
+    private static async Task<OperationsDashboardResponse> DashboardAsync(
+        Spinner.Api.Database.AppDbContext dbContext)
+    {
+        var result = await new GetOperationsDashboardHandler(dbContext, new TestBusinessClock())
+            .Handle(new GetOperationsDashboardQuery(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        return result.Value!;
     }
 
     [Fact]

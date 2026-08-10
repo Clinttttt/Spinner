@@ -1,6 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { SkeletonPulse } from "../../../components/common/SkeletonPulse";
 import { colors } from "../../../theme/colors";
 
 function SkeletonBlock({ height }: { height: number }) {
@@ -9,11 +10,14 @@ function SkeletonBlock({ height }: { height: number }) {
 
 export function PickupLocationSkeleton() {
   return (
-    <View accessibilityLabel="Loading pickup location" style={styles.skeleton}>
+    <SkeletonPulse
+      accessibilityLabel="Loading pickup location"
+      style={styles.skeleton}
+    >
       <SkeletonBlock height={116} />
       <SkeletonBlock height={280} />
       <SkeletonBlock height={250} />
-    </View>
+    </SkeletonPulse>
   );
 }
 

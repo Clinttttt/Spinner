@@ -1,5 +1,6 @@
 import { StyleSheet, View } from "react-native";
 
+import { SkeletonPulse } from "../../../components/common/SkeletonPulse";
 import {
   bookingDetailsCardStyle,
   bookingDetailsColors,
@@ -7,7 +8,10 @@ import {
 
 export function BookingDetailsSkeleton() {
   return (
-    <View accessibilityLabel="Loading booking details" style={styles.container}>
+    <SkeletonPulse
+      accessibilityLabel="Loading booking details"
+      style={styles.container}
+    >
       <View style={[styles.card, styles.summaryCard]}>
         <View style={styles.row}>
           <View style={styles.avatar} />
@@ -42,7 +46,7 @@ export function BookingDetailsSkeleton() {
 
       <View style={[styles.card, styles.smallCard]} />
       <View style={[styles.card, styles.smallCard]} />
-    </View>
+    </SkeletonPulse>
   );
 }
 

@@ -1,15 +1,19 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { SkeletonPulse } from "../../../components/common/SkeletonPulse";
 import { colors } from "../../../theme/colors";
 
 export function ManualOrdersSkeleton() {
   return (
-    <View style={styles.stack}>
+    <SkeletonPulse
+      accessibilityLabel="Loading manual orders"
+      style={styles.stack}
+    >
       {[1, 2, 3].map((item) => (
         <View key={item} style={styles.skeleton} />
       ))}
-    </View>
+    </SkeletonPulse>
   );
 }
 

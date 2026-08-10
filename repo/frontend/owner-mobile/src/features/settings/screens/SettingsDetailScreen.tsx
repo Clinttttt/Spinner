@@ -234,7 +234,12 @@ function ProfileInformationPage() {
   return (
     <>
       <SettingsCard style={styles.profileCard}>
-        <Image resizeMode="cover" source={ownerProfile} style={styles.avatar} />
+        <Image
+          fadeDuration={0}
+          resizeMode="cover"
+          source={ownerProfile}
+          style={styles.avatar}
+        />
         <View style={styles.profileCopy}>
           <Text style={styles.profileName}>{name}</Text>
           <Text style={styles.profileRole}>{role}</Text>
@@ -564,7 +569,12 @@ function BusinessInformationPage() {
   return (
     <>
       <SettingsCard style={styles.logoCard}>
-        <Image resizeMode="cover" source={logo} style={styles.businessLogo} />
+        <Image
+          fadeDuration={0}
+          resizeMode="cover"
+          source={logo}
+          style={styles.businessLogo}
+        />
         <View style={styles.logoCopy}>
           <Text style={styles.logoTitle}>Business Logo</Text>
           <Text style={styles.logoSubtitle}>
@@ -1662,7 +1672,12 @@ function AboutAppPage() {
   return (
     <>
       <SettingsCard style={styles.aboutHero}>
-        <Image resizeMode="cover" source={logo} style={styles.aboutLogo} />
+        <Image
+          fadeDuration={0}
+          resizeMode="cover"
+          source={logo}
+          style={styles.aboutLogo}
+        />
         <Text style={styles.aboutName}>{settingsDefaults.app.name}</Text>
         <Text style={styles.aboutVersion}>
           Version {settingsDefaults.app.version}

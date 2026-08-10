@@ -1,5 +1,6 @@
 import { StyleSheet, View } from "react-native";
 
+import { SkeletonPulse } from "../../../components/common/SkeletonPulse";
 import { colors } from "../../../theme/colors";
 import { pickupTaskCardStyle } from "./pickupTheme";
 
@@ -34,11 +35,14 @@ function PickupSkeletonCard() {
 
 export function PickupSkeleton() {
   return (
-    <View accessibilityLabel="Loading pickup schedules" style={styles.list}>
+    <SkeletonPulse
+      accessibilityLabel="Loading pickup schedules"
+      style={styles.list}
+    >
       <PickupSkeletonCard />
       <PickupSkeletonCard />
       <PickupSkeletonCard />
-    </View>
+    </SkeletonPulse>
   );
 }
 

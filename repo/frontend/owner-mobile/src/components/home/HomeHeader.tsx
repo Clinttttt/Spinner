@@ -23,6 +23,7 @@ function HomeHeaderComponent({
       <View style={styles.brandGroup}>
         <Image
           accessibilityLabel="Engr. Spin Laundromat logo"
+          fadeDuration={0}
           resizeMode="cover"
           source={logo}
           style={styles.logo}

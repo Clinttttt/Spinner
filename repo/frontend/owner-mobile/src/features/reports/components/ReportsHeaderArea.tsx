@@ -35,6 +35,7 @@ export function ReportsHeaderArea({
         ]}
       >
         <Image
+          fadeDuration={0}
           resizeMode="cover"
           source={headerWaves}
           style={styles.backgroundImage}
@@ -77,6 +78,7 @@ export function ReportsHeaderArea({
             <Image
               accessibilityIgnoresInvertColors
               accessibilityLabel="Spinly holding a business report"
+              fadeDuration={0}
               resizeMode="contain"
               source={reportMascot}
               style={styles.mascot}

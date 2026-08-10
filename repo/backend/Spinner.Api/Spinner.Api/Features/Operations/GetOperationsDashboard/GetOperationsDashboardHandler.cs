@@ -62,9 +62,32 @@ public sealed class GetOperationsDashboardHandler
             // takings change when the owner moved an already-paid job, and disagreed
             // with the transaction history. Completion is no longer required either:
             // a prepaid booking is real money in hand before the laundry is done.
-            SalesToday: await SumPaidOnAsync(today, cancellationToken));
+            SalesToday: await SumPaidOnAsync(today, cancellationToken),
+
+            TransactionCount: await CountTransactionsAsync(cancellationToken));
 
         return Result<OperationsDashboardResponse>.Success(response);
+    }
+
+    /// <summary>
+    /// How many rows the transaction history holds.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately the same two sources, with the same predicates, as
+    /// GetTransactionHistoryHandler: manual money movements plus every paid order. The
+    /// figure exists so the app can badge the history tab when it has something new to
+    /// show, so it has to agree with what that page lists or the badge lies. In
+    /// particular an unpaid booking is not counted, because it is not a transaction.
+    /// </remarks>
+    private async Task<int> CountTransactionsAsync(CancellationToken cancellationToken)
+    {
+        var manual = await _dbContext.FinancialTransactions.CountAsync(cancellationToken);
+
+        var sales = await _dbContext.LaundryOrders.CountAsync(
+            order => order.PaymentStatus == PaymentStatus.Paid && order.PaidAt != null,
+            cancellationToken);
+
+        return manual + sales;
     }
 
     /// <summary>

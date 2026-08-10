@@ -47,6 +47,7 @@ export function ActivityRow({ activity, onPress }: ActivityRowProps) {
       >
         {activity.type === "receipt" ? (
           <Image
+            fadeDuration={0}
             resizeMode="contain"
             source={receiptIcon}
             style={styles.receiptIcon}

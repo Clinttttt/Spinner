@@ -18,6 +18,8 @@ export interface OperationsCounts {
   unpaidOrders: number;
   completedToday: number;
   salesToday: number;
+  /** How many rows the transaction history holds. See currentFor. */
+  transactionCount: number;
 }
 
 const EMPTY: OperationsCounts = {
@@ -27,6 +29,7 @@ const EMPTY: OperationsCounts = {
   newBookings: 0,
   readyForDelivery: 0,
   salesToday: 0,
+  transactionCount: 0,
   unpaidOrders: 0,
 };
 
@@ -46,6 +49,8 @@ const SEEN_STORAGE_KEY = "spinner.tab-badges.seen";
 let counts: OperationsCounts = EMPTY;
 let seen: SeenCounts = { ...NOTHING_SEEN };
 let inFlight: Promise<OperationsCounts> | null = null;
+let restoring: Promise<void> | null = null;
+let hasStoredAcknowledgements = false;
 const listeners = new Set<() => void>();
 
 function emitChange() {
@@ -63,11 +68,18 @@ function emitChange() {
  * looked at — an unpaid order stays unpaid. A badge that clears on visit has to mean
  * "new since you last looked" instead, so what the owner has already acknowledged is
  * subtracted and only the difference is shown.
+ *
+ * Transaction History reports the size of the transaction list rather than unpaid
+ * orders. It used to report unpaid orders, which meant taking a booking raised a badge
+ * on a page that lists money movements and so had nothing new on it: an unpaid booking
+ * is not a transaction. Counting the list itself means the badge appears when a payment
+ * actually lands — an online QR payment, or an order the owner marks paid — and stays
+ * away for a booking that is merely received.
  */
 function currentFor(tab: BadgedTab) {
   if (tab === "Orders") return counts.newBookings;
   if (tab === "Schedule") return counts.forPickup;
-  return counts.unpaidOrders;
+  return counts.transactionCount;
 }
 
 export function getBadgeCount(tab: BadgedTab) {
@@ -120,6 +132,7 @@ export function acknowledgeTab(tab: BadgedTab) {
 async function persistSeen() {
   try {
     await SecureStore.setItemAsync(SEEN_STORAGE_KEY, JSON.stringify(seen));
+    hasStoredAcknowledgements = true;
   } catch {
     // Not worth surfacing. Losing this only means a badge reappears after a restart.
   }
@@ -127,6 +140,22 @@ async function persistSeen() {
 
 /** Restores what had been acknowledged before the app was last closed. */
 export async function restoreAcknowledgements() {
+  return ensureAcknowledgementsRestored();
+}
+
+/**
+ * Reads the stored acknowledgements once.
+ *
+ * Shared as a promise because more than one caller refreshes the counts — the tab bar on
+ * focus and the home screen's dashboard load — and a refresh that ran before the stored
+ * values were back would treat everything as unseen, then be overwritten a moment later.
+ */
+function ensureAcknowledgementsRestored() {
+  restoring ??= readStoredAcknowledgements();
+  return restoring;
+}
+
+async function readStoredAcknowledgements() {
   try {
     const stored = await SecureStore.getItemAsync(SEEN_STORAGE_KEY);
     if (!stored) return;
@@ -139,6 +168,7 @@ export async function restoreAcknowledgements() {
       TransactionHistory: Number(parsed.TransactionHistory) || 0,
     };
 
+    hasStoredAcknowledgements = true;
     emitChange();
   } catch {
     seen = { ...NOTHING_SEEN };
@@ -174,39 +204,59 @@ export async function refreshOperationsCounts() {
   // already running is shared rather than duplicated.
   if (inFlight) return inFlight;
 
-  inFlight = apiRequest<OperationsCounts>("/api/operations/dashboard")
-    .then((response) => {
-      counts = {
-        beingProcessed: response.beingProcessed ?? 0,
-        completedToday: response.completedToday ?? 0,
-        forPickup: response.forPickup ?? 0,
-        newBookings: response.newBookings ?? 0,
-        readyForDelivery: response.readyForDelivery ?? 0,
-        salesToday: response.salesToday ?? 0,
-        unpaidOrders: response.unpaidOrders ?? 0,
-      };
-
-      // An acknowledgement cannot exceed what is actually outstanding. Without this, a
-      // count that falls — an order finally paid, a booking confirmed — would leave the
-      // old, higher figure recorded as seen, and the badge would stay hidden through the
-      // next few genuinely new arrivals.
-      seen = {
-        Orders: Math.min(seen.Orders, counts.newBookings),
-        Schedule: Math.min(seen.Schedule, counts.forPickup),
-        TransactionHistory: Math.min(
-          seen.TransactionHistory,
-          counts.unpaidOrders,
-        ),
-      };
-
-      emitChange();
-      return counts;
-    })
-    .finally(() => {
-      inFlight = null;
-    });
+  inFlight = loadCounts().finally(() => {
+    inFlight = null;
+  });
 
   return inFlight;
+}
+
+async function loadCounts() {
+  // Before the counts are applied, so an acknowledgement that is still being read back
+  // from storage is not mistaken for "nothing seen yet".
+  await ensureAcknowledgementsRestored();
+
+  const response = await apiRequest<OperationsCounts>(
+    "/api/operations/dashboard",
+  );
+
+  counts = {
+    beingProcessed: response.beingProcessed ?? 0,
+    completedToday: response.completedToday ?? 0,
+    forPickup: response.forPickup ?? 0,
+    newBookings: response.newBookings ?? 0,
+    readyForDelivery: response.readyForDelivery ?? 0,
+    salesToday: response.salesToday ?? 0,
+    transactionCount: response.transactionCount ?? 0,
+    unpaidOrders: response.unpaidOrders ?? 0,
+  };
+
+  // The transaction count is a running total of everything the shop has ever taken, so
+  // on a first run there is nothing to compare it against and the whole history would
+  // arrive as a badge of forty-something. Treat what is already there as seen; only what
+  // arrives afterwards is new. The other two tabs count outstanding work, where the
+  // figure is meaningful on its own and worth showing immediately.
+  if (!hasStoredAcknowledgements) {
+    seen = { ...seen, TransactionHistory: counts.transactionCount };
+    hasStoredAcknowledgements = true;
+    void persistSeen();
+  }
+
+  // An acknowledgement cannot exceed what is actually outstanding. Without this, a
+  // count that falls — an order finally paid, a booking confirmed — would leave the
+  // old, higher figure recorded as seen, and the badge would stay hidden through the
+  // next few genuinely new arrivals.
+  seen = {
+    Orders: Math.min(seen.Orders, counts.newBookings),
+    Schedule: Math.min(seen.Schedule, counts.forPickup),
+    TransactionHistory: Math.min(
+      seen.TransactionHistory,
+      counts.transactionCount,
+    ),
+  };
+
+  emitChange();
+  return counts;
 }
 
 /**
@@ -225,5 +275,12 @@ export function resetOperationsCounts() {
   counts = EMPTY;
   seen = { ...NOTHING_SEEN };
   inFlight = null;
+
+  // Cleared so the next session reads the stored acknowledgements again. Leaving the
+  // resolved promise in place would skip that read, and the transaction badge would then
+  // find nothing acknowledged and show the shop's entire history as new.
+  restoring = null;
+  hasStoredAcknowledgements = false;
+
   emitChange();
 }

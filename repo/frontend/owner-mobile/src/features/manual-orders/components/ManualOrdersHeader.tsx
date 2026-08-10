@@ -48,6 +48,7 @@ export function ManualOrdersHeader({
         ]}
       >
         <Image
+          fadeDuration={0}
           resizeMode="cover"
           source={headerWaves}
           style={styles.backgroundImage}

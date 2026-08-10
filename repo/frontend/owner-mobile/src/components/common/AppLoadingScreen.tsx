@@ -27,6 +27,7 @@ export function AppLoadingScreen() {
     <View style={styles.screen}>
       <Image
         accessibilityIgnoresInvertColors
+        fadeDuration={0}
         resizeMode="cover"
         source={background}
         style={styles.background}
@@ -34,6 +35,7 @@ export function AppLoadingScreen() {
       <Image
         accessibilityIgnoresInvertColors
         accessibilityLabel="Spinner"
+        fadeDuration={0}
         resizeMode="contain"
         source={mascot}
         style={{ height: mascotWidth / MASCOT_ASPECT, width: mascotWidth }}

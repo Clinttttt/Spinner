@@ -38,6 +38,7 @@ export function HeaderAccountActions({
         {isAddTransaction ? (
           <Image
             accessibilityIgnoresInvertColors
+            fadeDuration={0}
             resizeMode="contain"
             source={transactionIcon}
             style={styles.transactionIcon}
@@ -68,6 +69,7 @@ export function HeaderAccountActions({
           <View style={styles.profileFrame}>
             <Image
               accessibilityLabel="Owner profile photo"
+              fadeDuration={0}
               resizeMode="cover"
               source={ownerProfile}
               style={styles.profilePhoto}

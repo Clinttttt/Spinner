@@ -16,6 +16,7 @@ import { appNotifications } from "../../notifications/components/NotificationsPr
 import { colors } from "../../../theme/colors";
 import { OrderHistoryHeader } from "../components/OrderHistoryHeader";
 import { OrderHistoryRow } from "../components/OrderHistoryRow";
+import { OrderHistorySkeleton } from "../components/OrderHistorySkeleton";
 import type {
   OrderHistoryEntry,
   OrderHistoryFilter,
@@ -173,12 +174,7 @@ export function OrderHistoryScreen({
           width={width}
         />
         <View style={{ paddingHorizontal: pagePadding }}>
-          {viewState === "loading" ? (
-            <View style={styles.stateCard}>
-              <ActivityIndicator color={colors.navy} />
-              <Text style={styles.stateBody}>Loading order history...</Text>
-            </View>
-          ) : null}
+          {viewState === "loading" ? <OrderHistorySkeleton /> : null}
           {viewState === "error" ? (
             <View style={styles.stateCard}>
               <Text style={styles.stateTitle}>

@@ -59,6 +59,7 @@ function OrderHistoryHeaderComponent({
         ]}
       >
         <Image
+          fadeDuration={0}
           resizeMode="cover"
           source={headerWaves}
           style={styles.backgroundImage}

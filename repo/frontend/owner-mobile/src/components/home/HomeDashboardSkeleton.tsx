@@ -1,15 +1,13 @@
 import { StyleSheet, View } from "react-native";
 
+import { SkeletonPulse } from "../common/SkeletonPulse";
 import { colors } from "../../theme/colors";
 import { radii } from "../../theme/radii";
 import { spacing } from "../../theme/spacing";
 
 export function HomeDashboardSkeleton() {
   return (
-    <View
-      accessibilityLabel="Loading dashboard"
-      accessibilityRole="progressbar"
-    >
+    <SkeletonPulse accessibilityLabel="Loading dashboard">
       <View style={styles.headerRow}>
         <View style={styles.logo} />
         <View style={styles.headerCopy}>
@@ -29,7 +27,7 @@ export function HomeDashboardSkeleton() {
         <View style={styles.divider} />
         <View style={styles.activityRow} />
       </View>
-    </View>
+    </SkeletonPulse>
   );
 }
 

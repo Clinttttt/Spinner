@@ -53,6 +53,7 @@ export function PriorityCard({
             />
           ) : (
             <Image
+              fadeDuration={0}
               resizeMode="contain"
               source={bellIcon}
               style={styles.bellIcon}

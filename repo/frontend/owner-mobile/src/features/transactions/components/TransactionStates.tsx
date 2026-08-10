@@ -1,11 +1,15 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { SkeletonPulse } from "../../../components/common/SkeletonPulse";
 import { colors } from "../../../theme/colors";
 
 export function TransactionSkeleton() {
   return (
-    <View style={styles.skeletonCard}>
+    <SkeletonPulse
+      accessibilityLabel="Loading transactions"
+      style={styles.skeletonCard}
+    >
       {[0, 1, 2, 3].map((item) => (
         <View key={item} style={styles.skeletonRow}>
           <View style={[styles.skeleton, styles.skeletonIcon]} />
@@ -16,7 +20,7 @@ export function TransactionSkeleton() {
           <View style={[styles.skeleton, styles.skeletonAmount]} />
         </View>
       ))}
-    </View>
+    </SkeletonPulse>
   );
 }
 

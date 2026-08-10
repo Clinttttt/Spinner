@@ -26,6 +26,7 @@ export function SettingsOverviewHeader({
     <View style={styles.overviewContainer}>
       <View pointerEvents="none" style={styles.backgroundFrame}>
         <Image
+          fadeDuration={0}
           resizeMode="cover"
           source={headerWaves}
           style={styles.backgroundImage}
@@ -75,6 +76,7 @@ export function SettingsPageHeader({
     <View style={styles.pageHeaderContainer}>
       <View pointerEvents="none" style={styles.pageBackgroundFrame}>
         <Image
+          fadeDuration={0}
           resizeMode="cover"
           source={headerWaves}
           style={styles.backgroundImage}

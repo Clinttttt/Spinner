@@ -18,6 +18,10 @@ expo-env.d.ts
 *.key
 *.mobileprovision
 
+# Release signing pulled from EAS for local Gradle builds. The repository is public and
+# this folder holds the signing key and its passwords.
+credentials/
+
 # Metro
 .metro-health-check*
 
