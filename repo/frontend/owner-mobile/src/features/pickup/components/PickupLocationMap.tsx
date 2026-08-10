@@ -44,7 +44,6 @@ export function PickupLocationMap({
   const hasCoordinates =
     Number.isFinite(latitude) && Number.isFinite(longitude);
   const routeCoordinates = details.routePreview?.coordinates ?? [];
-  const frameCoordinates = routeCoordinates.length > 1 ? routeCoordinates : [];
 
   useEffect(() => {
     if (!hasCoordinates) return;
@@ -58,14 +57,6 @@ export function PickupLocationMap({
     if (timerRef.current) clearTimeout(timerRef.current);
     setMapReady(true);
     setMapFailed(false);
-    if (frameCoordinates.length > 1) {
-      requestAnimationFrame(() => {
-        mapRef.current?.fitToCoordinates(frameCoordinates, {
-          animated: false,
-          edgePadding: { bottom: 40, left: 40, right: 40, top: 58 },
-        });
-      });
-    }
   };
 
   const summary = `Pickup location for ${details.customerName} at ${details.location.formattedAddress || details.shortAddress}${details.location.landmark ? `. Landmark: ${details.location.landmark}` : ""}.`;
@@ -115,12 +106,18 @@ export function PickupLocationMap({
       <MapView
         initialRegion={{
           latitude: latitude!,
-          // Tight enough to show the street the pin sits on. The previous 0.012
-          // span covered several kilometres of farmland, which told the rider
-          // nothing.
-          latitudeDelta: 0.0035,
+          // Close enough to see the actual house and its neighbours, which is the whole
+          // point of a satellite view for an address with no house numbers.
+          //
+          // This used to be widened straight back out again: on map ready the camera was
+          // fitted to the shop and the pickup point together, and those can be kilometres
+          // apart, so the view opened on farmland with two dots in it. The route line is
+          // still drawn and runs off the edge towards the shop, which shows the direction
+          // of approach without sacrificing the detail. Pinching out reaches the rest, and
+          // Open in Maps is there for actual navigation.
+          latitudeDelta: 0.0015,
           longitude: longitude!,
-          longitudeDelta: 0.0035,
+          longitudeDelta: 0.0015,
         }}
         mapPadding={{ bottom: 24, left: 20, right: 20, top: 32 }}
         // Hybrid: satellite imagery with Google's road and place labels drawn on

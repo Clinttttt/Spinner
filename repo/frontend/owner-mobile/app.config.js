@@ -1,4 +1,4 @@
-// `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` is the variable to set in every EAS
+﻿// `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` is the variable to set in every EAS
 // environment. The `EXPO_PUBLIC_` prefix means the JS bundle can also see
 // whether a key was supplied, so the pickup screen can say "map service is not
 // configured for this build" instead of rendering a blank grey rectangle.
@@ -27,7 +27,7 @@ module.exports = {
       // this remotely (appVersionSource: remote in eas.json) and ignores the value here,
       // so a local build otherwise defaulted to 1 and Android refused to install it over
       // an EAS build that had already reached 23.
-      versionCode: 27,
+      versionCode: 28,
       // Firebase client configuration, which is what lets Cloud Messaging issue this
       // app a device token. Kept out of the repository because it is public and the
       // file carries the project's Android API key: EAS supplies it as a file secret

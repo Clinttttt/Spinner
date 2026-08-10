@@ -1,20 +1,24 @@
-# Builds the shop's pickup-map marker.
+# Builds the shop's pickup-map marker from the shop's own logo.
 #
-# Why this is its own script: the marker has been resized three times, and each attempt
-# needs to be looked at before a six-minute Android build. Keeping it separate means it
-# can be regenerated and inspected on its own.
+# Why this is its own script: the marker has needed resizing several times, and each
+# attempt has to be looked at before a six-minute Android build. Pass -PreviewDir to also
+# write nearest-neighbour blow-ups, which show the actual pixels the phone is given rather
+# than a smoothed impression of them.
 #
-# The design point. The marker used to be the whole logo shrunk to fit, and the logo is a
-# coin: "ENGR. SPIN" arched over the top, "LAUNDRY" under, "EST. 2024", a hard hat and a
-# washing machine either side of the centre. At 64dp that was already an unreadable
-# smudge, and Google's own map labels sit at roughly 20dp, so matching them by shrinking
-# the coin further would produce a gold dot. Instead the marker is cropped to the part of
-# the logo that survives at that size: the gold gear with the blue swirl at its centre.
-# That is the same approach Google takes with its own places, a single simple mark inside
-# a circle, and it stays recognisable where the full lockup cannot.
+# Sizing is the whole problem here, and it is a trade-off between two real constraints.
 #
-# Emitted at 1x, 2x and 3x so React Native picks the right density and the mark is crisp
-# rather than an upscaled 28-pixel bitmap.
+# Too large and it dwarfs Google's own place icons, which sit at roughly 20-24dp, and
+# covers the roofs the rider is trying to see. It started at 96dp, then 64dp.
+#
+# Too small and the logo stops being legible. It is a photographic coin: bevelled gold,
+# arched wordmarks, a gear with teeth, a multi-tone vortex. Detail like that needs pixels,
+# and an attempt at 28dp came out as a blur.
+#
+# 44dp is the settled compromise: noticeably smaller than the original, still enough
+# resolution for the coin to read as the shop's logo rather than a smudge. The artwork is
+# used as drawn, not reinterpreted.
+#
+# Emitted at 1x, 2x and 3x so React Native can pick the density it needs.
 #
 # Run from the repository root:
 #   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-map-marker.ps1
@@ -22,26 +26,19 @@
 [CmdletBinding()]
 param(
   # Footprint in density-independent pixels. React Native treats an asset with no @Nx
-  # suffix as 1x, so the 1x file's pixel size is the dp size the map will draw at.
-  [int] $MarkerDp = 28,
-
-  # The square region of logo.jpg holding the gear and swirl, as a fraction of the
-  # image's width, measured from its centre. Tight enough to exclude the black band the
-  # hard hat and washing machine sit on, which runs straight through the gear's centre
-  # line and otherwise leaves two dark wedges inside the disc.
-  [double] $CropFraction = 0.30,
+  # suffix as 1x, so the 1x file's pixel size is the dp size the map draws at.
+  [int] $MarkerDp = 44,
 
   [string] $LogoPath,
-  [string] $OutputDir
+  [string] $OutputDir,
+  [string] $PreviewDir
 )
 
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-if (-not $LogoPath) {
-  $LogoPath = Join-Path $repoRoot 'repo\frontend\owner-mobile\assets\branding\logo.jpg'
-}
+if (-not $LogoPath) { $LogoPath = Join-Path $repoRoot 'assets\logo.jpg' }
 if (-not $OutputDir) {
   $OutputDir = Join-Path $repoRoot 'repo\frontend\owner-mobile\assets\branding'
 }
@@ -49,62 +46,84 @@ if (-not $OutputDir) {
 if (-not (Test-Path $LogoPath)) { throw "Logo not found: $LogoPath" }
 
 $logo = [System.Drawing.Bitmap]::FromFile($LogoPath)
+Write-Host ("logo {0}: {1}x{2}" -f (Split-Path $LogoPath -Leaf), $logo.Width, $logo.Height)
 
-# The gear sits slightly above the coin's centre, between the arched wordmarks.
-$cropSide = [int]($logo.Width * $CropFraction)
-$cropX = [int](($logo.Width - $cropSide) / 2)
-$cropY = [int](($logo.Height - $cropSide) / 2) - [int]($logo.Height * 0.005)
-$crop = New-Object System.Drawing.Rectangle $cropX, $cropY, $cropSide, $cropSide
+# The coin is drawn inside a square canvas with white margins of its own, so the artwork
+# is trimmed to the coin before it is scaled. Without this the logo lands smaller than the
+# marker it sits in and the ring appears to float away from it.
+$trim = [int]($logo.Width * 0.035)
+$source = New-Object System.Drawing.Rectangle $trim, $trim, ($logo.Width - $trim * 2), ($logo.Height - $trim * 2)
 
-Write-Output ("logo {0}x{1}, cropping {2}x{2} at ({3},{4})" -f `
-  $logo.Width, $logo.Height, $cropSide, $cropX, $cropY)
-
-function Write-Marker([int] $side, [string] $path) {
+function New-Marker([int] $side) {
   $marker = New-Object System.Drawing.Bitmap $side, $side, ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
   $g = [System.Drawing.Graphics]::FromImage($marker)
   $g.SmoothingMode = 'AntiAlias'
+  # The logo is being reduced by a factor of twenty or more, so the resampling quality
+  # is what decides whether the gear reads or turns to mush.
   $g.InterpolationMode = 'HighQualityBicubic'
   $g.PixelOffsetMode = 'HighQuality'
+  $g.CompositingQuality = 'HighQuality'
 
-  # Scaled with the marker so the ring is proportional at every density rather than
+  # Proportional to the side so the ring is identical at every density rather than
   # hairline at 3x and heavy at 1x.
-  $ringWidth = [Math]::Max(1.0, $side / 14.0)
+  $ringWidth = [Math]::Max(1.0, $side / 22.0)
   $inset = $ringWidth / 2.0
+  $disc = New-Object System.Drawing.RectangleF $inset, $inset, ($side - $inset * 2), ($side - $inset * 2)
 
-  $circle = New-Object System.Drawing.RectangleF $inset, $inset, ($side - ($inset * 2)), ($side - ($inset * 2))
-
-  $path2 = New-Object System.Drawing.Drawing2D.GraphicsPath
-  $path2.AddEllipse($circle)
-
-  # White behind the mark so it holds up over dark satellite imagery, which is what the
-  # pickup map shows.
+  # White behind the coin. The logo's own background is white but its corners are not,
+  # and the pickup map is satellite imagery, so a bare square of photograph would sit on
+  # dark foliage with no edge at all.
   $white = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::White)
-  $g.FillEllipse($white, $circle)
+  $g.FillEllipse($white, $disc)
 
-  # The gear is drawn inside the white disc with a margin, so the disc reads as a pin
-  # rather than the artwork being clipped by its own edge.
-  $g.SetClip($path2)
-  $artMargin = $side * 0.13
-  $art = New-Object System.Drawing.RectangleF ($inset + $artMargin), ($inset + $artMargin), `
-    ($circle.Width - ($artMargin * 2)), ($circle.Height - ($artMargin * 2))
-  $g.DrawImage($logo, $art, $crop, [System.Drawing.GraphicsUnit]::Pixel)
+  $clip = New-Object System.Drawing.Drawing2D.GraphicsPath
+  $clip.AddEllipse($disc)
+  $g.SetClip($clip)
+  $g.DrawImage($logo, $disc, $source, [System.Drawing.GraphicsUnit]::Pixel)
   $g.ResetClip()
 
-  # A navy edge, matching the app's own outlines, so the marker has a defined boundary
-  # against pale roofs and roads.
+  # A navy edge, matching the app's own outlines, so the marker keeps a defined boundary
+  # over pale roofs and dirt roads where the logo's gold rim alone would disappear.
   $navy = New-Object System.Drawing.Pen ([System.Drawing.ColorTranslator]::FromHtml('#0D2A52')), $ringWidth
-  $g.DrawEllipse($navy, $circle)
+  $g.DrawEllipse($navy, $disc)
 
-  $marker.Save($path, [System.Drawing.Imaging.ImageFormat]::Png)
-  Write-Output ("  wrote {0,-34} {1}x{1}" -f (Split-Path $path -Leaf), $side)
+  foreach ($item in @($navy, $clip, $white, $g)) { $item.Dispose() }
 
-  foreach ($item in @($navy, $white, $path2, $g, $marker)) { $item.Dispose() }
+  return $marker
 }
 
-Write-Marker $MarkerDp (Join-Path $OutputDir 'business-home-marker.png')
-Write-Marker ($MarkerDp * 2) (Join-Path $OutputDir 'business-home-marker@2x.png')
-Write-Marker ($MarkerDp * 3) (Join-Path $OutputDir 'business-home-marker@3x.png')
+function Save-Marker([int] $side, [string] $name) {
+  $marker = New-Marker $side
+  $marker.Save((Join-Path $OutputDir $name), [System.Drawing.Imaging.ImageFormat]::Png)
+  Write-Host ("  wrote {0,-34} {1}x{1}" -f $name, $side)
+  return $marker
+}
 
+$one = Save-Marker $MarkerDp 'business-home-marker.png'
+$two = Save-Marker ($MarkerDp * 2) 'business-home-marker@2x.png'
+$three = Save-Marker ($MarkerDp * 3) 'business-home-marker@3x.png'
+
+if ($PreviewDir) {
+  New-Item -ItemType Directory -Force -Path $PreviewDir | Out-Null
+
+  foreach ($pair in @(
+      @{ Bitmap = $one; Name = 'preview-1x-zoom.png' },
+      @{ Bitmap = $two; Name = 'preview-2x-zoom.png' })) {
+    $src = $pair.Bitmap
+    $zoom = [Math]::Max(1, [int](352 / $src.Width))
+    $big = New-Object System.Drawing.Bitmap ($src.Width * $zoom), ($src.Height * $zoom)
+    $bg = [System.Drawing.Graphics]::FromImage($big)
+    # Nearest neighbour on purpose: this shows the pixels as they are, not smoothed.
+    $bg.InterpolationMode = 'NearestNeighbor'
+    $bg.PixelOffsetMode = 'Half'
+    $bg.DrawImage($src, 0, 0, $big.Width, $big.Height)
+    $big.Save((Join-Path $PreviewDir $pair.Name), [System.Drawing.Imaging.ImageFormat]::Png)
+    Write-Host ("  preview {0,-32} {1}x{1}" -f $pair.Name, $big.Width)
+    $bg.Dispose(); $big.Dispose()
+  }
+}
+
+foreach ($bitmap in @($one, $two, $three)) { $bitmap.Dispose() }
 $logo.Dispose()
 
-Write-Output ("Marker footprint: {0}dp" -f $MarkerDp)
+Write-Host ("Marker footprint: {0}dp" -f $MarkerDp)
