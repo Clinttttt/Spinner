@@ -123,6 +123,20 @@ function getSnapshot() {
   return pickupTasks;
 }
 
+/**
+ * Empties the schedule held in memory.
+ *
+ * Called on sign-out. The counter phone is shared, so whoever signs in next must not see
+ * the previous person's pickups on the first frame, before the screen has refetched. The
+ * in-flight promise is dropped as well: a refresh started under the old session would
+ * otherwise resolve afterwards and repopulate the list it just cleared.
+ */
+export function resetPickupTasks() {
+  pickupTasks = [];
+  refreshPromise = null;
+  emitChange();
+}
+
 function localDate(offsetDays = 0) {
   const date = new Date();
   date.setDate(date.getDate() + offsetDays);

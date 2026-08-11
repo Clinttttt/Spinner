@@ -1,7 +1,7 @@
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
-import { useEffect, useState } from "react";
-import { BackHandler } from "react-native";
+import { useCallback, useState } from "react";
 
+import { useFocusedBackHandler } from "../../../components/common/useFocusedBackHandler";
 import type { RootTabParamList } from "../../../navigation/types";
 import { BookingDetailsScreen } from "./BookingDetailsScreen";
 import { BookingsScreen } from "./BookingsScreen";
@@ -13,19 +13,16 @@ export function BookingsFlowScreen({ navigation }: BookingsFlowScreenProps) {
     null,
   );
 
-  useEffect(() => {
-    if (!selectedBookingId) return;
+  const handleBack = useCallback(() => {
+    // Only claims the press when a booking is open; otherwise it is passed on so the
+    // system can close the app from the list.
+    if (!selectedBookingId) return false;
 
-    const subscription = BackHandler.addEventListener(
-      "hardwareBackPress",
-      () => {
-        setSelectedBookingId(null);
-        return true;
-      },
-    );
-
-    return () => subscription.remove();
+    setSelectedBookingId(null);
+    return true;
   }, [selectedBookingId]);
+
+  useFocusedBackHandler(handleBack);
 
   if (selectedBookingId) {
     return (

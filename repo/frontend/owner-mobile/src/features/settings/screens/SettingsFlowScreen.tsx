@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
-import { BackHandler } from "react-native";
+import { useCallback, useState } from "react";
 
+import { useFocusedBackHandler } from "../../../components/common/useFocusedBackHandler";
 import type { SettingsPageId } from "../models/settings";
 import { SettingsDetailScreen } from "./SettingsDetailScreen";
 import { SettingsScreen } from "./SettingsScreen";
@@ -8,19 +8,16 @@ import { SettingsScreen } from "./SettingsScreen";
 export function SettingsFlowScreen() {
   const [activePage, setActivePage] = useState<SettingsPageId | null>(null);
 
-  useEffect(() => {
-    if (!activePage) return;
+  const handleBack = useCallback(() => {
+    // Only claims the press when a settings page is open; otherwise it is passed on so
+    // the system can close the app.
+    if (!activePage) return false;
 
-    const subscription = BackHandler.addEventListener(
-      "hardwareBackPress",
-      () => {
-        setActivePage(null);
-        return true;
-      },
-    );
-
-    return () => subscription.remove();
+    setActivePage(null);
+    return true;
   }, [activePage]);
+
+  useFocusedBackHandler(handleBack);
 
   if (activePage) {
     return (

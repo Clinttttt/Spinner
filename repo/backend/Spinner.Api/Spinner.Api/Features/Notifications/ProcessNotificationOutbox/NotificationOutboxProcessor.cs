@@ -76,7 +76,34 @@ public sealed class NotificationOutboxProcessor
                 message.MarkFailed(ex.Message, sentAt);
             }
 
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await _dbContext.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                // Another worker re-claimed this message while it was in flight, which can
+                // only happen when the send outlasts the lease. Two things had to be
+                // handled here rather than letting it throw.
+                //
+                // The exception escaped the loop, so every message claimed after this one
+                // was abandoned mid-batch and sat as Processing until its own lease
+                // lapsed. On a deploy, where two revisions overlap briefly, that could
+                // stall a whole batch of receipts.
+                //
+                // And a failed save leaves the entity tracked with the stamp it read, so
+                // the next message's save would be rejected for this message's conflict,
+                // and so would every one after it. Detaching is what lets the loop go on.
+                //
+                // The outcome is deliberately not forced through: the row belongs to the
+                // other worker now, and overwriting it would let the two disagree about
+                // whether the customer was actually written to.
+                _logger.LogWarning(
+                    "Notification {NotificationId} finished after its lease expired. Another worker owns it, so the outcome was not recorded and the message may be sent again. Consider raising NotificationOutbox:ClaimMinutes.",
+                    message.Id);
+
+                _dbContext.Entry(message).State = EntityState.Detached;
+            }
         }
 
         return messages.Count;

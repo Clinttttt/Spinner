@@ -164,6 +164,20 @@ export function AdjustChargesSheet(props: AdjustChargesSheetProps) {
   );
 }
 
+/**
+ * Keeps only what can be part of a peso amount, and at most two decimal places.
+ *
+ * Mirrors sanitizeAmount in AddTransactionScreen, which is the other money field in the
+ * app. Both are deliberately text-first; see MoneyField for why.
+ */
+function sanitizeMoney(value: string) {
+  const normalized = value.replace(/[^0-9.]/g, "");
+  const [whole, ...decimals] = normalized.split(".");
+  return decimals.length > 0
+    ? `${whole}.${decimals.join("").slice(0, 2)}`
+    : whole;
+}
+
 function MoneyField({
   label,
   onChange,
@@ -173,6 +187,31 @@ function MoneyField({
   onChange: (value: number) => void;
   value: number;
 }) {
+  /**
+   * The text as typed, rather than the number rendered back as text.
+   *
+   * This field used to be controlled by String(value), so every keystroke was parsed and
+   * reformatted. Typing "5." produced Number("5.") = 5, which rendered as "5" and threw
+   * the decimal point away as it was typed; entering 5.50 gave 550, and the owner
+   * discounted an order by a hundred times what they meant. Only the parsed number is
+   * published upward now, and the text is left exactly as entered.
+   *
+   * Seeded from the prop once, which is all that is needed: the sheet is mounted fresh
+   * each time it opens and nothing outside it changes these amounts while it is open. An
+   * amount of zero starts empty so the placeholder shows rather than a "0" the owner has
+   * to delete before typing.
+   */
+  const [text, setText] = useState(() => (value === 0 ? "" : String(value)));
+
+  const handleChange = (next: string) => {
+    const cleaned = sanitizeMoney(next);
+    setText(cleaned);
+
+    // An empty field, or a lone ".", is zero rather than NaN.
+    const parsed = Number(cleaned);
+    onChange(Number.isFinite(parsed) ? Math.max(0, parsed) : 0);
+  };
+
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
@@ -181,11 +220,11 @@ function MoneyField({
         <TextInput
           accessibilityLabel={label}
           keyboardType="decimal-pad"
-          onChangeText={(text) =>
-            onChange(Math.max(0, Number(text.replace(/[^0-9.]/g, "")) || 0))
-          }
+          onChangeText={handleChange}
+          placeholder="0.00"
+          placeholderTextColor={colors.textMuted}
           style={styles.input}
-          value={String(value)}
+          value={text}
         />
       </View>
     </View>

@@ -122,6 +122,71 @@ public sealed class NotificationOutboxClaimTests
             message => Assert.Equal(order.OrderCode, message.Order?.OrderCode));
     }
 
+    [Fact]
+    public async Task Should_Finish_The_Batch_When_One_Message_Loses_Its_Claim_Mid_Send()
+    {
+        // What this reproduces: a send that outlasts its lease. Another worker re-claims
+        // the row, so recording the outcome fails on the concurrency stamp.
+        //
+        // That exception used to escape the loop, which took every message claimed behind
+        // it down as well — they were left as Processing until their own leases lapsed. A
+        // failed save also leaves the entity tracked with the stamp it read, so even
+        // catching it was not enough: the next message's save would be rejected for this
+        // message's conflict, and so would every one after it.
+        //
+        // Two overlapping workers is not hypothetical here: a Container Apps revision swap
+        // runs both briefly, and that is exactly when a batch of receipts would stall.
+        var (processing, other) = AppDbContextFactory.CreatePair();
+        await using var processingContext = processing;
+        await using var otherContext = other;
+
+        var older = new NotificationOutboxMessage(
+            NotificationChannel.Email,
+            "first@example.com",
+            "First",
+            "First message.",
+            DateTimeOffset.UtcNow.AddMinutes(-5));
+
+        var newer = new NotificationOutboxMessage(
+            NotificationChannel.Email,
+            "second@example.com",
+            "Second",
+            "Second message.",
+            DateTimeOffset.UtcNow);
+
+        processingContext.NotificationOutboxMessages.AddRange(older, newer);
+        await processingContext.SaveChangesAsync();
+
+        var stolen = false;
+        var sender = new CallbackSender(() =>
+        {
+            // Steal the claim once, while the first message is in flight.
+            if (stolen) return;
+            stolen = true;
+
+            var target = otherContext.NotificationOutboxMessages
+                .Single(message => message.Recipient == "first@example.com");
+            target.Claim(Guid.NewGuid(), DateTimeOffset.UtcNow.AddMinutes(5));
+            otherContext.SaveChanges();
+        });
+
+        // Must not throw.
+        await Processor(processingContext, sender).ProcessPendingAsync(CancellationToken.None);
+
+        var messages = await otherContext.NotificationOutboxMessages
+            .AsNoTracking()
+            .ToListAsync();
+
+        // The second message went out and its outcome was recorded, rather than being
+        // abandoned because the first one conflicted.
+        var second = messages.Single(message => message.Recipient == "second@example.com");
+        Assert.Equal(NotificationStatus.Sent, second.Status);
+
+        // The first is left to the worker that owns it now, not overwritten.
+        var first = messages.Single(message => message.Recipient == "first@example.com");
+        Assert.Equal(NotificationStatus.Processing, first.Status);
+    }
+
     private sealed class CapturingSender : INotificationSender
     {
         public List<NotificationOutboxMessage> Seen { get; } = [];

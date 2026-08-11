@@ -29,6 +29,10 @@ import {
   registerForPushNotificationsAsync,
   releasePushNotificationsAsync,
 } from "../notifications/services/pushRegistration";
+import { resetOperationsCounts } from "../operations/operationsCountsStore";
+import { resetPickupTasks } from "../pickup/services/pickupStore";
+import { resetSeenTransactions } from "../transactions/services/seenTransactionsStore";
+import { resetTransactions } from "../transactions/services/transactionStore";
 
 interface AuthContextValue {
   loading: boolean;
@@ -140,6 +144,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await releasePushNotificationsAsync();
       await revokeApiSession();
     } finally {
+      // Emptied before the session goes, so the next person to sign in cannot see the
+      // last one's shop data. These stores are module-level and survive a sign-out on
+      // their own, and they are the snapshot the screens render from, so without this the
+      // first frame after signing in shows the previous user's transactions, pickups and
+      // badge counts until each screen has refetched. The counter phone is shared, which
+      // is the whole reason a device can be reassigned between staff.
+      resetOperationsCounts();
+      resetTransactions();
+      resetSeenTransactions();
+      resetPickupTasks();
+
       setSession(undefined);
     }
   }, []);

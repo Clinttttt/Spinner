@@ -66,11 +66,40 @@ export function OrderHistoryScreen({
   const [refreshing, setRefreshing] = useState(false);
   const [viewState, setViewState] = useState<OrderHistoryViewState>("loading");
   const [reloadToken, setReloadToken] = useState(0);
+  // The last request that has been applied. See the block below.
+  const [lastRequest, setLastRequest] = useState(requestedOrderCode);
 
   useEffect(() => {
     const timeout = setTimeout(() => setDebouncedQuery(query.trim()), 300);
     return () => clearTimeout(timeout);
   }, [query]);
+
+  /**
+   * Opens the order a notification or a sale asked for.
+   *
+   * Applied during render rather than from an effect, which is React's own answer to
+   * resetting state when an input changes, and avoids the cascading render that setting
+   * state inside an effect would cause.
+   *
+   * It cannot be left to the useState initialisers above: this is a bottom-tab screen and
+   * stays mounted once visited, so they never run again, and tapping a second notification
+   * changed route.params while the screen went on showing the first order.
+   *
+   * lastRequest makes this idempotent, so the owner can search for something else without
+   * the request being reapplied on the next render, and returning to the tab by hand later
+   * does not resurrect an old one.
+   *
+   * The filter is reset because a request has to win over whatever view the ledger was
+   * left in: with "Cancelled" selected, a completed order would be filtered out and the
+   * screen would look broken rather than showing what was asked for.
+   */
+  if (requestedOrderCode && requestedOrderCode !== lastRequest) {
+    setLastRequest(requestedOrderCode);
+    setQuery(requestedOrderCode);
+    setDebouncedQuery(requestedOrderCode);
+    setExpanded(requestedOrderCode);
+    setFilter("all");
+  }
 
   // Search is sent to the server, so a new term is a new first page rather than a
   // filter over what happens to be loaded.

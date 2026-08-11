@@ -1,10 +1,10 @@
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import { useFocusEffect } from "@react-navigation/native";
-import { useCallback, useEffect, useState } from "react";
-import { BackHandler } from "react-native";
+import { useCallback, useState } from "react";
 
 import { describeApiError } from "../../../api/apiClient";
 import { useDialog } from "../../../components/common/DialogProvider";
+import { useFocusedBackHandler } from "../../../components/common/useFocusedBackHandler";
 import type { RootTabParamList } from "../../../navigation/types";
 import type { ManualOrder } from "../models/manualOrder";
 import {
@@ -38,21 +38,17 @@ export function ManualOrdersFlowScreen({
     );
   }, []);
 
-  useEffect(() => {
-    const subscription = BackHandler.addEventListener(
-      "hardwareBackPress",
-      () => {
-        if (view.name !== "list") {
-          setView({ name: "list" });
-          return true;
-        }
-        navigation.navigate("Home");
-        return true;
-      },
-    );
+  const handleBack = useCallback(() => {
+    if (view.name !== "list") {
+      setView({ name: "list" });
+      return true;
+    }
 
-    return () => subscription.remove();
+    navigation.navigate("Home");
+    return true;
   }, [navigation, view.name]);
+
+  useFocusedBackHandler(handleBack);
 
   const loadOrders = useCallback(async () => {
     try {

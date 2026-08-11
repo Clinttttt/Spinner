@@ -165,10 +165,25 @@ export function calculateManualOrder(
   return { serviceAmount, services, totalAmount };
 }
 
+/**
+ * The calendar date a "Today" or "Tomorrow" label means, in the shop's own day.
+ *
+ * Built from the local date parts rather than toISOString, which converts to UTC first.
+ * The shop is UTC+8, so between midnight and 08:00 the UTC date is still yesterday, and a
+ * manual order taken at one in the morning was filed against the previous day. It then
+ * disappeared from today's list and landed in the wrong day's figures.
+ *
+ * Matches localDate in pickupStore, which already does this correctly.
+ */
 function dateFromLabel(label: string) {
-  const now = new Date();
-  if (/tomorrow/i.test(label)) now.setDate(now.getDate() + 1);
-  return now.toISOString().slice(0, 10);
+  const date = new Date();
+  if (/tomorrow/i.test(label)) date.setDate(date.getDate() + 1);
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
 }
 
 function mapListOrder(dto: ManualOrderListDto): ManualOrder {
