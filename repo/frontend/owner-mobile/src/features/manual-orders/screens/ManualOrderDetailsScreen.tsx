@@ -201,7 +201,11 @@ export function ManualOrderDetailsScreen({
         primaryLoading={submitting}
         primaryLabel={submitting ? "Updating…" : primaryAction.label}
       />
-      <BookingDetailsSupportRow />
+      <BookingDetailsSupportRow
+        onContactSupport={() =>
+          navigation.navigate("Settings", { page: "help" })
+        }
+      />
     </BookingDetailsLayout>
   );
 }

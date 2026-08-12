@@ -1,6 +1,6 @@
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import { useFocusEffect } from "@react-navigation/native";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   Image,
   RefreshControl,
@@ -21,6 +21,7 @@ import { SpinlyAssistantCard } from "../../../components/home/SpinlyAssistantCar
 import { useAuth } from "../../auth/AuthContext";
 import type { RootTabParamList } from "../../../navigation/types";
 import { appNotifications } from "../../notifications/components/NotificationsProvider";
+import { useOperationsCounts } from "../../operations/operationsCountsStore";
 import { colors } from "../../../theme/colors";
 import { spacing } from "../../../theme/spacing";
 import type {
@@ -29,6 +30,7 @@ import type {
   HomeDashboardData,
 } from "../models/homeDashboard";
 import { getHomeDashboard } from "../services/homeDashboardService";
+import { buildSpinlySummary } from "../services/spinlySummary";
 
 const headerWaves = require("../../../../assets/backgrounds/home-header-waves.webp");
 
@@ -45,6 +47,19 @@ export function OwnerHomeScreen({ navigation }: OwnerHomeScreenProps) {
   const pageHorizontalPadding = width <= 360 ? 12 : 14;
   const topBackgroundHeight = Math.round(
     Math.min(420, Math.max(400, 410 + (width - 390) * 0.25)),
+  );
+
+  // Read from the shared store rather than fetched again: getHomeDashboard already
+  // refreshes it, so the assistant card, the tab badges and this screen all describe the
+  // same figures without a second request.
+  const counts = useOperationsCounts();
+
+  // Rebuilt when the counts change, which is on load, on focus and on pull to refresh. The
+  // clock is read at the same moment, so the wording moves from morning to evening on the
+  // next refresh rather than needing a timer.
+  const spinlySummary = useMemo(
+    () => buildSpinlySummary(counts, new Date()),
+    [counts],
   );
 
   // Confirming or completing an order on another tab changes these counters.
@@ -204,6 +219,7 @@ export function OwnerHomeScreen({ navigation }: OwnerHomeScreenProps) {
                   <SpinlyAssistantCard
                     onOrdersPress={() => navigation.navigate("ManualOrders")}
                     onReportsPress={() => navigation.navigate("Reports")}
+                    summary={spinlySummary}
                   />
                 </View>
 

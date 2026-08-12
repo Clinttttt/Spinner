@@ -29,6 +29,9 @@ export function BookingsFlowScreen({ navigation }: BookingsFlowScreenProps) {
       <BookingDetailsScreen
         bookingId={selectedBookingId}
         onBackPress={() => setSelectedBookingId(null)}
+        onContactSupport={() =>
+          navigation.navigate("Settings", { page: "help" })
+        }
         onProfilePress={() => navigation.navigate("Settings")}
       />
     );

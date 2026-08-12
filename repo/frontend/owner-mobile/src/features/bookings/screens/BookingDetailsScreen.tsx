@@ -35,12 +35,15 @@ function peso(value: number) {
 interface BookingDetailsScreenProps {
   bookingId: string;
   onBackPress: () => void;
+  /** Opens the Help Center. Provided by the flow screen, which owns navigation. */
+  onContactSupport: () => void;
   onProfilePress: () => void;
 }
 
 export function BookingDetailsScreen({
   bookingId,
   onBackPress,
+  onContactSupport,
   onProfilePress,
 }: BookingDetailsScreenProps) {
   const dialog = useDialog();
@@ -209,7 +212,7 @@ export function BookingDetailsScreen({
               submitting ? "Updating…" : bookingActionLabel(displayBooking)
             }
           />
-          <BookingDetailsSupportRow />
+          <BookingDetailsSupportRow onContactSupport={onContactSupport} />
         </>
       ) : null}
     </BookingDetailsLayout>

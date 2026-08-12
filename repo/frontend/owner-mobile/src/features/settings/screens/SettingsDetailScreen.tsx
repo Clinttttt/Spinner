@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  Linking,
   Platform,
   Pressable,
   StyleSheet,
@@ -14,6 +15,7 @@ import {
 } from "react-native";
 
 import { describeApiError } from "../../../api/apiClient";
+import { supportConfig } from "../../../api/supportConfig";
 import { appDialog } from "../../../components/common/DialogProvider";
 import { colors } from "../../../theme/colors";
 import {
@@ -1492,6 +1494,42 @@ function formatInviteDate(value: string) {
   });
 }
 
+/**
+ * Opens the owner's mail app with the app and version already filled in.
+ *
+ * The version matters: the first thing anyone answering a support message needs to know is
+ * which build the problem is on, and an owner should not have to go and find it.
+ */
+async function openSupportEmail() {
+  const subject = encodeURIComponent(
+    `${settingsDefaults.app.name} ${settingsDefaults.app.version} support`,
+  );
+
+  try {
+    await Linking.openURL(`mailto:${supportConfig.email}?subject=${subject}`);
+  } catch {
+    // Some devices have no mail app at all, so the address is shown instead of failing
+    // silently and leaving the owner with nothing to write to.
+    await appDialog.notify({
+      message: `This device has no email app set up. Write to ${supportConfig.email}.`,
+      title: "Email unavailable",
+      tone: "warning",
+    });
+  }
+}
+
+async function openSupportSite() {
+  try {
+    await Linking.openURL(supportConfig.url);
+  } catch {
+    await appDialog.notify({
+      message: `This device could not open the help site. Visit ${supportConfig.url}.`,
+      title: "Browser unavailable",
+      tone: "warning",
+    });
+  }
+}
+
 function HelpCenterPage() {
   const [expandedQuestion, setExpandedQuestion] = useState<string | null>(
     "confirm",
@@ -1510,10 +1548,30 @@ function HelpCenterPage() {
           </Text>
         </View>
       </SettingsCard>
-      <InlineNotice>
-        {settingsDefaults.app.supportContact}. The in-app guide remains
-        available below.
-      </InlineNotice>
+      {supportConfig.isConfigured ? (
+        <SettingsCard style={styles.formCard}>
+          <Text style={styles.helpContactIntro}>
+            If the guide below does not answer it, get in touch.
+          </Text>
+          {supportConfig.hasEmail ? (
+            <PrimaryButton
+              label="Email support"
+              onPress={() => void openSupportEmail()}
+            />
+          ) : null}
+          {supportConfig.hasUrl ? (
+            <SecondaryButton
+              label="Open the help site"
+              onPress={() => void openSupportSite()}
+            />
+          ) : null}
+        </SettingsCard>
+      ) : (
+        <InlineNotice>
+          No support channel is configured for this build. The in-app guide
+          below is available offline.
+        </InlineNotice>
+      )}
       <SettingsSectionTitle>Frequently Asked Questions</SettingsSectionTitle>
       <SettingsCard>
         {frequentlyAskedQuestions.map((faq, index) => {
@@ -1946,6 +2004,12 @@ const styles = StyleSheet.create({
     height: 54,
     justifyContent: "center",
     width: 54,
+  },
+  helpContactIntro: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: 4,
   },
   helpHeroSubtitle: {
     color: colors.textSecondary,

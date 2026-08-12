@@ -92,7 +92,18 @@ export function BookingDetailsLayout({
   );
 }
 
-export function BookingDetailsSupportRow() {
+/**
+ * Offers a way out when an order is not behaving as expected.
+ *
+ * The link used to be wired to nothing at all, so pressing it did precisely nothing. It now
+ * opens the Help Center, which already carries the app's guidance and the shop's support
+ * contact, rather than sending the owner to an external page that does not exist.
+ */
+export function BookingDetailsSupportRow({
+  onContactSupport,
+}: {
+  onContactSupport: () => void;
+}) {
   return (
     <View style={styles.supportRow}>
       <Ionicons
@@ -102,9 +113,9 @@ export function BookingDetailsSupportRow() {
       />
       <Text style={styles.supportText}>Need help with this order? </Text>
       <Pressable
-        accessibilityLabel="Contact support"
+        accessibilityLabel="Open the Help Center"
         accessibilityRole="button"
-        onPress={() => undefined}
+        onPress={onContactSupport}
         style={({ pressed }) => pressed && styles.pressed}
       >
         <Text style={styles.supportLink}>Contact support</Text>

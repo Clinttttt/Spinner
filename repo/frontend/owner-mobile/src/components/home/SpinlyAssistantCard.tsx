@@ -8,6 +8,7 @@ import {
 } from "react-native";
 
 import { colors } from "../../theme/colors";
+import type { SpinlySummary } from "../../features/home/services/spinlySummary";
 import {
   assistantShadow,
   controlShadow,
@@ -20,6 +21,13 @@ import { SpinlyMascotLoop } from "./SpinlyMascotLoop";
 interface SpinlyAssistantCardProps {
   onOrdersPress: () => void;
   onReportsPress: () => void;
+  /**
+   * The day in four lines, built from the shop's own counts.
+   *
+   * Passed in rather than read here so this stays a presentational card and the figures
+   * have one source. See buildSpinlySummary.
+   */
+  summary: SpinlySummary;
 }
 
 interface AssistantActionProps {
@@ -67,6 +75,7 @@ function AssistantAction({
 export function SpinlyAssistantCard({
   onOrdersPress,
   onReportsPress,
+  summary,
 }: SpinlyAssistantCardProps) {
   const { width } = useWindowDimensions();
   const compact = width <= 360;
@@ -104,13 +113,26 @@ export function SpinlyAssistantCard({
                   compact && styles.compactSpeechTitle,
                 ]}
               >
-                {"Hi, I’m Spinly"}
+                {summary.title}
               </Text>
-              <Text
-                style={[styles.speechBody, compact && styles.compactSpeechBody]}
-              >
-                {"I’m here to help you keep things running smoothly today."}
-              </Text>
+              <View style={styles.summaryLines}>
+                {summary.lines.map((line, index) =>
+                  line ? (
+                    <Text
+                      // The lines are short, fixed facts rather than a list that
+                      // reorders, so the position is a stable enough key.
+                      key={index}
+                      numberOfLines={1}
+                      style={[
+                        styles.speechBody,
+                        compact && styles.compactSpeechBody,
+                      ]}
+                    >
+                      {line}
+                    </Text>
+                  ) : null,
+                )}
+              </View>
             </View>
           </View>
         </View>
@@ -231,12 +253,22 @@ const styles = StyleSheet.create({
   compactSpeechTitle: {
     fontSize: 17,
   },
+  /**
+   * The three facts under the headline.
+   *
+   * Grouped so the spacing below the headline is set once here, rather than each line
+   * carrying its own top margin, which is what the single body paragraph used to do.
+   */
+  summaryLines: {
+    gap: 2,
+    marginTop: 9,
+  },
+
   speechBody: {
     ...typography.assistantBody,
     color: colors.textSecondary,
     fontSize: 14.5,
-    lineHeight: 22,
-    marginTop: 10,
+    lineHeight: 21,
   },
   compactSpeechBody: {
     fontSize: 12.5,
