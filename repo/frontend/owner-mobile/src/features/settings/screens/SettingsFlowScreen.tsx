@@ -1,5 +1,5 @@
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import { useFocusedBackHandler } from "../../../components/common/useFocusedBackHandler";
 import type { RootTabParamList } from "../../../navigation/types";
@@ -15,6 +15,21 @@ type SettingsFlowScreenProps = BottomTabScreenProps<
 export function SettingsFlowScreen({ route }: SettingsFlowScreenProps) {
   const [activePage, setActivePage] = useState<SettingsPageId | null>(null);
   const [lastRequest, setLastRequest] = useState<SettingsPageId | null>(null);
+
+  /**
+   * Where the settings list was scrolled to.
+   *
+   * Two pieces, deliberately. The ref accumulates the position as the owner scrolls, which
+   * must not redraw anything. The state is a snapshot taken at the moment a page is opened,
+   * because a ref cannot be read while rendering and the list needs the value as a prop.
+   */
+  const listOffset = useRef(0);
+  const [offsetOnOpen, setOffsetOnOpen] = useState(0);
+
+  const openPage = useCallback((page: SettingsPageId) => {
+    setOffsetOnOpen(listOffset.current);
+    setActivePage(page);
+  }, []);
 
   const requestedPage = route.params?.page ?? null;
 
@@ -54,5 +69,13 @@ export function SettingsFlowScreen({ route }: SettingsFlowScreenProps) {
     );
   }
 
-  return <SettingsScreen onOpenPage={setActivePage} />;
+  return (
+    <SettingsScreen
+      initialScrollOffset={offsetOnOpen}
+      onOpenPage={openPage}
+      onScrollOffsetChange={(offset) => {
+        listOffset.current = offset;
+      }}
+    />
+  );
 }

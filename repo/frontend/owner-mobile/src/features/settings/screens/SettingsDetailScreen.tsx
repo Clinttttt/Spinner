@@ -388,9 +388,7 @@ function ChangePasswordPage() {
 function NotificationPreferencesPage() {
   const [saving, setSaving] = useState(false);
   const [preferences, setPreferences] = useState({
-    bookingSms: true,
     bookingEmail: true,
-    statusSms: true,
     statusEmail: true,
     receiptEmail: true,
   });
@@ -403,14 +401,7 @@ function NotificationPreferencesPage() {
       .then((settings) => {
         setPreferences((current) => ({
           ...current,
-          bookingSms:
-            settings.isSmsBookingReceivedEnabled &&
-            settings.isSmsBookingConfirmedEnabled,
           bookingEmail: settings.isEmailBookingConfirmedEnabled,
-          statusSms:
-            settings.isSmsPickedUpEnabled &&
-            settings.isSmsReadyForDeliveryEnabled &&
-            settings.isSmsCompletedEnabled,
           statusEmail: settings.isEmailCompletedEnabled,
           receiptEmail: settings.isEmailReceiptEnabled,
         }));
@@ -425,11 +416,17 @@ function NotificationPreferencesPage() {
     setSaving(true);
     try {
       await updateNotificationSettings({
-        isSmsBookingReceivedEnabled: preferences.bookingSms,
-        isSmsBookingConfirmedEnabled: preferences.bookingSms,
-        isSmsPickedUpEnabled: preferences.statusSms,
-        isSmsReadyForDeliveryEnabled: preferences.statusSms,
-        isSmsCompletedEnabled: preferences.statusSms,
+        // The shop has no SMS gateway, so these are held off rather than offered as
+        // switches. They were on by default, which meant the outbox queued a text for
+        // every booking and status change, the logging provider accepted it, and the
+        // notification history recorded "Sent" for a message no customer ever received.
+        // A log that lies is worse than no log. The fields stay in the API so a real
+        // gateway can be turned on later without a migration.
+        isSmsBookingReceivedEnabled: false,
+        isSmsBookingConfirmedEnabled: false,
+        isSmsPickedUpEnabled: false,
+        isSmsReadyForDeliveryEnabled: false,
+        isSmsCompletedEnabled: false,
         isEmailBookingConfirmedEnabled: preferences.bookingEmail,
         isEmailReceiptEnabled: preferences.receiptEmail,
         isEmailCompletedEnabled: preferences.statusEmail,
@@ -444,50 +441,36 @@ function NotificationPreferencesPage() {
 
   return (
     <>
-      <SettingsSectionTitle subtitle="Updates automatically sent to customers.">
+      <SettingsSectionTitle subtitle="Emails automatically sent to customers.">
         Customer Notifications
       </SettingsSectionTitle>
       <SettingsCard>
         <ToggleRow
           description="Send confirmation after a booking is accepted"
-          icon="chatbubble-outline"
-          onValueChange={update("bookingSms")}
-          title="Booking Confirmation by SMS"
-          value={preferences.bookingSms}
-        />
-        <ToggleRow
-          description="Send confirmation when a customer email is available"
           icon="mail-outline"
           onValueChange={update("bookingEmail")}
-          title="Booking Confirmation by Email"
+          title="Booking Confirmation"
           value={preferences.bookingEmail}
         />
         <ToggleRow
           description="Send updates as the laundry order progresses"
-          icon="chatbubble-ellipses-outline"
-          onValueChange={update("statusSms")}
-          title="Status Updates by SMS"
-          value={preferences.statusSms}
-        />
-        <ToggleRow
-          description="Email updates when a customer email is available"
           icon="mail-unread-outline"
           onValueChange={update("statusEmail")}
-          title="Status Updates by Email"
+          title="Status Updates"
           value={preferences.statusEmail}
         />
         <ToggleRow
-          description="Email the receipt when an address is available"
+          description="Send the receipt once the order is paid"
           icon="document-text-outline"
           isLast
           onValueChange={update("receiptEmail")}
-          title="Digital Receipt by Email"
+          title="Digital Receipt"
           value={preferences.receiptEmail}
         />
       </SettingsCard>
       <InlineNotice>
-        Email notifications are sent only when the customer provided an email
-        address.
+        Sent only to customers who gave an email address. To reach a customer
+        directly, use Call or Message on the order.
       </InlineNotice>
       <PrimaryButton
         disabled={saving}
@@ -926,10 +909,6 @@ function PaymentMethodsPage() {
 
   return (
     <>
-      <InlineNotice>
-        Cash payments can be confirmed manually. Online payments are marked paid
-        only after a verified provider callback.
-      </InlineNotice>
       <SettingsSectionTitle subtitle="Methods customers can choose at booking.">
         Accepted payments
       </SettingsSectionTitle>
@@ -950,16 +929,16 @@ function PaymentMethodsPage() {
           value={online}
         />
       </SettingsCard>
+      {/* One notice, not three. This page carried the same point twice over — that cash
+          is confirmed by hand and online is confirmed by the provider — and then a third
+          note telling whoever reads it to configure provider credentials on the backend
+          deployment, which is an instruction for whoever installs the software and means
+          nothing to the person running the shop. What is left is the part the owner acts
+          on: which payment they have to mark themselves. */}
       <InlineNotice>
-        Staff confirms cash payments using “Mark Paid & Send Receipt.” Online
-        payments are confirmed automatically by the provider.
+        Cash is marked paid by you, using Mark Paid &amp; Send Receipt on the
+        order. Online payments are confirmed by the provider on their own.
       </InlineNotice>
-      {online ? (
-        <InlineNotice>
-          Provider credentials and QR assets must be configured securely on the
-          backend deployment before this option is offered to customers.
-        </InlineNotice>
-      ) : null}
       <PrimaryButton
         disabled={saving}
         label={saving ? "Saving..." : "Save Payment Methods"}
@@ -1644,7 +1623,7 @@ function TermsPage() {
   return (
     <LegalDocument
       intro="Terms for authorized use of the Engr. Spin Owner app."
-      notice="Draft content for the application interface. Final legal text requires review before production release."
+      notice="These terms cover use of this app by the shop owner and any staff given an account."
       sections={[
         {
           heading: "1. Acceptance of Terms",
@@ -1687,7 +1666,7 @@ function PrivacyPage() {
   return (
     <LegalDocument
       intro="How business and customer information is handled inside the owner app."
-      notice="Draft content for the application interface. Final privacy wording requires review before production release."
+      notice="This describes what the app stores and who can see it. It applies to the shop's own records and its customers' details."
       sections={[
         {
           heading: "1. Information Collected",
@@ -1727,6 +1706,21 @@ function PrivacyPage() {
 }
 
 function AboutAppPage() {
+  // The shop's real name, rather than the one that used to be written into the app. Falls
+  // back to a plain dash while it loads or if it cannot be read, which is honest: inventing
+  // a name here is how the settings screen once showed someone else's shop as the owner's.
+  const [businessName, setBusinessName] = useState("—");
+
+  useEffect(() => {
+    void getBusinessSettings()
+      .then((settings) => {
+        if (settings.businessName.trim()) {
+          setBusinessName(settings.businessName.trim());
+        }
+      })
+      .catch(() => undefined);
+  }, []);
+
   return (
     <>
       <SettingsCard style={styles.aboutHero}>
@@ -1767,31 +1761,31 @@ function AboutAppPage() {
           </View>
         ))}
       </SettingsCard>
+      {/* Build and Environment used to sit here, reading "Managed by EAS" and "Not set".
+          Both are notes to whoever ships the app rather than anything the owner of a
+          laundromat can use, and "Not set" reads like something is broken. The version is
+          already shown above, which is the one build detail worth having when reporting a
+          problem. The business name is read from the shop's own settings instead of the
+          name that used to be written into the app. */}
       <SettingsCard>
         <InfoRow
           icon="business-outline"
           label="Business"
-          value={settingsDefaults.business.name}
-        />
-        <InfoRow
-          icon="construct-outline"
-          label="Build"
-          value={settingsDefaults.app.buildNumber}
-        />
-        <InfoRow
-          icon="flask-outline"
-          label="Environment"
-          value={settingsDefaults.app.environment}
+          value={businessName}
         />
         <InfoRow
           icon="mail-outline"
           isLast
           label="Support"
-          value={settingsDefaults.app.supportContact}
+          value={
+            supportConfig.hasEmail ? supportConfig.email : "See the Help Center"
+          }
         />
       </SettingsCard>
       <Text style={styles.copyright}>
-        © 2026 {settingsDefaults.business.name}. All rights reserved.
+        {/* The shop's own name, from its settings. This read a name written into the app,
+            so a differently named laundromat saw someone else's in its copyright line. */}
+        © {new Date().getFullYear()} {businessName}. All rights reserved.
       </Text>
     </>
   );

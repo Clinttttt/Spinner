@@ -16,5 +16,7 @@ export const defaultManualOrderDraft: ManualOrderDraft = {
   discountReason: "",
   notes: "",
   specialInstructions: "",
-  preferredNotificationChannel: "sms",
+  // Email, because that is the only channel the shop can actually send on. This was
+  // "sms", which queued a text that went nowhere. See OptionalDetailsAccordion.
+  preferredNotificationChannel: "email",
 };

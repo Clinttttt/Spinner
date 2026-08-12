@@ -18,12 +18,12 @@ interface OptionalDetailsAccordionProps {
 
 export function OptionalDetailsAccordion(props: OptionalDetailsAccordionProps) {
   const [expanded, setExpanded] = useState(false);
-  const channels: PreferredNotificationChannel[] = [
-    "sms",
-    "email",
-    "both",
-    "none",
-  ];
+
+  // Email or nothing. SMS and "both" were offered here, but the shop has no SMS gateway,
+  // so choosing them queued a text that was recorded as sent and never arrived. The
+  // owner reaches a customer by phone from the order itself, which is a real action on a
+  // real handset rather than a promise the app cannot keep.
+  const channels: PreferredNotificationChannel[] = ["email", "none"];
 
   return (
     <View style={styles.card}>

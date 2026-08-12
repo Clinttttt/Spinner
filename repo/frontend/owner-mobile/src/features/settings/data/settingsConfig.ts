@@ -124,9 +124,6 @@ export const settingsDefaults = {
     name: "Engr. Spin Owner",
     version: "1.0.0",
     tagline: "Laundry operations made simple",
-    buildNumber: "Managed by EAS",
-    environment: "Not set",
-    supportContact: "Support contact not configured",
   },
 } as const;
 

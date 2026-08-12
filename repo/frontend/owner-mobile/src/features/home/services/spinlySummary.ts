@@ -1,16 +1,35 @@
 import type { OperationsCounts } from "../../operations/operationsCountsStore";
 
 /**
+ * One line under the headline.
+ *
+ * Money is its own shape rather than a formatted string, because the amount is set in navy
+ * and bold while the word beside it stays quiet. Keeping them apart means the card decides
+ * how they look and this file only decides what they say.
+ */
+export type SpinlyLine =
+  | { kind: "fact"; text: string }
+  | { kind: "money"; amount: string; label: string };
+
+/**
  * What the assistant card says.
  *
- * A headline and exactly three short facts, which is what the speech panel has room for.
+ * A headline and up to three short facts, which is what the speech panel has room for.
  * The card used to read "Hi, I'm Spinly / I'm here to help you keep things running smoothly
  * today" on every load, which told the owner nothing they could act on while taking the most
  * prominent space on the screen to do it.
  */
 export interface SpinlySummary {
   title: string;
-  lines: [string, string, string];
+  lines: SpinlyLine[];
+}
+
+function fact(text: string): SpinlyLine {
+  return { kind: "fact", text };
+}
+
+function money(amount: number, label: string): SpinlyLine {
+  return { kind: "money", amount: peso(amount), label };
 }
 
 /**
@@ -28,13 +47,18 @@ const MORNING_ENDS_AT_HOUR = 11;
 const EVENING_STARTS_AT_HOUR = 17;
 
 /**
- * Money, short enough for the card.
+ * Money, written the way the shop's books write it.
  *
- * Rounded to whole pesos on purpose: each fact gets one short line, and "₱2,450.00 sales"
- * wraps where "₱2,450 sales" does not. The exact figure is a tap away in Insights.
+ * Two decimals, matching the receipts, the ledger and every other amount in the app. An
+ * earlier version rounded to whole pesos to save width, which made this the one place a
+ * figure appeared in a different form from everywhere else. "₱128,499.50 sales" still fits
+ * the panel, so there was nothing to buy with the inconsistency.
  */
 function peso(amount: number) {
-  return `₱${Math.round(amount).toLocaleString("en-PH")}`;
+  return `₱${amount.toLocaleString("en-PH", {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 2,
+  })}`;
 }
 
 function plural(count: number, singular: string, pluralForm: string) {
@@ -71,7 +95,11 @@ export function buildSpinlySummary(
   if (active === 0 && handledToday === 0 && takings === 0) {
     return {
       title: "Ready for today",
-      lines: ["No active orders", "No pickups due", "Start a new order"],
+      lines: [
+        fact("No active orders"),
+        fact("No pickups due"),
+        fact("Start a new order"),
+      ],
     };
   }
 
@@ -80,9 +108,9 @@ export function buildSpinlySummary(
     return {
       title: "All caught up",
       lines: fill([
-        "No pending pickups",
-        handledToday > 0 ? `${handledToday} completed` : null,
-        takings > 0 ? `${peso(takings)} sales` : null,
+        fact("No pending pickups"),
+        handledToday > 0 ? fact(`${handledToday} completed`) : null,
+        takings > 0 ? money(takings, "sales") : null,
         ...absences(counts),
       ]),
     };
@@ -92,15 +120,21 @@ export function buildSpinlySummary(
     return {
       title: "Busy day ahead",
       lines: fill([
-        `${active} active orders`,
+        fact(`${active} active orders`),
         counts.forPickup > 0
-          ? `${counts.forPickup} ${plural(counts.forPickup, "pickup", "pickups")} left`
+          ? fact(
+              `${counts.forPickup} ${plural(counts.forPickup, "pickup", "pickups")} left`,
+            )
           : null,
-        counts.readyForDelivery > 0 ? `${counts.readyForDelivery} ready` : null,
+        counts.readyForDelivery > 0
+          ? fact(`${counts.readyForDelivery} ready`)
+          : null,
         counts.beingProcessed > 0
-          ? `${counts.beingProcessed} processing`
+          ? fact(`${counts.beingProcessed} processing`)
           : null,
-        counts.newBookings > 0 ? `${counts.newBookings} to confirm` : null,
+        counts.newBookings > 0
+          ? fact(`${counts.newBookings} to confirm`)
+          : null,
         ...absences(counts),
       ]),
     };
@@ -111,9 +145,9 @@ export function buildSpinlySummary(
     return {
       title: "Today's progress",
       lines: fill([
-        `${handledToday} of ${handledToday + active} completed`,
-        `${active} still active`,
-        takings > 0 ? `${peso(takings)} collected` : null,
+        fact(`${handledToday} of ${handledToday + active} completed`),
+        fact(`${active} still active`),
+        takings > 0 ? money(takings, "collected") : null,
         ...absences(counts),
       ]),
     };
@@ -125,16 +159,22 @@ export function buildSpinlySummary(
       title: `${active} ${plural(active, "job", "jobs")} scheduled`,
       lines: fill([
         counts.forPickup > 0
-          ? `${counts.forPickup} ${plural(counts.forPickup, "pickup", "pickups")}`
+          ? fact(
+              `${counts.forPickup} ${plural(counts.forPickup, "pickup", "pickups")}`,
+            )
           : null,
         counts.readyForDelivery > 0
-          ? `${counts.readyForDelivery} ${plural(counts.readyForDelivery, "delivery", "deliveries")}`
+          ? fact(
+              `${counts.readyForDelivery} ${plural(counts.readyForDelivery, "delivery", "deliveries")}`,
+            )
           : null,
-        counts.newBookings > 0 ? `${counts.newBookings} to confirm` : null,
+        counts.newBookings > 0
+          ? fact(`${counts.newBookings} to confirm`)
+          : null,
         counts.beingProcessed > 0
-          ? `${counts.beingProcessed} processing`
+          ? fact(`${counts.beingProcessed} processing`)
           : null,
-        takings > 0 ? `${peso(takings)} so far` : null,
+        takings > 0 ? money(takings, "so far") : null,
         ...absences(counts),
       ]),
     };
@@ -143,13 +183,19 @@ export function buildSpinlySummary(
   return {
     title: `${active} ${plural(active, "order", "orders")} today`,
     lines: fill([
-      counts.readyForDelivery > 0 ? `${counts.readyForDelivery} ready` : null,
-      counts.beingProcessed > 0 ? `${counts.beingProcessed} processing` : null,
-      takings > 0 ? `${peso(takings)} sales` : null,
-      counts.forPickup > 0
-        ? `${counts.forPickup} ${plural(counts.forPickup, "pickup", "pickups")} left`
+      counts.readyForDelivery > 0
+        ? fact(`${counts.readyForDelivery} ready`)
         : null,
-      counts.newBookings > 0 ? `${counts.newBookings} to confirm` : null,
+      counts.beingProcessed > 0
+        ? fact(`${counts.beingProcessed} processing`)
+        : null,
+      takings > 0 ? money(takings, "sales") : null,
+      counts.forPickup > 0
+        ? fact(
+            `${counts.forPickup} ${plural(counts.forPickup, "pickup", "pickups")} left`,
+          )
+        : null,
+      counts.newBookings > 0 ? fact(`${counts.newBookings} to confirm`) : null,
       ...absences(counts),
     ]),
   };
@@ -167,10 +213,10 @@ export function buildSpinlySummary(
  * absence is now a candidate in its own right, guarded by the same count it describes, so
  * the two cannot both be true. A blank line is the last resort, never filler.
  */
-function fill(candidates: (string | null)[]): [string, string, string] {
-  const chosen = candidates.filter((line): line is string => line !== null);
-
-  return [chosen[0] ?? "", chosen[1] ?? "", chosen[2] ?? ""];
+function fill(candidates: (SpinlyLine | null)[]): SpinlyLine[] {
+  return candidates
+    .filter((line): line is SpinlyLine => line !== null)
+    .slice(0, 3);
 }
 
 /**
@@ -179,11 +225,11 @@ function fill(candidates: (string | null)[]): [string, string, string] {
  * Each is true only when its count is zero, so appending these to a branch's own facts can
  * never contradict them. Ordered by what the owner would look for next.
  */
-function absences(counts: OperationsCounts): (string | null)[] {
+function absences(counts: OperationsCounts): (SpinlyLine | null)[] {
   return [
-    counts.forPickup === 0 ? "No pickups due" : null,
-    counts.readyForDelivery === 0 ? "Nothing ready yet" : null,
-    counts.newBookings === 0 ? "Nothing to confirm" : null,
-    counts.salesToday === 0 ? "No sales yet" : null,
+    counts.forPickup === 0 ? fact("No pickups due") : null,
+    counts.readyForDelivery === 0 ? fact("Nothing ready yet") : null,
+    counts.newBookings === 0 ? fact("Nothing to confirm") : null,
+    counts.salesToday === 0 ? fact("No sales yet") : null,
   ];
 }

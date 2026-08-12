@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Modal,
   Pressable,
@@ -29,10 +29,24 @@ import {
 } from "../services/settingsService";
 
 interface SettingsScreenProps {
+  /**
+   * Where the list was scrolled to when a page was last opened from it.
+   *
+   * Opening a settings page unmounts this list, so it came back at the top and the owner
+   * had to scroll down again to reach the next thing they wanted — which is most of the
+   * list, since the page they just used is rarely the first one.
+   */
+  initialScrollOffset?: number;
   onOpenPage: (page: SettingsPageId) => void;
+  /** Reports the offset so the flow screen can hand it back on return. */
+  onScrollOffsetChange?: (offset: number) => void;
 }
 
-export function SettingsScreen({ onOpenPage }: SettingsScreenProps) {
+export function SettingsScreen({
+  initialScrollOffset = 0,
+  onOpenPage,
+  onScrollOffsetChange,
+}: SettingsScreenProps) {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const compact = width <= 360;
@@ -42,6 +56,10 @@ export function SettingsScreen({ onOpenPage }: SettingsScreenProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
   const { logOut } = useAuth();
+
+  const scrollRef = useRef<ScrollView>(null);
+  // Whether the remembered position has already been applied for this mount.
+  const offsetRestored = useRef(false);
 
   const loadBusiness = useCallback(async (showRefresh = false) => {
     if (showRefresh) setRefreshing(true);
@@ -105,6 +123,24 @@ export function SettingsScreen({ onOpenPage }: SettingsScreenProps) {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         contentInsetAdjustmentBehavior="never"
+        onContentSizeChange={(_, height) => {
+          // Restored here rather than on mount, because the offset can only be applied
+          // once the content is tall enough to hold it. Guarded by a ref so it happens on
+          // the first layout only and does not fight the owner if they scroll while the
+          // business details are still arriving and the content grows.
+          if (offsetRestored.current) return;
+          if (initialScrollOffset <= 0 || height <= initialScrollOffset) return;
+
+          offsetRestored.current = true;
+          scrollRef.current?.scrollTo({
+            animated: false,
+            y: initialScrollOffset,
+          });
+        }}
+        onScroll={(event) =>
+          onScrollOffsetChange?.(event.nativeEvent.contentOffset.y)
+        }
+        ref={scrollRef}
         refreshControl={
           <RefreshControl
             onRefresh={() => void loadBusiness(true)}
@@ -112,6 +148,9 @@ export function SettingsScreen({ onOpenPage }: SettingsScreenProps) {
             tintColor={colors.navy}
           />
         }
+        // Often enough to keep the remembered position accurate without reporting on
+        // every frame of a flick.
+        scrollEventThrottle={64}
         showsVerticalScrollIndicator={false}
       >
         <SettingsOverviewHeader

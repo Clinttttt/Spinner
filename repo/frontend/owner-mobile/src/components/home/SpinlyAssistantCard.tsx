@@ -116,22 +116,42 @@ export function SpinlyAssistantCard({
                 {summary.title}
               </Text>
               <View style={styles.summaryLines}>
-                {summary.lines.map((line, index) =>
-                  line ? (
-                    <Text
-                      // The lines are short, fixed facts rather than a list that
-                      // reorders, so the position is a stable enough key.
-                      key={index}
-                      numberOfLines={1}
-                      style={[
-                        styles.speechBody,
-                        compact && styles.compactSpeechBody,
-                      ]}
-                    >
-                      {line}
-                    </Text>
-                  ) : null,
-                )}
+                {summary.lines.map((line, index) => (
+                  <Text
+                    // Shrinks a little rather than truncating. The longest line the
+                    // card can produce is "₱3,850.00 collected", which is close to the
+                    // panel's width on a narrow phone, and an ellipsis through an
+                    // amount would be worse than a slightly smaller one.
+                    adjustsFontSizeToFit
+                    // Short fixed facts rather than a list that reorders, so the
+                    // position is a stable enough key.
+                    key={index}
+                    minimumFontScale={0.85}
+                    numberOfLines={1}
+                    style={[
+                      styles.speechBody,
+                      compact && styles.compactSpeechBody,
+                    ]}
+                  >
+                    {line.kind === "money" ? (
+                      <>
+                        {/* The figure carries the weight; the word beside it stays
+                            quiet, so takings read at a glance without shouting. */}
+                        <Text
+                          style={[
+                            styles.speechAmount,
+                            compact && styles.compactSpeechAmount,
+                          ]}
+                        >
+                          {line.amount}
+                        </Text>
+                        {` ${line.label}`}
+                      </>
+                    ) : (
+                      line.text
+                    )}
+                  </Text>
+                ))}
               </View>
             </View>
           </View>
@@ -269,6 +289,24 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 14.5,
     lineHeight: 21,
+  },
+
+  /**
+   * The takings figure.
+   *
+   * Navy and bold against the quieter facts around it, because money is the line the owner
+   * looks for first. Tabular figures so the digits keep their own width and the amount does
+   * not shuffle as it changes through the day.
+   */
+  speechAmount: {
+    color: colors.navy,
+    fontSize: 15,
+    fontVariant: ["tabular-nums"],
+    fontWeight: "700",
+  },
+
+  compactSpeechAmount: {
+    fontSize: 13,
   },
   compactSpeechBody: {
     fontSize: 12.5,
