@@ -10,7 +10,6 @@ export const defaultManualOrderDraft: ManualOrderDraft = {
   paymentMethod: "cash",
   selectedServiceIds: [],
   loadCount: 1,
-  deliveryFee: 0,
   additionalCharge: 0,
   additionalChargeReason: "",
   discount: 0,

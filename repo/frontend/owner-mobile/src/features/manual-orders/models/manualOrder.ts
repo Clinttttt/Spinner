@@ -65,6 +65,11 @@ export interface ManualServiceOption {
   name: string;
   price: number;
   unitLabel: string;
+  /**
+   * What this service charges for a pickup and delivery trip, as configured in Settings.
+   * Null when the service does not offer it.
+   */
+  deliveryFee: number | null;
 }
 
 export interface ManualOrderDraft {
@@ -77,7 +82,6 @@ export interface ManualOrderDraft {
   paymentMethod: ManualPaymentMethod;
   selectedServiceIds: string[];
   loadCount: number;
-  deliveryFee: number;
   additionalCharge: number;
   additionalChargeReason: string;
   discount: number;

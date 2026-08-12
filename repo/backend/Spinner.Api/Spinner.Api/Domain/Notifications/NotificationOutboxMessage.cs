@@ -85,7 +85,9 @@ public sealed class NotificationOutboxMessage
     public bool IsClaimable(DateTimeOffset now, int maxAttempts) => Status switch
     {
         NotificationStatus.Pending => true,
-        NotificationStatus.Failed => AttemptCount < maxAttempts,
+        // A failed message waits out its backoff, if one was set. See MarkFailed.
+        NotificationStatus.Failed =>
+            AttemptCount < maxAttempts && (LockedUntil is null || LockedUntil <= now),
         NotificationStatus.Processing => LockedUntil is null || LockedUntil <= now,
         _ => false
     };
@@ -109,14 +111,31 @@ public sealed class NotificationOutboxMessage
         ConcurrencyStamp = Guid.NewGuid();
     }
 
-    public void MarkFailed(string error, DateTimeOffset now)
+    /// <summary>
+    /// Records a failed attempt, and optionally holds the message back before the next.
+    /// </summary>
+    /// <param name="retryAfter">
+    /// How long to wait before this message may be claimed again. Null retries as soon as
+    /// a worker next looks, which is what a manual resend wants.
+    /// </param>
+    /// <remarks>
+    /// The wait exists because the attempt limit was being spent in about a minute: the
+    /// worker polls every thirty seconds and nothing held a failed message back, so three
+    /// attempts were gone before a provider having a bad minute had recovered, and a
+    /// customer's receipt was lost for good. Spacing the attempts means a brief outage is
+    /// ridden out instead.
+    ///
+    /// This reuses LockedUntil rather than adding a column, since it already means "not
+    /// available until".
+    /// </remarks>
+    public void MarkFailed(string error, DateTimeOffset now, TimeSpan? retryAfter = null)
     {
         AttemptCount++;
         Status = NotificationStatus.Failed;
         LastError = string.IsNullOrWhiteSpace(error) ? "Notification send failed." : error.Trim();
         SentAt = null;
         ClaimId = null;
-        LockedUntil = null;
+        LockedUntil = retryAfter is null ? null : now.Add(retryAfter.Value);
         ConcurrencyStamp = Guid.NewGuid();
     }
 

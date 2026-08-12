@@ -230,10 +230,7 @@ export function CreateManualOrderScreen({
           phone={draft.phone}
         />
         <OrderMethodSelector
-          onChange={(method) => {
-            update("method", method);
-            update("deliveryFee", method === "pickupDelivery" ? 60 : 0);
-          }}
+          onChange={(method) => update("method", method)}
           value={draft.method}
         />
         <ManualServiceSelector
@@ -258,7 +255,7 @@ export function CreateManualOrderScreen({
         />
         <OrderSummaryCard
           additionalCharge={draft.additionalCharge}
-          deliveryFee={draft.deliveryFee}
+          deliveryFee={calculation.deliveryFee}
           discount={draft.discount}
           onAdjustPress={() => setAdjustmentsVisible(true)}
           serviceAmount={calculation.serviceAmount}

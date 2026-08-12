@@ -33,12 +33,22 @@ public static class StartupConfigurationValidator
         if (jwtKey.Contains("SuperSecretKey", StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Production Jwt:Key must not use the development secret.");
 
-        var webhookSecret = configuration[$"{OnlinePaymentOptions.SectionName}:WebhookSecret"];
-        if (string.IsNullOrWhiteSpace(webhookSecret) || webhookSecret.Length < 32)
-            throw new InvalidOperationException("OnlinePayments:WebhookSecret must be configured and at least 32 characters long.");
+        // Only demanded when the legacy self-signed webhook is actually open. It is closed by
+        // default now that PayMongo is the gateway, and insisting on a 32-character secret
+        // for a route that refuses every call was asking the deployment to carry a key to a
+        // door that is locked.
+        var legacyWebhookEnabled = configuration.GetValue<bool>(
+            $"{OnlinePaymentOptions.SectionName}:EnableLegacyWebhook");
 
-        if (string.Equals(webhookSecret, DevelopmentWebhookSecret, StringComparison.Ordinal))
-            throw new InvalidOperationException("Production OnlinePayments:WebhookSecret must not use the development secret.");
+        if (legacyWebhookEnabled)
+        {
+            var webhookSecret = configuration[$"{OnlinePaymentOptions.SectionName}:WebhookSecret"];
+            if (string.IsNullOrWhiteSpace(webhookSecret) || webhookSecret.Length < 32)
+                throw new InvalidOperationException("OnlinePayments:WebhookSecret must be configured and at least 32 characters long when OnlinePayments:EnableLegacyWebhook is true.");
+
+            if (string.Equals(webhookSecret, DevelopmentWebhookSecret, StringComparison.Ordinal))
+                throw new InvalidOperationException("Production OnlinePayments:WebhookSecret must not use the development secret.");
+        }
 
         var publicPaymentBaseUrl =
             configuration[$"{OnlinePaymentOptions.SectionName}:PublicPaymentBaseUrl"];

@@ -52,8 +52,14 @@ public sealed class GetBookingConfirmationHandler
             order.OrderCode,
             order.TrackingCode,
             order.ContactName,
-            order.Customer.MobileNumber,
-            order.Customer.EmailAddress,
+            // Masked, because this endpoint needs no account. Anyone holding a booking code
+            // can read it, and codes travel: they are quoted in messages, screenshots and
+            // over the counter. The contact details are not needed to answer "where is my
+            // laundry", and the customer site never displays them from here, so returning
+            // them in full only widened what a shared code gives away. The full values stay
+            // available to the shop through the authenticated order endpoints.
+            MaskMobile(order.Customer.MobileNumber),
+            MaskEmail(order.Customer.EmailAddress),
             order.ServiceName,
             order.UnitLabel,
             order.LoadCount,
@@ -70,5 +76,42 @@ public sealed class GetBookingConfirmationHandler
             order.AdditionalNotes);
 
         return Result<BookingConfirmationResponse>.Success(response);
+    }
+
+    /// <summary>
+    /// Leaves enough of a number for the customer to recognise it as theirs, and not enough
+    /// to be worth harvesting. "09171234567" becomes "•••••••4567".
+    /// </summary>
+    private static string MaskMobile(string mobileNumber)
+    {
+        var digits = mobileNumber?.Trim() ?? string.Empty;
+
+        if (digits.Length <= 4)
+            return digits;
+
+        return new string('\u2022', digits.Length - 4) + digits[^4..];
+    }
+
+    /// <summary>
+    /// Keeps the shape of an address without giving it away. "maria@example.com" becomes
+    /// "m•••@example.com".
+    /// </summary>
+    private static string? MaskEmail(string? emailAddress)
+    {
+        if (string.IsNullOrWhiteSpace(emailAddress)) return emailAddress;
+
+        var trimmed = emailAddress.Trim();
+        var at = trimmed.IndexOf('@');
+
+        // Not an address shape this can safely shorten, so nothing is returned rather than
+        // guessing which part is sensitive.
+        if (at <= 0) return "\u2022\u2022\u2022";
+
+        var name = trimmed[..at];
+        var domain = trimmed[at..];
+
+        return name.Length == 1
+            ? $"{name}{domain}"
+            : $"{name[0]}\u2022\u2022\u2022{domain}";
     }
 }

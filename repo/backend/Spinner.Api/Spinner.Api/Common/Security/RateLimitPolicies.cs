@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 
@@ -87,21 +88,57 @@ public static class RateLimitPolicies
     /// Identifies the caller for partitioning.
     /// </summary>
     /// <remarks>
-    /// The API runs behind Azure Container Apps, so the socket address is the
-    /// ingress proxy and would put every caller in one bucket. The forwarded header
-    /// is used when present, taking the first entry, which is the original client.
+    /// The API runs behind Azure Container Apps, so the socket address is the ingress proxy
+    /// and would put every caller in one bucket. The forwarded header carries the real
+    /// address, but only the end of it can be trusted.
+    ///
+    /// X-Forwarded-For grows left to right: each proxy appends the address it received the
+    /// request from. Anything already in the header arrived from the client, so the leftmost
+    /// entry is whatever the caller chose to put there. This used to read that first entry,
+    /// which meant a caller could send a different value on every request, land in a fresh
+    /// bucket each time, and never be limited at all — on the login and public booking
+    /// endpoints these policies exist to protect.
+    ///
+    /// The last entry is the address our own ingress observed, which a caller cannot forge.
+    /// There is exactly one proxy in front of this API: the custom domain points straight at
+    /// Container Apps with nothing else in between.
+    ///
+    /// Kept internal rather than private so the parsing can be tested directly.
     /// </remarks>
-    private static string ClientKey(HttpContext httpContext)
+    internal static string ClientKey(HttpContext httpContext)
     {
         var forwarded = httpContext.Request.Headers["X-Forwarded-For"].ToString();
 
         if (!string.IsNullOrWhiteSpace(forwarded))
         {
-            var first = forwarded.Split(',', StringSplitOptions.TrimEntries)[0];
-            if (!string.IsNullOrWhiteSpace(first))
-                return first;
+            var entries = forwarded.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+
+            if (entries.Length > 0)
+            {
+                // Envoy appends a port to the address it saw, which has to come off or every
+                // request from one client would look like a different caller.
+                var candidate = WithoutPort(entries[^1]);
+
+                if (!string.IsNullOrWhiteSpace(candidate))
+                    return candidate;
+            }
         }
 
         return httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    }
+
+    /// <summary>
+    /// Strips a trailing port from a forwarded address, leaving IPv6 addresses intact.
+    /// </summary>
+    private static string WithoutPort(string address)
+    {
+        if (IPAddress.TryParse(address, out var parsed))
+            return parsed.ToString();
+
+        // "203.0.113.4:51514", or "[::1]:51514".
+        if (IPEndPoint.TryParse(address, out var endpoint))
+            return endpoint.Address.ToString();
+
+        return address;
     }
 }

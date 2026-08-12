@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Spinner.Api.Common.Results;
 using Spinner.Api.Domain.Notifications;
@@ -204,6 +205,39 @@ public sealed class PaymentHandlerTests
     }
 
     [Fact]
+    public async Task HandleOnlinePaymentWebhook_Should_Refuse_A_Legacy_Webhook_Call_When_It_Is_Closed()
+    {
+        // PayMongo is the gateway and posts to the paymongo/webhook route with its own
+        // signature header, so it cannot reach this one. That left a second route able to
+        // mark any QR order paid on nothing but a shared secret held in configuration. It is
+        // closed unless deliberately switched on, and a correct signature must not open it.
+        await using var dbContext = AppDbContextFactory.Create();
+        var created = await CreateActiveQrOrderWithPaymentLinkAsync(dbContext);
+        var order = await dbContext.LaundryOrders.SingleAsync(item => item.Id == created.OrderId);
+        var signature = OnlinePaymentSignatureVerifier.Sign(
+            order.OnlinePaymentReference!,
+            order.EstimatedTotalAmount,
+            "paid",
+            WebhookSecret);
+
+        var result = await CreateWebhookHandler(dbContext, legacyWebhookEnabled: false)
+            .Handle(
+                new HandleOnlinePaymentWebhookCommand(
+                    order.OnlinePaymentReference!,
+                    order.EstimatedTotalAmount,
+                    "paid",
+                    signature),
+                CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+
+        // The order must be untouched: no payment, no receipt.
+        var saved = await dbContext.LaundryOrders.SingleAsync(item => item.Id == created.OrderId);
+        Assert.NotEqual(PaymentStatus.Paid, saved.PaymentStatus);
+        Assert.Null(saved.PaidAt);
+    }
+
+    [Fact]
     public async Task HandleOnlinePaymentWebhook_Should_Return_Unauthorized_For_Invalid_Signature()
     {
         await using var dbContext = AppDbContextFactory.Create();
@@ -292,15 +326,24 @@ public sealed class PaymentHandlerTests
             }));
     }
 
-    private static HandleOnlinePaymentWebhookHandler CreateWebhookHandler(Spinner.Api.Database.AppDbContext dbContext)
+    private static HandleOnlinePaymentWebhookHandler CreateWebhookHandler(
+        Spinner.Api.Database.AppDbContext dbContext,
+        bool legacyWebhookEnabled = true)
     {
-        var verifier = new OnlinePaymentSignatureVerifier(Options.Create(new OnlinePaymentOptions
+        // The legacy webhook is closed in production, so these tests open it deliberately.
+        // Should_Refuse_A_Legacy_Webhook_Call_When_It_Is_Closed covers the default.
+        var options = Options.Create(new OnlinePaymentOptions
         {
+            EnableLegacyWebhook = legacyWebhookEnabled,
             PublicPaymentBaseUrl = "/pay",
             WebhookSecret = WebhookSecret
-        }));
+        });
 
-        return new HandleOnlinePaymentWebhookHandler(dbContext, verifier);
+        return new HandleOnlinePaymentWebhookHandler(
+            dbContext,
+            new OnlinePaymentSignatureVerifier(options),
+            options,
+            NullLogger<HandleOnlinePaymentWebhookHandler>.Instance);
     }
 
     private static async Task<OnlinePaymentLinkResponse> CreateActiveQrOrderWithPaymentLinkAsync(

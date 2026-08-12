@@ -14,14 +14,21 @@ public sealed class TransactionHandlerTests
     {
         await using var dbContext = AppDbContextFactory.Create();
         var occurredAt = DateTimeOffset.UtcNow.AddMinutes(-5);
+        var recordedBy = Guid.NewGuid();
 
         var result = await new CreateManualTransactionHandler(dbContext).Handle(
             new CreateManualTransactionCommand(
                 TransactionKind.ManualIncome,
                 250m,
                 "Walk-in cash adjustment",
-                occurredAt),
+                occurredAt,
+                recordedBy),
             CancellationToken.None);
+
+        // The ledger has to say who moved the money. Every entry used to be filed against
+        // the literal text "Owner/Staff".
+        var logged = dbContext.ActivityLogEntries.Single();
+        Assert.Equal(recordedBy.ToString(), logged.Actor);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(TransactionKind.ManualIncome, result.Value!.Kind);

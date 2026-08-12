@@ -458,6 +458,36 @@ public sealed class LaundryOrder
         _ => false
     };
 
+    /// <summary>
+    /// Records that the rider has set out for this pickup.
+    /// </summary>
+    /// <remarks>
+    /// Only the pickup's own state moves; the order stays Confirmed, because leaving the
+    /// shop is not progress on the laundry. That also means MarkPickedUp still applies
+    /// afterwards, since it gates on the order status rather than on this.
+    /// </remarks>
+    public Result MarkOnRoute(DateTimeOffset now)
+    {
+        if (FulfillmentType != FulfillmentType.PickupAndDelivery)
+            return Result.Conflict("Only pickup and delivery orders can be marked on route.");
+
+        if (Status != OrderStatus.Confirmed)
+            return Result.Conflict("Confirm the booking before setting out for it.");
+
+        if (PickupStatus == Domain.Orders.PickupStatus.PickedUp)
+            return Result.Conflict("This pickup has already been collected.");
+
+        if (PickupStatus == Domain.Orders.PickupStatus.OnRoute)
+            return Result.Conflict("This pickup is already marked on route.");
+
+        PickupStatus = Domain.Orders.PickupStatus.OnRoute;
+        PickupFailureReason = null;
+        PickupUpdatedAt = now;
+        UpdatedAt = now;
+
+        return Result.Success();
+    }
+
     public Result MarkPickedUp(DateTimeOffset now)
     {
         if (FulfillmentType != FulfillmentType.PickupAndDelivery)

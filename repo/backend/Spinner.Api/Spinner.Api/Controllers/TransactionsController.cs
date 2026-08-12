@@ -23,11 +23,16 @@ public sealed class TransactionsController : ApiControllerBase
         [FromBody] CreateManualTransactionRequest request,
         CancellationToken ct = default)
     {
+        // Taken from the token, never from the body, so the entry cannot be attributed to
+        // someone else.
+        var recordedBy = TryGetCurrentUserId(out var userId) ? userId : (Guid?)null;
+
         var result = await Sender.Send(new CreateManualTransactionCommand(
             request.Kind,
             request.Amount,
             request.Note,
-            request.OccurredAt), ct);
+            request.OccurredAt,
+            recordedBy), ct);
 
         return HandleResponse(result);
     }

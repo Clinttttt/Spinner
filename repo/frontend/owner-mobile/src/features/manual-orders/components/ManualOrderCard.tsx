@@ -24,7 +24,8 @@ function statusLabel(status: ManualOrder["status"]) {
 
 function bookingStatusValue(status: ManualOrder["status"]): BookingStatus {
   if (status === "created") return "new";
-  if (status === "cancelled") return "completed";
+  // "cancelled" used to be reported as "completed", which showed a cancelled order as
+  // finished work. BookingStatus carries a cancelled state, so it passes straight through.
   return status;
 }
 

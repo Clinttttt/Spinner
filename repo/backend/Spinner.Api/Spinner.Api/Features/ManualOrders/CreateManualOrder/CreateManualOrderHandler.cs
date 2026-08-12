@@ -53,12 +53,30 @@ public sealed class CreateManualOrderHandler
             .ToList();
         var now = DateTimeOffset.UtcNow;
         var serviceAmount = selections.Sum(selection => selection.Item1.BasePrice * selection.Quantity);
+        // One trip, so the fee is charged once, at the highest rate among the chosen
+        // services.
+        //
+        // This used to take the fee of whichever service happened to be first in the
+        // request, which made the charge depend on the order the boxes were ticked and
+        // disagreed with what the customer website quotes. The website has always shown
+        // the highest rate, so a multi-service pickup could be quoted one figure and
+        // charged a lower one. Aligning on the highest makes the charge match the quote.
         var deliveryFee = request.Method == FulfillmentType.PickupAndDelivery
-            ? selections[0].Item1.DeliveryFee ?? 0m
+            ? selections.Max(selection => selection.Item1.DeliveryFee ?? 0m)
             : 0m;
-        var expectedTotal = Math.Max(
-            0m,
-            serviceAmount + deliveryFee + request.AdditionalCharge - request.Discount);
+        var chargeableTotal = serviceAmount + deliveryFee + request.AdditionalCharge;
+
+        // A discount cannot exceed what is being charged. The total is clamped at zero
+        // further down, so an oversized discount was accepted silently and simply made the
+        // order free, with nothing to show that more had been taken off than the job was
+        // worth. The validator cannot check this because it does not know the prices.
+        if (request.Discount > chargeableTotal)
+        {
+            return Result<OrderDetailsResponse>.Validation(
+                "The discount is more than the order total.");
+        }
+
+        var expectedTotal = Math.Max(0m, chargeableTotal - request.Discount);
 
         // Replayed submit (double tap or retry after a flaky response).
         var replay = await DuplicateOrderGuard.FindRecentIdenticalAsync(

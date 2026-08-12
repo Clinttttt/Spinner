@@ -63,7 +63,10 @@ public sealed class NotificationOutboxProcessor
                 }
                 else
                 {
-                    message.MarkFailed(result.ErrorMessage ?? "Notification provider rejected the message.", sentAt);
+                    message.MarkFailed(
+                        result.ErrorMessage ?? "Notification provider rejected the message.",
+                        sentAt,
+                        RetryDelayFor(message.AttemptCount));
                 }
             }
             catch (Exception ex)
@@ -73,7 +76,7 @@ public sealed class NotificationOutboxProcessor
                     "Notification {NotificationId} failed while sending.",
                     message.Id);
 
-                message.MarkFailed(ex.Message, sentAt);
+                message.MarkFailed(ex.Message, sentAt, RetryDelayFor(message.AttemptCount));
             }
 
             try
@@ -110,6 +113,24 @@ public sealed class NotificationOutboxProcessor
     }
 
     /// <summary>
+    /// How long to hold a message back before the attempt after this one.
+    /// </summary>
+    /// <remarks>
+    /// Doubling, from the attempt that has just failed: two minutes, then four. Taken from
+    /// the count before <see cref="NotificationOutboxMessage.MarkFailed"/> increments it.
+    /// </remarks>
+    private TimeSpan RetryDelayFor(int attemptsAlreadyMade)
+    {
+        var baseMinutes = Math.Max(0, _options.RetryBackoffMinutes);
+        if (baseMinutes == 0) return TimeSpan.Zero;
+
+        // Capped so a large MaxAttempts cannot overflow into an absurd wait.
+        var doublings = Math.Min(attemptsAlreadyMade, 6);
+
+        return TimeSpan.FromMinutes(baseMinutes * Math.Pow(2, doublings));
+    }
+
+    /// <summary>
     /// Takes ownership of up to <paramref name="batchSize"/> waiting messages.
     /// </summary>
     /// <remarks>
@@ -132,7 +153,12 @@ public sealed class NotificationOutboxProcessor
             .Include(message => message.Order)
             .Where(message =>
                 message.Status == NotificationStatus.Pending ||
-                (message.Status == NotificationStatus.Failed && message.AttemptCount < maxAttempts) ||
+                // Mirrors NotificationOutboxMessage.IsClaimable: a failed message waits out
+                // its backoff. Without the LockedUntil test here the query would hand back
+                // messages the domain considers unavailable, and the wait would do nothing.
+                (message.Status == NotificationStatus.Failed &&
+                    message.AttemptCount < maxAttempts &&
+                    (message.LockedUntil == null || message.LockedUntil <= now)) ||
                 (message.Status == NotificationStatus.Processing &&
                     (message.LockedUntil == null || message.LockedUntil <= now)))
             .OrderBy(message => message.CreatedAt)

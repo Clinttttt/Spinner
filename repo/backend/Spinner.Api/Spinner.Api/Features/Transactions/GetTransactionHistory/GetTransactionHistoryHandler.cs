@@ -107,7 +107,14 @@ public sealed class GetTransactionHistoryHandler
 
         var salesSource = _dbContext.LaundryOrders
             .AsNoTracking()
-            .Where(order => order.PaymentStatus == PaymentStatus.Paid && order.PaidAt != null);
+            // A turned-down job is not takings. This matches the daily sales report and
+            // GetOperationsDashboard, which have always excluded it, and the rule the
+            // Should_Not_Count_A_Rejected_Order_As_Takings test pins down. Without it this
+            // ledger disagreed with both, and the app's Insights page disagreed again.
+            .Where(order =>
+                order.PaymentStatus == PaymentStatus.Paid &&
+                order.PaidAt != null &&
+                order.Status != OrderStatus.Rejected);
 
         if (from is not null)
             salesSource = salesSource.Where(order => order.PaidAt >= from);

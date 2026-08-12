@@ -7,6 +7,7 @@ using Spinner.Api.Features.Pickups;
 using Spinner.Api.Features.Pickups.FailPickup;
 using Spinner.Api.Features.Pickups.GetPickupDetails;
 using Spinner.Api.Features.Pickups.GetPickupSchedule;
+using Spinner.Api.Features.Pickups.MarkOnRoute;
 using Spinner.Api.Features.Pickups.MarkPickedUp;
 using Spinner.Api.Features.Pickups.ReschedulePickup;
 
@@ -56,6 +57,16 @@ public sealed class PickupsController : ApiControllerBase
     public async Task<ActionResult<PickupDetailsResponse>> GetDetails(Guid id, CancellationToken ct)
     {
         var result = await Sender.Send(new GetPickupDetailsQuery(id), ct);
+        return HandleResponse(result);
+    }
+
+    /// <summary>
+    /// Records that the rider has set out for this pickup.
+    /// </summary>
+    [HttpPost("{id:guid}/on-route")]
+    public async Task<ActionResult<PickupDetailsResponse>> MarkOnRoute(Guid id, CancellationToken ct)
+    {
+        var result = await Sender.Send(new MarkOnRouteCommand(id), ct);
         return HandleResponse(result);
     }
 

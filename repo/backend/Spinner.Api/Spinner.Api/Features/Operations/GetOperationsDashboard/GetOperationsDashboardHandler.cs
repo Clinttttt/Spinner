@@ -89,7 +89,13 @@ public sealed class GetOperationsDashboardHandler
         var manual = await _dbContext.FinancialTransactions.CountAsync(cancellationToken);
 
         var sales = await _dbContext.LaundryOrders.CountAsync(
-            order => order.PaymentStatus == PaymentStatus.Paid && order.PaidAt != null,
+            order =>
+                order.PaymentStatus == PaymentStatus.Paid &&
+                order.PaidAt != null &&
+                // Mirrors GetTransactionHistoryHandler exactly, including its exclusion of
+                // rejected orders. If the two drift the badge counts rows the page will not
+                // show, which is the fault this count was introduced to fix.
+                order.Status != OrderStatus.Rejected,
             cancellationToken);
 
         return manual + sales;

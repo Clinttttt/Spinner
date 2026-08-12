@@ -451,6 +451,19 @@ export async function confirmPickupBooking(id: string) {
   return reloadTask(id);
 }
 
+/**
+ * Records that the rider has set out, on the server.
+ *
+ * This used to be a local edit to the in-memory list with no request behind it, so the
+ * rider marked a job as on the way and the On Route column emptied the next time the
+ * schedule refreshed. The API models the state, so the change is asked for and the task is
+ * reloaded from the answer.
+ */
+export async function markPickupOnRoute(id: string) {
+  await apiRequest(`/api/pickups/${id}/on-route`, { method: "POST" });
+  return reloadTask(id);
+}
+
 export async function markPickupPickedUp(id: string) {
   await apiRequest(`/api/pickups/${id}/picked-up`, { method: "POST" });
   return reloadTask(id);
@@ -487,8 +500,7 @@ export async function advancePickupStatus(id: string) {
     return toLocationDetails(confirmed);
   }
   if (current.pickupStatus === "pending") {
-    const next = { ...current, pickupStatus: "onRoute" as const };
-    replaceTask(next);
+    const next = await markPickupOnRoute(id);
     return toLocationDetails(next);
   }
   if (current.pickupStatus === "onRoute") {

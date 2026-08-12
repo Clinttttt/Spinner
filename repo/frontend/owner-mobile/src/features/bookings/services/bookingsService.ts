@@ -58,11 +58,23 @@ function stableIndex(value: string, length: number) {
   );
 }
 
+/**
+ * The API's order status as the app's own.
+ *
+ * Rejected is mapped rather than left to the fallback. It used to fall through to
+ * "completed", so an order the owner had turned down was shown as finished work, its
+ * badge read Completed, and the action button read Completed too and did nothing when
+ * pressed. The "cancelled" state and its badge already existed for this.
+ *
+ * The fallback stays as completed for a status this build does not know about, which is
+ * the least misleading option for a terminal state, but every current status is listed.
+ */
 export function mapApiOrderStatus(status: string): BookingStatus {
   if (status === "BookingReceived") return "new";
   if (status === "Confirmed") return "confirmed";
   if (status === "PickedUp" || status === "BeingProcessed") return "inProcess";
   if (status === "ReadyForDelivery") return "ready";
+  if (status === "Rejected") return "cancelled";
   return "completed";
 }
 
@@ -288,12 +300,18 @@ export function bookingActionLabel(booking: BookingDetails) {
     return "Confirm Cash Payment";
   }
   if (booking.apiStatus === "ReadyForDelivery") return "Mark Completed";
+  // A turned-down order has nowhere to advance to. This used to fall through to
+  // "Completed", which read as if the work had been done.
+  if (booking.apiStatus === "Rejected") return "Cancelled";
   return "Completed";
 }
 
 export function isBookingActionDisabled(booking: BookingDetails) {
   return (
     booking.apiStatus === "Completed" ||
+    // Nothing to advance: advanceBookingStatus has no transition for a rejected order, so
+    // the button was enabled and silently did nothing when pressed.
+    booking.apiStatus === "Rejected" ||
     (booking.apiStatus === "ReadyForDelivery" &&
       booking.paymentStatus === "unpaid")
   );

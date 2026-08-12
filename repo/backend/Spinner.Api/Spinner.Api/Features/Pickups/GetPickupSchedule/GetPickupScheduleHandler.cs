@@ -47,8 +47,18 @@ public sealed class GetPickupScheduleHandler
         var pageSize = PageRequest.NormalizePageSize(request.PageSize);
         var totalCount = await query.CountAsync(cancellationToken);
         var pickupOrders = await query
+            // The window is free text the owner configures, so this orders by its label
+            // rather than by a time value. That is tolerable because the app fetches every
+            // page for the day and re-sorts on the parsed time before showing anything.
+            //
+            // The Id is what matters here. Without a unique final key the order is not a
+            // total order, and PostgreSQL is then free to return rows that share a window
+            // and a customer name differently on each page, so paging through the day
+            // could show one pickup twice and miss another entirely. The client pages
+            // through the whole day, so that is a lost job, not a cosmetic glitch.
             .OrderBy(order => order.PreferredTimeWindow)
             .ThenBy(order => order.ContactName)
+            .ThenBy(order => order.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);

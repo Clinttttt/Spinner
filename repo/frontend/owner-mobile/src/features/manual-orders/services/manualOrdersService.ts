@@ -15,6 +15,8 @@ interface LaundryServiceDto {
   name: string;
   unitLabel: string;
   basePrice: number;
+  /** Null when the service is not offered for pickup and delivery. */
+  deliveryFee: number | null;
 }
 
 export interface ManualOrderCustomer {
@@ -158,11 +160,33 @@ export function calculateManualOrder(
     (total, item) => total + item.subtotal,
     0,
   );
+
+  /**
+   * What the trip costs, worked out from the services actually chosen.
+   *
+   * The screen used to put a flat 60 here whenever the method was pickup and delivery,
+   * which was nobody's configured fee in particular: the server charges what the services
+   * are set to, so the owner could be quoted one figure and the customer charged another.
+   *
+   * Charged once at the highest rate among the chosen services, because it is one trip.
+   * That is the rule the customer website already quotes, and the server now applies the
+   * same one.
+   */
+  const deliveryFee =
+    draft.method === "pickupDelivery"
+      ? draft.selectedServiceIds.reduce((highest, serviceId) => {
+          const service = availableServices.find(
+            (item) => item.id === serviceId,
+          );
+          return Math.max(highest, service?.deliveryFee ?? 0);
+        }, 0)
+      : 0;
+
   const totalAmount = Math.max(
     0,
-    serviceAmount + draft.deliveryFee + draft.additionalCharge - draft.discount,
+    serviceAmount + deliveryFee + draft.additionalCharge - draft.discount,
   );
-  return { serviceAmount, services, totalAmount };
+  return { deliveryFee, serviceAmount, services, totalAmount };
 }
 
 /**
@@ -271,6 +295,7 @@ export async function getManualOrderServices(): Promise<ManualServiceOption[]> {
     { authenticated: false },
   );
   return services.map((service) => ({
+    deliveryFee: service.deliveryFee,
     id: service.id,
     name: service.name,
     price: service.basePrice,

@@ -29,8 +29,16 @@ public sealed class CreateManualTransactionHandler
             now);
 
         _dbContext.FinancialTransactions.Add(transaction);
+
+        // Attributed to whoever's token this was, rather than the literal "Owner/Staff"
+        // that every entry used to carry. A money movement that cannot be traced to a
+        // person is the one thing an audit trail has to get right.
+        var actor = request.RecordedByUserId is { } userId
+            ? userId.ToString()
+            : "Unknown";
+
         _dbContext.ActivityLogEntries.Add(new ActivityLogEntry(
-            "Owner/Staff",
+            actor,
             "ManualTransactionCreated",
             nameof(FinancialTransaction),
             transaction.Id,

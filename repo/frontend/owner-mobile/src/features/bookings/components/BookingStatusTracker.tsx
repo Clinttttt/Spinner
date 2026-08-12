@@ -27,6 +27,27 @@ export function BookingStatusTracker({
 }: BookingStatusTrackerProps) {
   const currentIndex = steps.findIndex((step) => step.value === status);
 
+  // A turned-down order never travels this path, so the steps say nothing about it.
+  // Rendering them anyway highlighted none of them and announced the raw status, which
+  // read as a fault rather than as a decision the owner had made.
+  if (status === "cancelled") {
+    return (
+      <View
+        accessibilityLabel="This booking was cancelled"
+        style={[styles.panel, compact && styles.compactPanel, styles.terminal]}
+      >
+        <Ionicons
+          color={bookingDetailsColors.trackerText}
+          name="close-circle-outline"
+          size={18}
+        />
+        <Text style={styles.terminalText}>
+          Cancelled. This booking will not be processed.
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <View
       accessibilityLabel={`Current booking status: ${steps[currentIndex]?.label ?? status}`}
@@ -91,6 +112,19 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingHorizontal: 4,
     paddingVertical: 9,
+  },
+  terminal: {
+    alignItems: "center",
+    gap: 8,
+    justifyContent: "center",
+    paddingHorizontal: 13,
+  },
+  terminalText: {
+    color: bookingDetailsColors.trackerText,
+    flexShrink: 1,
+    fontSize: 12.5,
+    fontWeight: "600",
+    lineHeight: 17,
   },
   step: {
     alignItems: "center",

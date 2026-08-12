@@ -46,7 +46,7 @@ interface ManualOrderDetailsScreenProps {
 
 function bookingStatus(status: ManualOrderStatus): BookingStatus {
   if (status === "created") return "new";
-  if (status === "cancelled") return "completed";
+  // See ManualOrderCard: cancelled used to be reported as completed.
   return status;
 }
 

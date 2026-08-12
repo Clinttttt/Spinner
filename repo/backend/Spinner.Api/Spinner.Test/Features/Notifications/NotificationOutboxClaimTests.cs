@@ -187,6 +187,68 @@ public sealed class NotificationOutboxClaimTests
         Assert.Equal(NotificationStatus.Processing, first.Status);
     }
 
+    [Fact]
+    public async Task Should_Hold_A_Failed_Message_Back_Before_Trying_It_Again()
+    {
+        // The attempt limit used to be spent in about a minute: the worker polls every
+        // thirty seconds and nothing held a failed message back, so a provider having one
+        // bad minute cost the customer their receipt permanently.
+        await using var dbContext = AppDbContextFactory.Create();
+        await AddPendingAsync(dbContext);
+
+        var rejecting = new RejectingSender();
+        var processor = Processor(dbContext, rejecting);
+
+        await processor.ProcessPendingAsync(CancellationToken.None);
+        Assert.Equal(1, rejecting.SendCount);
+
+        // Immediately afterwards the message is still inside its backoff, so a second pass
+        // must not touch it.
+        await processor.ProcessPendingAsync(CancellationToken.None);
+        Assert.Equal(1, rejecting.SendCount);
+
+        var message = await dbContext.NotificationOutboxMessages.SingleAsync();
+        Assert.Equal(NotificationStatus.Failed, message.Status);
+        Assert.NotNull(message.LockedUntil);
+
+        // Once the wait has passed it becomes available again.
+        Assert.True(message.IsClaimable(message.LockedUntil!.Value.AddSeconds(1), 3));
+        Assert.False(message.IsClaimable(message.LockedUntil!.Value.AddSeconds(-1), 3));
+    }
+
+    [Fact]
+    public void A_Resend_Requested_By_The_Owner_Ignores_The_Backoff()
+    {
+        // The wait is there to ride out a provider blip, not to make the owner watch a
+        // clock after they have pressed Send again.
+        var now = DateTimeOffset.UtcNow;
+        var message = new NotificationOutboxMessage(
+            NotificationChannel.Email,
+            "customer@example.com",
+            "Receipt",
+            "Your receipt.",
+            now);
+
+        message.MarkFailed("Rejected.", now, TimeSpan.FromMinutes(30));
+        Assert.False(message.IsClaimable(now, 3));
+
+        Assert.True(message.Requeue(now).IsSuccess);
+        Assert.True(message.IsClaimable(now, 3));
+    }
+
+    private sealed class RejectingSender : INotificationSender
+    {
+        public int SendCount { get; private set; }
+
+        public Task<NotificationSendResult> SendAsync(
+            NotificationOutboxMessage message,
+            CancellationToken cancellationToken)
+        {
+            SendCount++;
+            return Task.FromResult(NotificationSendResult.Failure("Provider unavailable."));
+        }
+    }
+
     private sealed class CapturingSender : INotificationSender
     {
         public List<NotificationOutboxMessage> Seen { get; } = [];

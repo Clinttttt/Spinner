@@ -8,6 +8,8 @@ import type {
 
 interface OrderHistoryDto {
   fulfillmentType: string;
+  /** When the money actually arrived. Absent while the order is unpaid. */
+  paidAt?: string | null;
   paymentStatus: string;
   preferredDate: string;
   serviceName: string;
@@ -172,8 +174,20 @@ export async function getReportsDashboard(
     ]);
   const current = applyFilters(currentRaw, filters);
   const previous = applyFilters(previousRaw, filters);
-  const paid = current.filter((order) => order.paymentStatus === "Paid");
-  const oldPaid = previous.filter((order) => order.paymentStatus === "Paid");
+  /**
+   * What was actually taken.
+   *
+   * A rejected order is excluded even when it carries a payment, which is the rule the
+   * daily sales report and the dashboard have always applied and which
+   * Should_Not_Count_A_Rejected_Order_As_Takings pins down on the server. Insights counted
+   * them, so this page reported more revenue than the shop's own daily figure and than the
+   * transaction ledger.
+   */
+  const isTakings = (order: OrderHistoryDto) =>
+    order.paymentStatus === "Paid" && order.status !== "Rejected";
+
+  const paid = current.filter(isTakings);
+  const oldPaid = previous.filter(isTakings);
   const completed = current.filter((order) => order.status === "Completed");
   const oldCompleted = previous.filter((order) => order.status === "Completed");
   const grossSales = paid.reduce((sum, order) => sum + order.totalAmount, 0);
@@ -225,12 +239,22 @@ export async function getReportsDashboard(
     }));
 
   const byDate = new Map<string, number>();
-  paid.forEach((order) =>
-    byDate.set(
-      order.preferredDate,
-      (byDate.get(order.preferredDate) ?? 0) + order.totalAmount,
-    ),
-  );
+  paid.forEach((order) => {
+    /**
+     * Filed under the day the money arrived, not the day the laundry was wanted.
+     *
+     * The preferred date is reschedulable, so moving a job that had already been paid for
+     * moved its revenue with it and the daily chart disagreed with both the transaction
+     * ledger and the shop's own sales figure. The server has attributed revenue by PaidAt
+     * for the same reason. Orders paid before this field existed fall back to the preferred
+     * date rather than being dropped from the chart.
+     */
+    const key = order.paidAt
+      ? apiDate(new Date(order.paidAt))
+      : order.preferredDate;
+
+    byDate.set(key, (byDate.get(key) ?? 0) + order.totalAmount);
+  });
   currentTransactions.forEach((transaction) => {
     const key = apiDate(new Date(transaction.occurredAt));
     const signedAmount =

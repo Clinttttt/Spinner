@@ -18,4 +18,15 @@ public sealed class NotificationOutboxOptions
     /// notification for long.
     /// </remarks>
     public int ClaimMinutes { get; set; } = 5;
+
+    /// <summary>
+    /// The wait before a failed message is tried again, doubling with each attempt.
+    /// </summary>
+    /// <remarks>
+    /// Two minutes then four, so three attempts span roughly six minutes rather than the
+    /// minute they took when nothing held a failure back. A provider having a bad moment
+    /// is then ridden out instead of spending the whole attempt limit before it recovers.
+    /// A resend requested by the owner ignores this and goes at once.
+    /// </remarks>
+    public int RetryBackoffMinutes { get; set; } = 2;
 }
