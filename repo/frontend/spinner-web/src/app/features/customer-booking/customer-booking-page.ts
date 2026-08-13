@@ -103,6 +103,14 @@ interface SubmittedSummary {
 const SUGGESTION_DEBOUNCE_MS = 320;
 const SERVICE_AREA_DEBOUNCE_MS = 400;
 
+/**
+ * How long to wait after typing stops before remembering the details.
+ *
+ * Long enough that filling in a phone number is one write rather than eleven, short enough
+ * that closing the tab straight after typing still keeps them.
+ */
+const SAVED_DETAILS_DEBOUNCE_MS = 600;
+
 /** Upper bound per service line. Bulk jobs are arranged with the shop directly. */
 const MAX_SERVICE_LOADS = 20;
 
@@ -319,6 +327,34 @@ export class CustomerBookingPage {
     // Last, so patching orderMethod runs through the subscription above and the address
     // validator ends up matching the restored choice.
     this.restoreSavedDetails();
+    this.rememberDetailsAsTheyAreTyped();
+  }
+
+  /**
+   * Keeps the remembered details up to date while the customer fills the form.
+   *
+   * Saving only on a completed booking was not enough. Someone who fills in their name and
+   * number, then gets interrupted or closes the tab, comes back to an empty form and has to
+   * type it all again — which is the friction this was meant to remove, and it is exactly
+   * when they are most likely to give up. It also made the feature look broken: a form
+   * abandoned halfway saved nothing, so the prefill appeared to work only sometimes.
+   *
+   * Debounced because this writes to storage, and a keystroke is not worth a write. Only the
+   * contact and address fields are watched; the date, services and payment choice are
+   * per-visit decisions and are deliberately not remembered.
+   */
+  private rememberDetailsAsTheyAreTyped(): void {
+    this.bookingForm.valueChanges
+      .pipe(debounceTime(SAVED_DETAILS_DEBOUNCE_MS), takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        const value = this.bookingForm.getRawValue();
+
+        // Nothing worth keeping yet. Writing an empty record would also overwrite a good
+        // one from a previous visit the moment this page opened.
+        if (!value.fullName.trim() && !value.mobileNumber.trim()) return;
+
+        this.rememberDetails(value.orderMethod === 'pickupDelivery');
+      });
   }
 
   /**

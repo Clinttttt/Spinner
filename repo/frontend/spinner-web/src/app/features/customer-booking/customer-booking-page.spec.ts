@@ -947,8 +947,9 @@ describe('CustomerBookingPage pickup location', () => {
 
       expect(page.detailsRestored()).toBe(false);
       expect(page.bookingForm.controls.fullName.value).toBe('');
-      // Dropped rather than left to fail again on the next visit.
-      expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+      // Ignored, not deleted. Nothing but "Start fresh" removes a customer's details, so a
+      // clock change or a long absence cannot destroy them.
+      expect(localStorage.getItem(STORAGE_KEY)).not.toBeNull();
     });
 
     it('survives hand-edited storage instead of failing to load the page', () => {
@@ -958,6 +959,85 @@ describe('CustomerBookingPage pickup location', () => {
 
       expect(page.detailsRestored()).toBe(false);
       expect(page.bookingForm.controls.fullName.value).toBe('');
+    });
+
+    it('carries the details across a reload, not just within one visit', () => {
+      // The real journey: book, close the tab, come back. Seeding storage by hand proves the
+      // reading half only; this proves the writing half agrees with it.
+      const first = createPage();
+      first.page.submitBooking();
+      submittedPayload();
+
+      // A reload is a new application over the same browser storage, so the testing module
+      // has to be torn down first. localStorage is untouched by the reset, which is the point.
+      TestBed.resetTestingModule();
+      const second = createPage([service], false);
+
+      expect(second.page.detailsRestored()).toBe(true);
+      expect(second.page.bookingForm.controls.fullName.value).toBe('Kendra Mae');
+      expect(second.page.bookingForm.controls.mobileNumber.value).toBe('09171234567');
+      expect(second.page.bookingForm.controls.address.value).toBe(CUSTOMER_ADDRESS);
+    });
+
+    it('keeps the details for a third visit, not only the first one back', () => {
+      // Reported as "the remembering only happens once": it appeared after the first reload
+      // and was gone after the next.
+      const first = createPage();
+      first.page.submitBooking();
+      submittedPayload();
+
+      TestBed.resetTestingModule();
+      const second = createPage([service], false);
+      expect(second.page.detailsRestored()).toBe(true);
+
+      TestBed.resetTestingModule();
+      const third = createPage([service], false);
+      expect(third.page.detailsRestored()).toBe(true);
+      expect(third.page.bookingForm.controls.fullName.value).toBe('Kendra Mae');
+    });
+
+    it('remembers details that were typed but never submitted', async () => {
+      // The case that made this look unreliable: someone fills in their name and number,
+      // then is interrupted or closes the tab. Saving only on a completed booking meant they
+      // came back to an empty form and typed it all again.
+      const { page } = createPage([service], false);
+
+      page.bookingForm.patchValue({
+        fullName: 'Walk In Customer',
+        mobileNumber: '09179998888',
+      });
+
+      // Past the debounce.
+      await new Promise((resolve) => setTimeout(resolve, 800));
+
+      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}');
+      expect(stored.fullName).toBe('Walk In Customer');
+      expect(stored.mobileNumber).toBe('09179998888');
+    });
+
+    it('does not wipe a previous visit before anything has been typed', async () => {
+      // Opening the page must not overwrite good details with an empty record just because
+      // the form starts blank.
+      storeDetails();
+
+      const { page } = createPage([service], false);
+      page.bookingForm.patchValue({ notes: 'looking around' });
+
+      await new Promise((resolve) => setTimeout(resolve, 800));
+
+      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}');
+      expect(stored.fullName).toBe('Kendra Mae');
+    });
+
+    it('keeps a record it cannot use rather than deleting it', () => {
+      // Clearing on a failed read meant one bad entry destroyed details the customer would
+      // otherwise have got back. Only "Start fresh" should remove them.
+      localStorage.setItem(STORAGE_KEY, '{ not json');
+
+      const { page } = createPage([service], false);
+
+      expect(page.detailsRestored()).toBe(false);
+      expect(localStorage.getItem(STORAGE_KEY)).not.toBeNull();
     });
 
     it('remembers the details once a booking is submitted', () => {

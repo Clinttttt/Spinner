@@ -70,6 +70,12 @@ export class SavedBookingDetailsService {
    *
    * Returns null rather than throwing for anything unexpected: a customer who cannot be
    * prefilled should get an empty form, never an error page.
+   *
+   * Nothing here deletes the record. An earlier version cleared it whenever it could not be
+   * used — corrupt JSON, or past the retention window — which meant one bad read threw away
+   * details the customer would otherwise have got back, and made the feature look as though
+   * it only worked once. Only an explicit "Start fresh" removes it now, and a new save
+   * replaces it.
    */
   read(): SavedBookingDetails | null {
     const raw = this.readRaw();
@@ -79,22 +85,14 @@ export class SavedBookingDetailsService {
     try {
       parsed = JSON.parse(raw);
     } catch {
-      // Corrupt or hand-edited. Drop it so it cannot fail again on every visit.
-      this.clear();
       return null;
     }
 
-    if (!parsed || typeof parsed !== 'object') {
-      this.clear();
-      return null;
-    }
+    if (!parsed || typeof parsed !== 'object') return null;
 
     const envelope = parsed as Partial<StoredEnvelope>;
 
-    if (this.isExpired(envelope.savedAt)) {
-      this.clear();
-      return null;
-    }
+    if (this.isExpired(envelope.savedAt)) return null;
 
     const orderMethod = envelope.orderMethod;
     const paymentMethod = envelope.paymentMethod;

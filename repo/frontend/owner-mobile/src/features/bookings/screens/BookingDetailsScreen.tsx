@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Linking } from "react-native";
+import { Linking, Platform, ToastAndroid } from "react-native";
 
 import { describeApiError } from "../../../api/apiClient";
 import { useDialog } from "../../../components/common/DialogProvider";
@@ -97,12 +97,66 @@ export function BookingDetailsScreen({
     }
   }, [displayBooking]);
 
+  /**
+   * What just happened, in the owner's words.
+   *
+   * The primary action used to succeed in silence. Confirming a cash payment records the
+   * money and issues the receipt but deliberately leaves the order Ready for Delivery,
+   * because collecting payment and closing the job are separate facts — so the button then
+   * reads "Mark Completed" and needs pressing again. With no acknowledgement of the first
+   * press, that reads as a button that ignored you, and the natural response is to press it
+   * again rather than to notice the label changed.
+   */
+  const describeAction = (before: BookingDetails) => {
+    if (
+      before.apiStatus === "ReadyForDelivery" &&
+      before.paymentStatus === "cod"
+    ) {
+      return "Cash payment recorded and receipt issued. Mark it completed when it is handed over.";
+    }
+
+    if (before.apiStatus === "BookingReceived") return "Booking confirmed.";
+
+    if (
+      before.apiStatus === "Confirmed" &&
+      before.fulfillmentType === "PickupAndDelivery"
+    ) {
+      return "Marked picked up.";
+    }
+
+    if (before.apiStatus === "Confirmed" || before.apiStatus === "PickedUp") {
+      return "Processing started.";
+    }
+
+    if (before.apiStatus === "BeingProcessed") return "Marked ready.";
+    if (before.apiStatus === "ReadyForDelivery") return "Order completed.";
+
+    return "Order updated.";
+  };
+
   const performPrimaryAction = useCallback(async () => {
     if (!displayBooking || submitting) return;
+
+    // Captured before the call, because the refetch replaces it and the message describes
+    // the step that was taken, not the state it landed in.
+    const before = displayBooking;
+
     setSubmitting(true);
     try {
-      const updated = await advanceBookingStatus(displayBooking);
+      const updated = await advanceBookingStatus(before);
       if (updated) setDisplayBooking(updated);
+
+      const message = describeAction(before);
+
+      if (Platform.OS === "android") {
+        ToastAndroid.show(message, ToastAndroid.LONG);
+      } else {
+        await dialog.notify({
+          message,
+          title: "Order updated",
+          tone: "success",
+        });
+      }
     } catch (error) {
       await dialog.notify({
         message: describeApiError(error, "Please try again."),
