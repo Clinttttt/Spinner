@@ -16,6 +16,7 @@ import {
 
 import { describeApiError } from "../../../api/apiClient";
 import { supportConfig } from "../../../api/supportConfig";
+import { refreshBusinessIdentity } from "../services/businessIdentityStore";
 import { appDialog } from "../../../components/common/DialogProvider";
 import { colors } from "../../../theme/colors";
 import {
@@ -73,7 +74,6 @@ import {
 } from "../services/settingsService";
 import { captureCurrentLocation } from "../services/deviceLocation";
 
-const ownerProfile = require("../../../../assets/profile/owner-profile.png");
 const logo = require("../../../../assets/branding/logo.jpg");
 
 interface SettingsDetailScreenProps {
@@ -156,6 +156,24 @@ export function SettingsDetailScreen({
   );
 }
 
+/**
+ * Up to two letters for an avatar, from whatever name is available.
+ *
+ * Returns nothing for an empty name rather than a placeholder letter, so a circle that is
+ * still loading stays blank instead of showing a letter that then changes.
+ */
+function initialsFrom(fullName: string) {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "";
+
+  const letters =
+    parts.length === 1
+      ? parts[0].slice(0, 2)
+      : `${parts[0][0]}${parts[parts.length - 1][0]}`;
+
+  return letters.toUpperCase();
+}
+
 function showSaved(label: string) {
   if (Platform.OS === "android") {
     ToastAndroid.show(label, ToastAndroid.SHORT);
@@ -236,12 +254,17 @@ function ProfileInformationPage() {
   return (
     <>
       <SettingsCard style={styles.profileCard}>
-        <Image
-          fadeDuration={0}
-          resizeMode="cover"
-          source={ownerProfile}
-          style={styles.avatar}
-        />
+        {/*
+          The account's own initials.
+
+          This was a photograph bundled with the app, so every account saw the same face:
+          a staff member opening their profile was shown the owner's photo as their own.
+          Initials come from the profile that has just been loaded, so the avatar is whoever
+          is signed in, and nobody's likeness ships inside the binary.
+        */}
+        <View style={styles.avatar}>
+          <Text style={styles.avatarInitials}>{initialsFrom(name)}</Text>
+        </View>
         <View style={styles.profileCopy}>
           <Text style={styles.profileName}>{name}</Text>
           <Text style={styles.profileRole}>{role}</Text>
@@ -543,6 +566,9 @@ function BusinessInformationPage() {
         phoneNumber: phone.trim(),
         address: address.trim(),
       });
+      // The header reads the name and logo from the shared store, so it is re-read here
+      // rather than leaving the previous one on screen until the app restarts.
+      void refreshBusinessIdentity();
       showSaved("Business information updated.");
     } catch (error) {
       showApiError("Unable to update business information", error);
@@ -557,13 +583,19 @@ function BusinessInformationPage() {
         <Image
           fadeDuration={0}
           resizeMode="cover"
-          source={logo}
+          // The shop's own logo once it has one, otherwise the mark shipped with the app.
+          source={logoUrl?.trim() ? { uri: logoUrl.trim() } : logo}
           style={styles.businessLogo}
         />
         <View style={styles.logoCopy}>
           <Text style={styles.logoTitle}>Business Logo</Text>
           <Text style={styles.logoSubtitle}>
-            Managed by the application deployment
+            {/* This read "Managed by the application deployment", which told the owner
+                their own logo was someone else's to change — and there was no field to
+                change it with, even though the API has always accepted one. */}
+            {logoUrl?.trim()
+              ? "Shown in the app header"
+              : "Using the default mark"}
           </Text>
         </View>
       </SettingsCard>
@@ -575,6 +607,13 @@ function BusinessInformationPage() {
           label="Business Name"
           onChangeText={setName}
           value={name}
+        />
+        <SettingsField
+          keyboardType="url"
+          label="Logo image link"
+          onChangeText={setLogoUrl}
+          placeholder="https://example.com/logo.png"
+          value={logoUrl ?? ""}
         />
         <SettingsField
           keyboardType="phone-pad"
@@ -1890,7 +1929,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 13,
   },
   addButtonLabel: { color: colors.surface, fontSize: 13, fontWeight: "700" },
-  avatar: { borderRadius: 32, height: 64, width: 64 },
+  avatar: {
+    alignItems: "center",
+    backgroundColor: colors.blueSoft,
+    borderRadius: 32,
+    height: 64,
+    justifyContent: "center",
+    width: 64,
+  },
+  avatarInitials: {
+    color: colors.navy,
+    fontSize: 22,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
   businessLogo: { borderRadius: 27, height: 54, width: 54 },
   copyright: {
     color: colors.textMuted,

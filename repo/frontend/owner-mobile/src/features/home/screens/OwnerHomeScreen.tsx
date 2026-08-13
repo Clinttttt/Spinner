@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { appDialog } from "../../../components/common/DialogProvider";
 import { ActivitySection } from "../../../components/home/ActivitySection";
 import { DashboardErrorState } from "../../../components/home/DashboardErrorState";
 import { GreetingSection } from "../../../components/home/GreetingSection";
@@ -19,6 +20,7 @@ import { HomeHeader } from "../../../components/home/HomeHeader";
 import { PriorityCard } from "../../../components/home/PriorityCard";
 import { SpinlyAssistantCard } from "../../../components/home/SpinlyAssistantCard";
 import { useAuth } from "../../auth/AuthContext";
+import { isOwner, ownerOnlyNotice } from "../../auth/permissions";
 import type { RootTabParamList } from "../../../navigation/types";
 import { appNotifications } from "../../notifications/components/NotificationsProvider";
 import { useOperationsCounts } from "../../operations/operationsCountsStore";
@@ -43,6 +45,28 @@ export function OwnerHomeScreen({ navigation }: OwnerHomeScreenProps) {
   const [viewState, setViewState] = useState<DashboardViewState>("loading");
   const [dashboard, setDashboard] = useState<HomeDashboardData>();
   const [refreshing, setRefreshing] = useState(false);
+
+  /**
+   * Whether this account may read the shop's takings.
+   *
+   * Reports are owner work in the API, so a staff account opening Insights used to get the
+   * screen's own failure message — "We couldn't load your reports. Check your connection" —
+   * for something that was never a connection problem and never would have worked.
+   */
+  const owner = isOwner(session);
+
+  const openInsights = useCallback(() => {
+    if (!owner) {
+      void appDialog.notify({
+        message: ownerOnlyNotice.message,
+        title: ownerOnlyNotice.title,
+        tone: "info",
+      });
+      return;
+    }
+
+    navigation.navigate("Reports");
+  }, [navigation, owner]);
   const compact = width <= 360;
   const pageHorizontalPadding = width <= 360 ? 12 : 14;
   const topBackgroundHeight = Math.round(
@@ -218,7 +242,8 @@ export function OwnerHomeScreen({ navigation }: OwnerHomeScreenProps) {
                 >
                   <SpinlyAssistantCard
                     onOrdersPress={() => navigation.navigate("ManualOrders")}
-                    onReportsPress={() => navigation.navigate("Reports")}
+                    insightsLocked={!owner}
+                    onReportsPress={openInsights}
                     summary={spinlySummary}
                   />
                 </View>

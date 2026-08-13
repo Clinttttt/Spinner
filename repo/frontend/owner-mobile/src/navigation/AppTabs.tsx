@@ -22,6 +22,7 @@ import {
   restoreAcknowledgements,
   useOperationsCounts,
 } from "../features/operations/operationsCountsStore";
+import { refreshBusinessIdentity } from "../features/settings/services/businessIdentityStore";
 import { colors } from "../theme/colors";
 import { typography } from "../theme/typography";
 import type { RootTabParamList } from "./types";
@@ -106,6 +107,10 @@ export function AppTabs() {
   useEffect(() => {
     // Restored first, so a badge the owner already dealt with does not flash back on
     // every app start.
+    // The shop's name and logo, read once for the session. The header shows them on
+    // nearly every screen, so it is fetched here rather than per header.
+    void refreshBusinessIdentity();
+
     void restoreAcknowledgements().finally(() => {
       void refreshOperationsCounts().catch(() => undefined);
     });

@@ -1,6 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Image, Pressable, StyleSheet, View } from "react-native";
+import { useMemo } from "react";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
+import { useAuth } from "../../features/auth/AuthContext";
 import {
   hasUnreadNotifications,
   useOperationsCounts,
@@ -8,7 +10,6 @@ import {
 import { colors } from "../../theme/colors";
 import { radii } from "../../theme/radii";
 
-const ownerProfile = require("../../../assets/profile/owner-profile.png");
 const transactionIcon = require("../../../assets/transactions/transaction-icon.png");
 
 interface HeaderAccountActionsProps {
@@ -24,6 +25,8 @@ export function HeaderAccountActions({
 }: HeaderAccountActionsProps) {
   const isAddTransaction = primaryAction === "addTransaction";
 
+  const { session } = useAuth();
+
   // Subscribed for the re-render, not the value: the dot reads acknowledged counts
   // through the store, and this is what redraws the bell when either side changes.
   useOperationsCounts();
@@ -32,6 +35,21 @@ export function HeaderAccountActions({
   // the owner nothing. It now appears only when the notification log has messages that
   // have arrived since the sheet was last opened.
   const unread = !isAddTransaction && hasUnreadNotifications();
+
+  // Up to two letters, which is what fits the ring. Falls back to a person glyph rather than
+  // showing an empty circle while the session is still being restored.
+  const initials = useMemo(() => {
+    const name = session?.fullName?.trim() ?? "";
+    if (!name) return "";
+
+    const parts = name.split(/\s+/).filter(Boolean);
+    const letters =
+      parts.length === 1
+        ? parts[0].slice(0, 2)
+        : `${parts[0][0]}${parts[parts.length - 1][0]}`;
+
+    return letters.toUpperCase();
+  }, [session]);
 
   return (
     <View style={styles.actions}>
@@ -84,13 +102,15 @@ export function HeaderAccountActions({
           ]}
         >
           <View style={styles.profileFrame}>
-            <Image
-              accessibilityLabel="Owner profile photo"
-              fadeDuration={0}
-              resizeMode="cover"
-              source={ownerProfile}
-              style={styles.profilePhoto}
-            />
+            {/*
+              The signed-in person's initials.
+              
+              This was a photograph bundled with the app, which meant every account saw the
+              same face: a staff member signing in was shown the owner's photo as though it
+              were their own. Initials come from the session, so the avatar is whoever is
+              actually signed in, and nobody's likeness ships inside the binary.
+            */}
+            <Text style={styles.profileInitials}>{initials}</Text>
           </View>
           <View pointerEvents="none" style={styles.profileBadge}>
             <Ionicons color={colors.actionBlue} name="scan-outline" size={15} />
@@ -154,7 +174,9 @@ const styles = StyleSheet.create({
   },
   profileFrame: {
     alignItems: "center",
-    backgroundColor: "transparent",
+    // A soft fill so the initials sit on something, where the photograph used to provide
+    // its own background.
+    backgroundColor: colors.blueSoft,
     borderColor: "rgba(201,138,0,0.72)",
     borderRadius: 28,
     borderWidth: 1.25,
@@ -167,10 +189,11 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     width: 56,
   },
-  profilePhoto: {
-    borderRadius: 27,
-    height: 54,
-    width: 54,
+  profileInitials: {
+    color: colors.navy,
+    fontSize: 19,
+    fontWeight: "700",
+    letterSpacing: 0.5,
   },
   transactionIcon: { height: 68, width: 68 },
   profileBadge: {

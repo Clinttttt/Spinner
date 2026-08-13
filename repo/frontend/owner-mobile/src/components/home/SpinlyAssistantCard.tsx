@@ -19,6 +19,8 @@ import { typography } from "../../theme/typography";
 import { SpinlyMascotLoop } from "./SpinlyMascotLoop";
 
 interface SpinlyAssistantCardProps {
+  /** True when the signed-in person may not read the shop's takings. */
+  insightsLocked: boolean;
   onOrdersPress: () => void;
   onReportsPress: () => void;
   /**
@@ -34,6 +36,8 @@ interface AssistantActionProps {
   accessibilityLabel: string;
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
+  /** Shows a lock and refuses, for work the API restricts to the owner. */
+  locked?: boolean;
   onPress: () => void;
   variant: "outline" | "navy";
 }
@@ -42,6 +46,7 @@ function AssistantAction({
   accessibilityLabel,
   icon,
   label,
+  locked = false,
   onPress,
   variant,
 }: AssistantActionProps) {
@@ -49,20 +54,26 @@ function AssistantAction({
 
   return (
     <Pressable
-      accessibilityLabel={accessibilityLabel}
+      accessibilityHint={
+        locked ? "Only the shop owner can open this" : undefined
+      }
+      accessibilityLabel={
+        locked ? `${accessibilityLabel}, owner only` : accessibilityLabel
+      }
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [
         styles.action,
         isNavy ? styles.navyAction : styles.outlineAction,
+        locked && styles.lockedAction,
         pressed && styles.pressed,
       ]}
     >
       <View style={styles.actionContent}>
         <Ionicons
           color={isNavy ? colors.surface : colors.navy}
-          name={icon}
-          size={22}
+          name={locked ? "lock-closed" : icon}
+          size={locked ? 18 : 22}
         />
         <Text style={[styles.actionText, isNavy && styles.navyActionText]}>
           {label}
@@ -73,6 +84,7 @@ function AssistantAction({
 }
 
 export function SpinlyAssistantCard({
+  insightsLocked,
   onOrdersPress,
   onReportsPress,
   summary,
@@ -169,6 +181,9 @@ export function SpinlyAssistantCard({
             accessibilityLabel="Open reports"
             icon="bar-chart-outline"
             label="Insights"
+            // Takings are owner work. New Order is not: helping with the day's orders is
+            // exactly what a staff account is for.
+            locked={insightsLocked}
             onPress={onReportsPress}
             variant="navy"
           />
@@ -342,6 +357,8 @@ const styles = StyleSheet.create({
     ...speechShadow,
     elevation: 2,
   },
+  /** Reads as unavailable without vanishing, so the reason can be explained on press. */
+  lockedAction: { opacity: 0.55 },
   navyAction: {
     backgroundColor: colors.navy,
   },

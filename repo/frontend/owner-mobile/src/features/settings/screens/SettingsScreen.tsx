@@ -15,6 +15,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { describeApiError } from "../../../api/apiClient";
 import { appDialog } from "../../../components/common/DialogProvider";
 import { useAuth } from "../../auth/AuthContext";
+import {
+  isOwner,
+  isOwnerOnlyPage,
+  ownerOnlyNotice,
+} from "../../auth/permissions";
 import { colors } from "../../../theme/colors";
 import { radii } from "../../../theme/radii";
 import { spacing } from "../../../theme/spacing";
@@ -55,7 +60,11 @@ export function SettingsScreen({
   const [business, setBusiness] = useState<BusinessSettingsDto | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
-  const { logOut } = useAuth();
+  const { logOut, session } = useAuth();
+
+  // Drives the locks below. The API refuses these for staff either way; this only means
+  // the app says so first instead of surfacing a raw 403.
+  const owner = isOwner(session);
 
   const scrollRef = useRef<ScrollView>(null);
   // Whether the remembered position has already been applied for this mount.
@@ -216,14 +225,30 @@ export function SettingsScreen({
             <View key={section.title} style={styles.section}>
               <Text style={styles.sectionTitle}>{section.title}</Text>
               <SettingsCard>
-                {section.items.map((item, index) => (
-                  <SettingsMenuRow
-                    isLast={index === section.items.length - 1}
-                    item={item}
-                    key={item.id}
-                    onPress={() => onOpenPage(item.id)}
-                  />
-                ))}
+                {section.items.map((item, index) => {
+                  // Owner work stays visible but locked, so staff can see what the
+                  // shop has and who to ask rather than opening a page that
+                  // answers 403.
+                  const locked = !owner && isOwnerOnlyPage(item.id);
+
+                  return (
+                    <SettingsMenuRow
+                      isLast={index === section.items.length - 1}
+                      item={item}
+                      key={item.id}
+                      locked={locked}
+                      onPress={() =>
+                        locked
+                          ? void appDialog.notify({
+                              message: ownerOnlyNotice.message,
+                              title: ownerOnlyNotice.title,
+                              tone: "info",
+                            })
+                          : onOpenPage(item.id)
+                      }
+                    />
+                  );
+                })}
               </SettingsCard>
             </View>
           ))}
