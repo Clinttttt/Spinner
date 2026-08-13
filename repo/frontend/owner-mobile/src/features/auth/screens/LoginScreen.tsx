@@ -435,7 +435,11 @@ export function LoginScreen() {
               // window rather than scrolling to the focused input, so without somewhere to
               // scroll to, the password fields sat underneath the keyboard and the owner
               // could not see what they were typing.
-              keyboardVisible && { paddingBottom: spacing.xl * 3 },
+              //
+              // Twice the usual gap, not more: the visible area with a keyboard open is
+              // small, and padding that is too generous pushes the fields off the top
+              // instead, which is the same problem upside down.
+              keyboardVisible && { paddingBottom: spacing.xl * 2 },
             ]}
             keyboardDismissMode="on-drag"
             keyboardShouldPersistTaps="handled"
