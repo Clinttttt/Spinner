@@ -1,6 +1,7 @@
 import * as ImageManipulator from "expo-image-manipulator";
 import { SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
+import { Platform } from "react-native";
 
 /**
  * A picked image, prepared for upload.
@@ -29,6 +30,20 @@ const MAX_EDGE_PIXELS = 512;
 const JPEG_QUALITY = 0.85;
 
 /**
+ * Whether this platform needs the photo library permission before it will hand over a file.
+ *
+ * Android 13 opened the system photo picker, which is its own consent step: the person chooses
+ * exactly which picture the app receives, so no permission is involved. expo-image-picker
+ * reflects that by asking for an empty set of permissions from Android 13 onwards, and its
+ * library picker never checks one. Asking anyway and then refusing to continue would risk
+ * blocking the feature outright on every modern phone over a permission the OS no longer has.
+ *
+ * Older Android really does need READ_EXTERNAL_STORAGE, which is why the check is kept there.
+ */
+const requiresLibraryPermission =
+  Platform.OS !== "android" || Number(Platform.Version) < 33;
+
+/**
  * Asks for a picture from the phone's library, then shrinks it ready for upload.
  *
  * Returns undefined when the person cancels, which is not an error and must not be
@@ -41,10 +56,12 @@ const JPEG_QUALITY = 0.85;
 export async function pickImageFromLibrary(
   square: boolean,
 ): Promise<PreparedImage | undefined> {
-  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (requiresLibraryPermission) {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-  if (!permission.granted) {
-    throw new ImagePermissionError(permission.canAskAgain);
+    if (!permission.granted) {
+      throw new ImagePermissionError(permission.canAskAgain);
+    }
   }
 
   const picked = await ImagePicker.launchImageLibraryAsync({

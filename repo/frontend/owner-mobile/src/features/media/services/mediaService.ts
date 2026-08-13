@@ -28,7 +28,9 @@ export function uploadLogo(image: PreparedImage): Promise<UploadedMedia> {
 /**
  * Uploads the signed-in person's profile photo.
  */
-export function uploadProfilePhoto(image: PreparedImage): Promise<UploadedMedia> {
+export function uploadProfilePhoto(
+  image: PreparedImage,
+): Promise<UploadedMedia> {
   return upload("/api/media/profile-photo", image);
 }
 

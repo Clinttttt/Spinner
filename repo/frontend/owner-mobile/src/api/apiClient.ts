@@ -438,23 +438,27 @@ export async function apiRequest<T>(
   const cacheKey = `${cacheUserId}:${path}`;
   const send = async () => {
     const token = authenticated ? await getAccessToken() : undefined;
-    return fetchApi(path, {
-      ...requestInit,
-      body:
-        body === undefined
-          ? undefined
-          : isMultipart
-            ? (body as FormData)
-            : JSON.stringify(body),
-      headers: {
-        Accept: "application/json",
-        ...(body === undefined || isMultipart
-          ? {}
-          : { "Content-Type": "application/json" }),
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...headers,
+    return fetchApi(
+      path,
+      {
+        ...requestInit,
+        body:
+          body === undefined
+            ? undefined
+            : isMultipart
+              ? (body as FormData)
+              : JSON.stringify(body),
+        headers: {
+          Accept: "application/json",
+          ...(body === undefined || isMultipart
+            ? {}
+            : { "Content-Type": "application/json" }),
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...headers,
+        },
       },
-    }, isMultipart ? UPLOAD_TIMEOUT_MS : REQUEST_TIMEOUT_MS);
+      isMultipart ? UPLOAD_TIMEOUT_MS : REQUEST_TIMEOUT_MS,
+    );
   };
 
   try {
