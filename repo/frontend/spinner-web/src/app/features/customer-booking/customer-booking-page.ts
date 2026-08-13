@@ -236,6 +236,22 @@ export class CustomerBookingPage {
     },
   ];
 
+  /**
+   * The pickup windows the shop offers.
+   *
+   * Held here rather than as options inside a select, because the template now renders them
+   * as tappable choices: a select hands the list to the browser, and on Android that is a
+   * full-screen dark dialog that looks nothing like the rest of the page.
+   *
+   * The values are what the API receives and must stay as they are.
+   */
+  readonly pickupTimeWindows: readonly { label: string; value: string }[] = [
+    { label: '8:00 AM – 10:00 AM', value: '08:00-10:00' },
+    { label: '10:00 AM – 12:00 PM', value: '10:00-12:00' },
+    { label: '1:00 PM – 3:00 PM', value: '13:00-15:00' },
+    { label: '3:00 PM – 5:00 PM', value: '15:00-17:00' },
+  ];
+
   readonly bookingForm = this.formBuilder.nonNullable.group({
     orderMethod: this.formBuilder.nonNullable.control<OrderMethod>('pickupDelivery'),
     fullName: ['', [Validators.required, Validators.minLength(2)]],
@@ -430,6 +446,17 @@ export class CustomerBookingPage {
 
   get estimatedTotal(): number {
     return this.serviceAmount + this.deliveryFee;
+  }
+
+  /**
+   * Picks a pickup window.
+   *
+   * Marked as touched so the "Choose a preferred time" message behaves as it did when this
+   * was a select, rather than lingering after a choice has been made.
+   */
+  choosePreferredTime(value: string): void {
+    this.bookingForm.controls.preferredTime.setValue(value);
+    this.bookingForm.controls.preferredTime.markAsTouched();
   }
 
   isServiceSelected(serviceId: string): boolean {

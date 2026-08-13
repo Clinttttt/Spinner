@@ -2,8 +2,10 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import {
   type ComponentProps,
   type ReactNode,
+  useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
@@ -49,6 +51,8 @@ interface AuthFieldProps {
   keyboardType?: ComponentProps<typeof TextInput>["keyboardType"];
   label: string;
   onChangeText: (value: string) => void;
+  /** Lets the screen scroll this field clear of the keyboard. */
+  onFocus?: () => void;
   onSubmitEditing?: () => void;
   placeholder: string;
   rightAccessory?: ReactNode;
@@ -81,6 +85,7 @@ function AuthField({
   keyboardType,
   label,
   onChangeText,
+  onFocus,
   onSubmitEditing,
   placeholder,
   rightAccessory,
@@ -98,6 +103,7 @@ function AuthField({
         editable={editable}
         keyboardType={keyboardType}
         onChangeText={onChangeText}
+        onFocus={onFocus}
         onSubmitEditing={onSubmitEditing}
         placeholder={placeholder}
         placeholderTextColor={colors.textMuted}
@@ -138,6 +144,24 @@ export function LoginScreen() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+
+  const scrollRef = useRef<ScrollView>(null);
+
+  /**
+   * Brings a focused field clear of the keyboard.
+   *
+   * Android resizes the window when the keyboard opens but does not scroll to the input that
+   * has focus, and React Native's ScrollView only does that on iOS. On the Create Account
+   * form the password fields sit near the bottom, so typing a password meant typing into a
+   * field hidden behind the keyboard.
+   *
+   * The delay lets the window finish resizing; scrolling first would aim at the old height.
+   */
+  const revealFocusedField = useCallback(() => {
+    if (Platform.OS === "ios") return;
+
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 140);
+  }, []);
 
   const isSignUp = mode === "signUp";
   const isSignIn = mode === "signIn";
@@ -407,9 +431,15 @@ export function LoginScreen() {
               // Clears the system navigation bar, which the safe area no longer does.
               { paddingBottom: spacing.xl + insets.bottom },
               keyboardVisible && styles.contentKeyboard,
+              // Room to scroll the last fields clear of the keyboard. Android shrinks the
+              // window rather than scrolling to the focused input, so without somewhere to
+              // scroll to, the password fields sat underneath the keyboard and the owner
+              // could not see what they were typing.
+              keyboardVisible && { paddingBottom: spacing.xl * 3 },
             ]}
             keyboardDismissMode="on-drag"
             keyboardShouldPersistTaps="handled"
+            ref={scrollRef}
             showsVerticalScrollIndicator={false}
           >
             {/* The mascot is a sign-in welcome flourish. On the taller Create
@@ -506,6 +536,7 @@ export function LoginScreen() {
                       icon="call-outline"
                       keyboardType="phone-pad"
                       label="Mobile number"
+                      onFocus={revealFocusedField}
                       onChangeText={setMobileNumber}
                       placeholder="09xx xxx xxxx"
                       value={mobileNumber}
@@ -515,6 +546,7 @@ export function LoginScreen() {
                       editable={!submitting}
                       icon="ticket-outline"
                       label="Invitation code"
+                      onFocus={revealFocusedField}
                       onChangeText={setInvitationCode}
                       placeholder="From the shop owner"
                       value={invitationCode}
@@ -596,6 +628,7 @@ export function LoginScreen() {
                     editable={!submitting}
                     icon="lock-closed-outline"
                     label="Password"
+                    onFocus={revealFocusedField}
                     onChangeText={setPassword}
                     onSubmitEditing={
                       isSignUp || isReset ? undefined : () => void submit()
@@ -617,6 +650,7 @@ export function LoginScreen() {
                     editable={!submitting}
                     icon="shield-checkmark-outline"
                     label="Confirm password"
+                    onFocus={revealFocusedField}
                     onChangeText={setConfirmPassword}
                     onSubmitEditing={() => void submit()}
                     placeholder="Re-enter your password"

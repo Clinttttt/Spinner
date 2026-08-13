@@ -86,7 +86,69 @@ public sealed class ResendNotificationSenderTests
         Assert.Null(handler.RequestUri);
     }
 
-    private static ResendNotificationSender CreateSender(HttpClient httpClient)
+    [Fact]
+    public async Task SendAsync_Should_Show_The_Shop_Logo_When_One_Is_Configured()
+    {
+        // Emails went out as a bare paragraph, which read as a system notice rather than
+        // something the laundromat sent.
+        var handler = new RecordingHttpMessageHandler(HttpStatusCode.OK);
+        using var httpClient = new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://api.resend.com/")
+        };
+
+        var result = await CreateSender(
+            httpClient,
+            "https://spinlaundry.online/assets/email-logo.png")
+            .SendAsync(CreateEmailMessage(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        using var payload = JsonDocument.Parse(handler.Content!);
+        var html = payload.RootElement.GetProperty("html").GetString()!;
+
+        Assert.Contains("email-logo.png", html, StringComparison.Ordinal);
+        Assert.Contains("Engr. Spin Laundromat", html, StringComparison.Ordinal);
+
+        // The message itself must survive the letterhead.
+        Assert.Contains(
+            "Your verification code is 123456.",
+            html,
+            StringComparison.Ordinal);
+
+        // And the plain text part stays intact for clients that show no HTML, and for
+        // anyone who blocks images.
+        Assert.Equal(
+            "Your verification code is 123456.",
+            payload.RootElement.GetProperty("text").GetString());
+    }
+
+    [Fact]
+    public async Task SendAsync_Should_Omit_The_Image_When_No_Logo_Is_Configured()
+    {
+        // A broken image in a receipt looks worse than no image, so an unconfigured logo
+        // means none is referenced at all.
+        var handler = new RecordingHttpMessageHandler(HttpStatusCode.OK);
+        using var httpClient = new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://api.resend.com/")
+        };
+
+        await CreateSender(httpClient).SendAsync(CreateEmailMessage(), CancellationToken.None);
+
+        using var payload = JsonDocument.Parse(handler.Content!);
+        var html = payload.RootElement.GetProperty("html").GetString()!;
+
+        Assert.DoesNotContain("<img", html, StringComparison.Ordinal);
+        Assert.Contains(
+            "Your verification code is 123456.",
+            html,
+            StringComparison.Ordinal);
+    }
+
+    private static ResendNotificationSender CreateSender(
+        HttpClient httpClient,
+        string logoUrl = "")
     {
         return new ResendNotificationSender(
             httpClient,
@@ -95,7 +157,8 @@ public sealed class ResendNotificationSenderTests
                 ApiKey = "re_test_key",
                 FromEmail = "notifications@example.com",
                 FromName = "Engr. Spin Laundromat",
-                DefaultSubject = "Engr. Spin Laundromat Update"
+                DefaultSubject = "Engr. Spin Laundromat Update",
+                LogoUrl = logoUrl
             }),
             NullLogger<ResendNotificationSender>.Instance);
     }

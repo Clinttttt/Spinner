@@ -602,6 +602,71 @@ button {
   grid-column: 1 / -1;
 }
 
+/**
+ * The pickup window choices.
+ *
+ * Replaces a select, which on Android Chrome opened a full-screen dark dialog with radio
+ * buttons — the browser's own furniture, in the middle of a booking form. Two columns of
+ * tappable options match the pickup method and payment choices above, keep the whole booking
+ * on one surface, and show the chosen window without a second look.
+ *
+ * The legend carries the field's own label styling, since this is no longer a label element
+ * wrapping a control.
+ */
+.field-legend {
+  color: var(--navy);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.time-options {
+  display: grid;
+  gap: 9px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.time-option {
+  background: #fff;
+  border: 1px solid #dfe4ea;
+  border-radius: 12px;
+  color: var(--navy);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  min-height: 48px;
+  padding: 0 10px;
+  text-align: center;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease;
+  width: 100%;
+}
+
+.time-option:hover {
+  border-color: #c2cbd6;
+}
+
+.time-option.selected {
+  background: var(--gold-soft);
+  border-color: #c78b12;
+  /* Two signals rather than colour alone, so the choice is clear to anyone who cannot
+     easily distinguish the tint. */
+  box-shadow: inset 0 0 0 1px #c78b12;
+}
+
+.time-option:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: 2px;
+}
+
+@media (max-width: 380px) {
+  /* One per row where two would wrap the label mid-range. */
+  .time-options {
+    grid-template-columns: 1fr;
+  }
+}
+
 .field-control {
   background: #fff;
   border: 1px solid #dfe4ea;

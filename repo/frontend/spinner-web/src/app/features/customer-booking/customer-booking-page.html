@@ -321,19 +321,39 @@
                 <small class="field-error">Choose your preferred date.</small>
               }
             </label>
-            <label class="field">
-              <span>Preferred time</span>
-              <select class="field-control" formControlName="preferredTime">
-                <option value="">Select a time</option>
-                <option value="08:00-10:00">8:00 AM – 10:00 AM</option>
-                <option value="10:00-12:00">10:00 AM – 12:00 PM</option>
-                <option value="13:00-15:00">1:00 PM – 3:00 PM</option>
-                <option value="15:00-17:00">3:00 PM – 5:00 PM</option>
-              </select>
+            <div class="field">
+              <span class="field-legend" id="preferred-time-label">Preferred time</span>
+              <!--
+                Buttons rather than a select. A select hands the choice to the browser, and on
+                Android Chrome that is a full-screen dark dialog with radio buttons — nothing
+                like the rest of this page, and a jarring handover in the middle of a booking.
+                These are the same tappable options the page already uses for pickup method
+                and payment, so a time is chosen without leaving the form.
+              -->
+              <div
+                class="time-options"
+                role="radiogroup"
+                aria-labelledby="preferred-time-label"
+              >
+                @for (window of pickupTimeWindows; track window.value) {
+                  <button
+                    class="time-option"
+                    type="button"
+                    role="radio"
+                    [class.selected]="bookingForm.controls.preferredTime.value === window.value"
+                    [attr.aria-checked]="
+                      bookingForm.controls.preferredTime.value === window.value
+                    "
+                    (click)="choosePreferredTime(window.value)"
+                  >
+                    {{ window.label }}
+                  </button>
+                }
+              </div>
               @if (hasError('preferredTime')) {
                 <small class="field-error">Choose a preferred time.</small>
               }
-            </label>
+            </div>
             <label class="field">
               <span>Notes <em>Optional</em></span>
               <input

@@ -50,7 +50,7 @@ public sealed class ResendNotificationSender : IEmailNotificationSender
             [message.Recipient],
             subject,
             message.Message,
-            $"<p>{encodedMessage}</p>"));
+            BuildHtml(encodedMessage)));
 
         using var response = await _httpClient.SendAsync(request, cancellationToken);
         if (response.IsSuccessStatusCode)
@@ -63,6 +63,70 @@ public sealed class ResendNotificationSender : IEmailNotificationSender
 
         return NotificationSendResult.Failure(
             $"Resend rejected email delivery with HTTP status {(int)response.StatusCode}.");
+    }
+
+    /// <summary>
+    /// Wraps the message in the shop's own letterhead.
+    /// </summary>
+    /// <remarks>
+    /// Emails went out as a bare paragraph, which read as a system notice rather than
+    /// something the laundromat had sent. A logo and the shop's name make a receipt or a
+    /// booking confirmation recognisable at a glance.
+    ///
+    /// Written as tables with inline styles on purpose. Mail clients are not browsers: Outlook
+    /// ignores most of a stylesheet and several strip anything in a head block, so layout that
+    /// works everywhere is the layout email had twenty years ago.
+    ///
+    /// The plain text part is still sent alongside this, so a client that shows no HTML, and
+    /// anyone who blocks images, still gets the whole message.
+    /// </remarks>
+    private string BuildHtml(string encodedMessage)
+    {
+        var shopName = WebUtility.HtmlEncode(
+            string.IsNullOrWhiteSpace(_options.FromName)
+                ? "Engr. Spin Laundromat"
+                : _options.FromName);
+
+        var logo = string.IsNullOrWhiteSpace(_options.LogoUrl)
+            ? string.Empty
+            : $"""
+              <tr>
+                <td align="center" style="padding:0 0 18px 0;">
+                  <img src="{WebUtility.HtmlEncode(_options.LogoUrl)}" width="64" height="64"
+                       alt="{shopName}"
+                       style="display:block;border:0;border-radius:16px;" />
+                </td>
+              </tr>
+              """;
+
+        return $"""
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
+                   style="background:#f4f7fb;padding:24px 12px;">
+              <tr>
+                <td align="center">
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
+                         style="max-width:520px;background:#ffffff;border:1px solid #e2e8f0;border-radius:18px;padding:26px 24px;font-family:Arial,Helvetica,sans-serif;">
+                    {logo}
+                    <tr>
+                      <td align="center" style="padding:0 0 16px 0;color:#0d2a52;font-size:16px;font-weight:bold;">
+                        {shopName}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="color:#334155;font-size:14px;line-height:22px;">
+                        {encodedMessage}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding:22px 0 0 0;border-top:1px solid #eef2f7;color:#8391a5;font-size:11px;line-height:17px;">
+                        Sent by {shopName}. Please do not reply to this address.
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+            """;
     }
 
     private sealed record ResendEmailRequest(
