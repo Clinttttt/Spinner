@@ -15,7 +15,15 @@ interface LaundryServiceDto {
   name: string;
   unitLabel: string;
   basePrice: number;
-  /** Null when the service is not offered for pickup and delivery. */
+  /**
+   * Whether the shop offers this service for collection and return.
+   *
+   * Read rather than inferred from the fee. The two are set independently, so a service can
+   * support pickup with no fee at all — free delivery — and treating a missing fee as "not
+   * offered" would hide it from every pickup order.
+   */
+  supportsPickupAndDelivery: boolean;
+  /** Null when no fee is configured, which is not the same as not being offered. */
   deliveryFee: number | null;
 }
 
@@ -299,6 +307,7 @@ export async function getManualOrderServices(): Promise<ManualServiceOption[]> {
     id: service.id,
     name: service.name,
     price: service.basePrice,
+    supportsPickupAndDelivery: service.supportsPickupAndDelivery,
     unitLabel: service.unitLabel,
   }));
 }

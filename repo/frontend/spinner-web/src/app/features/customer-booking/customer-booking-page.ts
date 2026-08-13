@@ -291,6 +291,33 @@ export class CustomerBookingPage {
     this.services().filter((service) => this.selectedServiceIds().includes(service.id)),
   );
 
+  /** True while the customer wants the laundry collected rather than bringing it in. */
+  private readonly pickupChosen = signal(true);
+
+  /**
+   * Says why a service cannot be chosen right now, or empty when it can.
+   *
+   * Not every service can be collected and returned — Self-Service is used on the premises,
+   * and the shop marks such services accordingly. The API has always refused the
+   * combination, but nothing said so until the booking was submitted, so a customer could
+   * fill the whole form and be turned away at the last step. The constraint now lives where
+   * the choice is made.
+   */
+  unavailableReason(service: LaundryServiceDto): string {
+    return this.pickupChosen() && !service.supportsPickupAndDelivery
+      ? 'Not available for pickup and delivery'
+      : '';
+  }
+
+  isServiceAvailable(service: LaundryServiceDto): boolean {
+    return this.unavailableReason(service) === '';
+  }
+
+  /**
+   * Tells the customer that their choice was adjusted, rather than adjusting it silently.
+   */
+  readonly serviceAdjustmentNotice = signal('');
+
   readonly loadCount = computed(() =>
     this.serviceLines().reduce((total, line) => total + line.loads, 0),
   );
@@ -324,6 +351,11 @@ export class CustomerBookingPage {
         else address.clearValidators();
         address.updateValueAndValidity({ emitEvent: false });
         if (method !== 'pickupDelivery') this.closeSuggestions();
+
+        // The service list depends on this, so it is recorded before the selection is
+        // re-checked against it.
+        this.pickupChosen.set(method === 'pickupDelivery');
+        this.reconcileSelectionWithFulfilment();
       });
 
     this.addressQuery
@@ -465,6 +497,12 @@ export class CustomerBookingPage {
 
   toggleService(serviceId: string): void {
     const wasSelected = this.selectedServiceIds().includes(serviceId);
+    const service = this.services().find((option) => option.id === serviceId);
+
+    // Unticking is always allowed. Ticking is not, when the service cannot be delivered and
+    // the customer has asked for delivery — the card is disabled, so this only guards
+    // against a click that arrives anyway.
+    if (!wasSelected && service && !this.isServiceAvailable(service)) return;
 
     this.selectedServiceIds.update((current) =>
       wasSelected ? current.filter((id) => id !== serviceId) : [...current, serviceId],
@@ -476,6 +514,61 @@ export class CustomerBookingPage {
       else next[serviceId] = 1;
       return next;
     });
+  }
+
+  /**
+   * Brings the chosen services back in line with the chosen fulfilment.
+   *
+   * Called when the customer switches between drop-off and pickup. It does two things, and
+   * both matter: it drops anything the new fulfilment cannot carry, which is what stopped the
+   * form reaching the API in a state it refuses; and it makes sure something is still
+   * selected whenever something can be, for the same reason the page preselects on load —
+   * the estimate should never be blank.
+   */
+  private reconcileSelectionWithFulfilment(): void {
+    const blocked = this.selectedServices().filter(
+      (service) => !this.isServiceAvailable(service),
+    );
+
+    if (blocked.length > 0) {
+      const blockedIds = new Set(blocked.map((service) => service.id));
+
+      this.selectedServiceIds.update((current) =>
+        current.filter((id) => !blockedIds.has(id)),
+      );
+      this.serviceLoads.update((current) => {
+        const next = { ...current };
+        for (const id of blockedIds) delete next[id];
+        return next;
+      });
+
+      const names = blocked.map((service) => service.name).join(', ');
+      this.serviceAdjustmentNotice.set(
+        blocked.length === 1
+          ? `${names} cannot be picked up and delivered, so it was removed.`
+          : `${names} cannot be picked up and delivered, so they were removed.`,
+      );
+    } else {
+      this.serviceAdjustmentNotice.set('');
+    }
+
+    if (this.selectedServiceIds().length === 0) this.preselectFirstAvailable();
+  }
+
+  /**
+   * Selects the first service the current fulfilment allows, so the estimate is never empty.
+   */
+  private preselectFirstAvailable(): void {
+    const first = this.services().find((service) => this.isServiceAvailable(service));
+
+    if (!first) {
+      this.selectedServiceIds.set([]);
+      this.serviceLoads.set({});
+      return;
+    }
+
+    this.selectedServiceIds.set([first.id]);
+    this.serviceLoads.set({ [first.id]: 1 });
   }
 
   /** Loads chosen for one service. Defaults to a single load. */
@@ -988,14 +1081,8 @@ export class CustomerBookingPage {
     this.submittedSummary.set(null);
 
     // Back to the first service, matching a freshly loaded page.
-    const services = this.services();
-    if (services.length) {
-      this.selectedServiceIds.set([services[0].id]);
-      this.serviceLoads.set({ [services[0].id]: 1 });
-    } else {
-      this.selectedServiceIds.set([]);
-      this.serviceLoads.set({});
-    }
+    this.preselectFirstAvailable();
+    this.serviceAdjustmentNotice.set('');
 
     if (typeof window !== 'undefined') {
       window.scrollTo({ behavior: 'smooth', top: 0 });
@@ -1098,10 +1185,10 @@ export class CustomerBookingPage {
         next: (services) => {
           this.services.set(services);
           // Preselect the first service so the estimate is never empty, while
-          // leaving every option toggleable.
+          // leaving every option toggleable. It has to be one the chosen fulfilment
+          // allows, or the form would start in a state the API refuses.
           if (services.length && this.selectedServiceIds().length === 0) {
-            this.selectedServiceIds.set([services[0].id]);
-            this.serviceLoads.set({ [services[0].id]: 1 });
+            this.preselectFirstAvailable();
           }
         },
         error: () =>

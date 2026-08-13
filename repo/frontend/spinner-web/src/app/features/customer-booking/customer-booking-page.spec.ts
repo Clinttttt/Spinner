@@ -1053,4 +1053,97 @@ describe('CustomerBookingPage pickup location', () => {
       expect(stored.preferredDate).toBeUndefined();
     });
   });
+
+  // Not every service can be collected: Self-Service is used on the premises. The API has
+  // always refused such a service on a pickup booking, but the page used to offer it anyway
+  // and the customer only found out when the finished form was rejected. Every fixture above
+  // sets supportsPickupAndDelivery to true, which is exactly why nothing caught it.
+  describe('services that cannot be picked up', () => {
+    const selfService = {
+      basePrice: 80,
+      // No fee, because there is no trip to charge for.
+      deliveryFee: 0,
+      description: null,
+      id: 'service-3',
+      name: 'Self-Service',
+      supportsPickupAndDelivery: false,
+      unitLabel: 'per load',
+    };
+
+    it('does not offer an undeliverable service for a pickup booking', () => {
+      const { page } = createPage([service, selfService]);
+
+      expect(page.isServiceAvailable(selfService)).toBe(false);
+      expect(page.unavailableReason(selfService)).toContain('pickup');
+    });
+
+    it('offers it once the customer chooses drop-off instead', () => {
+      const { fixture, page } = createPage([service, selfService]);
+
+      page.selectOrderMethod('dropOff');
+      fixture.detectChanges();
+
+      expect(page.isServiceAvailable(selfService)).toBe(true);
+      expect(page.unavailableReason(selfService)).toBe('');
+    });
+
+    it('preselects a deliverable service even when an undeliverable one comes first', () => {
+      // The page deliberately preselects a service so the estimate is never empty. That
+      // convenience must not start the form in a state the API will refuse.
+      const { page } = createPage([selfService, service]);
+
+      expect(page.selectedServiceIds()).toEqual([service.id]);
+    });
+
+    it('refuses to select an undeliverable service while pickup is chosen', () => {
+      const { page } = createPage([service, selfService]);
+
+      page.toggleService(selfService.id);
+
+      expect(page.selectedServiceIds()).not.toContain(selfService.id);
+    });
+
+    it('removes an undeliverable choice when the customer switches to pickup, and says so', () => {
+      const { fixture, page } = createPage([service, selfService]);
+
+      page.selectOrderMethod('dropOff');
+      fixture.detectChanges();
+      page.toggleService(selfService.id);
+      expect(page.selectedServiceIds()).toContain(selfService.id);
+
+      page.selectOrderMethod('pickupDelivery');
+      fixture.detectChanges();
+
+      expect(page.selectedServiceIds()).not.toContain(selfService.id);
+      // Adjusted, not silently corrected.
+      expect(page.serviceAdjustmentNotice()).toContain('Self-Service');
+    });
+
+    it('keeps a deliverable choice untouched when switching to pickup', () => {
+      const { fixture, page } = createPage([service, selfService]);
+
+      page.selectOrderMethod('dropOff');
+      fixture.detectChanges();
+      page.selectOrderMethod('pickupDelivery');
+      fixture.detectChanges();
+
+      expect(page.selectedServiceIds()).toEqual([service.id]);
+      expect(page.serviceAdjustmentNotice()).toBe('');
+    });
+
+    it('selects nothing rather than something invalid when no service can be delivered', () => {
+      const { fixture, page } = createPage([selfService]);
+
+      // Drop-off can use it.
+      page.selectOrderMethod('dropOff');
+      fixture.detectChanges();
+      expect(page.selectedServiceIds()).toEqual([selfService.id]);
+
+      // Pickup cannot, and there is no alternative to fall back to.
+      page.selectOrderMethod('pickupDelivery');
+      fixture.detectChanges();
+      expect(page.selectedServiceIds()).toEqual([]);
+    });
+  });
+
 });

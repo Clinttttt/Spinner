@@ -66,8 +66,16 @@ export interface ManualServiceOption {
   price: number;
   unitLabel: string;
   /**
+   * Whether this service can be collected and returned.
+   *
+   * Independent of the fee: a service can be offered for pickup with no fee configured. The
+   * API refuses a Pickup & Delivery order containing a service without this, so the New Order
+   * screen has to know before the order is sent rather than finding out from the refusal.
+   */
+  supportsPickupAndDelivery: boolean;
+  /**
    * What this service charges for a pickup and delivery trip, as configured in Settings.
-   * Null when the service does not offer it.
+   * Null when no fee is set.
    */
   deliveryFee: number | null;
 }

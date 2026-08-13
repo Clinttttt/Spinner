@@ -106,7 +106,13 @@ public sealed class CreateBookingMultiServiceTests
             CancellationToken.None);
 
         Assert.False(result.IsSuccess);
-        Assert.Contains("pickup and delivery", result.Error.Message);
+        // Naming the service is the point. The message used to say only that every selected
+        // service must support pickup and delivery, which left the reader to work out which
+        // of their choices was the problem.
+        Assert.Contains("Self-Service", result.Error.Message);
+        Assert.Contains("picked up and delivered", result.Error.Message);
+        // The service that is fine must not be blamed.
+        Assert.DoesNotContain(wash.Name, result.Error.Message);
     }
 
     [Fact]

@@ -33,6 +33,7 @@ import { defaultManualOrderDraft } from "../data/manualOrderDefaults";
 import type {
   ManualOrder,
   ManualOrderDraft,
+  ManualOrderMethod,
   ManualServiceOption,
 } from "../models/manualOrder";
 import {
@@ -85,13 +86,24 @@ export function CreateManualOrderScreen({
       .then((available) => {
         if (!active) return;
         setServices(available);
-        setDraft((current) => ({
-          ...current,
-          selectedServiceIds:
-            current.selectedServiceIds.length > 0 || available.length === 0
-              ? current.selectedServiceIds
-              : [available[0].id],
-        }));
+        setDraft((current) => {
+          if (current.selectedServiceIds.length > 0 || available.length === 0) {
+            return current;
+          }
+
+          // Services arrive after the screen does, so the method may already be pickup and
+          // delivery by now. Preselecting the first service regardless would start the order
+          // in a state the API refuses.
+          const selectable = available.filter(
+            (service) =>
+              current.method !== "pickupDelivery" ||
+              service.supportsPickupAndDelivery,
+          );
+
+          return selectable.length === 0
+            ? current
+            : { ...current, selectedServiceIds: [selectable[0].id] };
+        });
       })
       .catch((error: unknown) => {
         if (!active) return;
@@ -117,7 +129,89 @@ export function CreateManualOrderScreen({
     setErrors((current) => ({ ...current, [key]: undefined }));
   };
 
+  /**
+   * Whether this service can be part of the order as it currently stands.
+   *
+   * Only pickup and delivery restricts anything: Self-Service is used on the premises, so it
+   * cannot be collected. The API refuses such an order, and it used to be the first thing to
+   * say so — after the whole form had been filled in.
+   */
+  const canBeSelected = (service: ManualServiceOption) =>
+    draft.method !== "pickupDelivery" || service.supportsPickupAndDelivery;
+
+  /** A brief, non-blocking explanation. Nothing has gone wrong, so no dialog on Android. */
+  const say = (message: string) => {
+    if (Platform.OS === "android") {
+      ToastAndroid.show(message, ToastAndroid.LONG);
+      return;
+    }
+    void dialog.notify({ message, title: "Services", tone: "info" });
+  };
+
+  /**
+   * Changes the fulfilment method, keeping the chosen services valid for it.
+   *
+   * Switching to pickup and delivery can invalidate a service already chosen. Dropping it
+   * here, and saying so, is better than leaving the order in a state the API will refuse.
+   */
+  const changeMethod = (method: ManualOrderMethod) => {
+    if (method !== "pickupDelivery") {
+      update("method", method);
+      return;
+    }
+
+    const blocked = services.filter(
+      (service) =>
+        draft.selectedServiceIds.includes(service.id) &&
+        !service.supportsPickupAndDelivery,
+    );
+
+    if (blocked.length === 0) {
+      update("method", method);
+      return;
+    }
+
+    const blockedIds = new Set(blocked.map((service) => service.id));
+    const kept = draft.selectedServiceIds.filter((id) => !blockedIds.has(id));
+    // Something stays selected where possible, so the running total does not empty out.
+    const fallback = services.find(
+      (service) => service.supportsPickupAndDelivery,
+    );
+    const nextIds =
+      kept.length > 0 ? kept : fallback ? [fallback.id] : ([] as string[]);
+
+    setDraft((current) => ({
+      ...current,
+      method,
+      selectedServiceIds: nextIds,
+    }));
+    setErrors((current) => ({
+      ...current,
+      method: undefined,
+      services: undefined,
+    }));
+
+    const names = blocked.map((service) => service.name).join(", ");
+    say(
+      blocked.length === 1
+        ? `${names} cannot be picked up and delivered, so it was removed.`
+        : `${names} cannot be picked up and delivered, so they were removed.`,
+    );
+  };
+
   const toggleService = (id: string) => {
+    const service = services.find((option) => option.id === id);
+    const alreadySelected = draft.selectedServiceIds.includes(id);
+
+    // Unticking is always allowed. Ticking is refused with a reason rather than doing
+    // nothing, so a press on a dimmed row explains itself.
+    if (!alreadySelected && service && !canBeSelected(service)) {
+      say(
+        `${service.name} cannot be picked up and delivered. Choose Walk-in or Drop-off to include it.`,
+      );
+      return;
+    }
+
     setDraft((current) => ({
       ...current,
       selectedServiceIds: current.selectedServiceIds.includes(id)
@@ -229,14 +323,12 @@ export function CreateManualOrderScreen({
           onChangePhone={(value) => update("phone", value)}
           phone={draft.phone}
         />
-        <OrderMethodSelector
-          onChange={(method) => update("method", method)}
-          value={draft.method}
-        />
+        <OrderMethodSelector onChange={changeMethod} value={draft.method} />
         <ManualServiceSelector
           error={errors.services}
           loading={servicesLoading}
           onToggle={toggleService}
+          pickupSelected={draft.method === "pickupDelivery"}
           selectedIds={draft.selectedServiceIds}
           services={services}
         />

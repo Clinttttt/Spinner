@@ -47,11 +47,15 @@ public sealed class CreateBookingHandler : IRequestHandler<CreateBookingCommand,
         if (services.Any(service => !service.IsActive))
             return Result<BookingConfirmationResponse>.Conflict("One or more selected services are not active.");
 
-        if (request.FulfillmentType == FulfillmentType.PickupAndDelivery &&
-            services.Any(service => !service.SupportsPickupAndDelivery))
+        if (request.FulfillmentType == FulfillmentType.PickupAndDelivery)
         {
-            return Result<BookingConfirmationResponse>.Validation(
-                "Every selected service must support pickup and delivery.");
+            var undeliverable = PickupDeliveryRule.UndeliverableNames(services);
+
+            if (undeliverable.Count > 0)
+            {
+                return Result<BookingConfirmationResponse>.Validation(
+                    PickupDeliveryRule.Describe(undeliverable));
+            }
         }
 
         var settings = await BusinessSettingsDefaults.GetOrCreateAsync(_dbContext, cancellationToken);

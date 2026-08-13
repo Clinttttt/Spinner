@@ -24,12 +24,20 @@ export function ManualServiceSelector({
   error,
   loading,
   onToggle,
+  pickupSelected,
   selectedIds,
   services,
 }: {
   error?: string;
   loading?: boolean;
   onToggle: (id: string) => void;
+  /**
+   * Whether the order is for pickup and delivery, which not every service supports.
+   *
+   * The rows stay listed and pressable when unavailable: the shop does offer the service,
+   * just not for collection, and a press explains that rather than doing nothing.
+   */
+  pickupSelected: boolean;
   selectedIds: string[];
   services: ManualServiceOption[];
 }) {
@@ -45,17 +53,22 @@ export function ManualServiceSelector({
       <View style={[styles.options, compact && styles.compactOptions]}>
         {services.map((service) => {
           const selected = selectedIds.includes(service.id);
+          const unavailable =
+            pickupSelected && !service.supportsPickupAndDelivery;
           return (
             <Pressable
-              accessibilityLabel={`${service.name}, ${peso(service.price)} ${service.unitLabel}`}
+              accessibilityLabel={`${service.name}, ${peso(service.price)} ${service.unitLabel}${
+                unavailable ? ", not available for pickup and delivery" : ""
+              }`}
               accessibilityRole="checkbox"
-              accessibilityState={{ checked: selected }}
+              accessibilityState={{ checked: selected, disabled: unavailable }}
               key={service.id}
               onPress={() => onToggle(service.id)}
               style={({ pressed }) => [
                 styles.option,
                 compact && styles.compactOption,
                 selected && styles.selectedOption,
+                unavailable && styles.unavailableOption,
                 pressed && styles.pressed,
               ]}
             >
@@ -90,12 +103,26 @@ export function ManualServiceSelector({
                 <Text
                   style={[styles.price, selected && styles.selectedSubtext]}
                 >
-                  {peso(service.price)} {service.unitLabel}
+                  {unavailable
+                    ? "Not available for pickup and delivery"
+                    : `${peso(service.price)} ${service.unitLabel}`}
                 </Text>
               </View>
               <Ionicons
-                color={selected ? colors.surface : colors.textMuted}
-                name={selected ? "checkmark-circle" : "ellipse-outline"}
+                color={
+                  unavailable
+                    ? colors.textMuted
+                    : selected
+                      ? colors.surface
+                      : colors.textMuted
+                }
+                name={
+                  unavailable
+                    ? "lock-closed-outline"
+                    : selected
+                      ? "checkmark-circle"
+                      : "ellipse-outline"
+                }
                 size={19}
               />
             </Pressable>
@@ -156,4 +183,6 @@ const styles = StyleSheet.create({
   selectedOption: { backgroundColor: colors.navy, borderColor: colors.navy },
   selectedSubtext: { color: "rgba(255,255,255,0.78)" },
   selectedText: { color: colors.surface },
+  // Muted rather than warning-coloured: the service is fine, it just cannot be collected.
+  unavailableOption: { backgroundColor: colors.surfaceSoft, opacity: 0.62 },
 });

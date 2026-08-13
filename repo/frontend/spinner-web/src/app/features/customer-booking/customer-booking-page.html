@@ -148,14 +148,22 @@
               No services are published right now. Please contact the shop.
             </div>
           } @else {
+            @if (serviceAdjustmentNotice()) {
+              <div class="inline-notice" role="status">{{ serviceAdjustmentNotice() }}</div>
+            }
             <div class="choice-grid">
               @for (option of services(); track option.id) {
-                <div class="service-card" [class.selected]="isServiceSelected(option.id)">
+                <div
+                  class="service-card"
+                  [class.selected]="isServiceSelected(option.id)"
+                  [class.unavailable]="!isServiceAvailable(option)"
+                >
                   <button
                     class="choice-card service-toggle"
                     type="button"
                     role="checkbox"
                     [attr.aria-checked]="isServiceSelected(option.id)"
+                    [disabled]="!isServiceAvailable(option)"
                     (click)="toggleService(option.id)"
                   >
                     <span class="check-box" aria-hidden="true">
@@ -166,6 +174,11 @@
                       <small>₱{{ option.basePrice }} {{ option.unitLabel }}</small>
                       @if (option.description) {
                         <small>{{ option.description }}</small>
+                      }
+                      <!-- Says why the option cannot be chosen, rather than leaving a
+                           greyed-out card with no explanation. -->
+                      @if (unavailableReason(option)) {
+                        <small class="service-unavailable">{{ unavailableReason(option) }}</small>
                       }
                     </span>
                   </button>

@@ -8,6 +8,7 @@ using Spinner.Api.Common.Results;
 using Spinner.Api.Common.Time;
 using Spinner.Api.Database;
 using Spinner.Api.Domain.Orders;
+using Spinner.Api.Domain.Services;
 using Spinner.Api.Domain.Payments;
 using Spinner.Api.Features.Bookings.CreateBooking;
 using Spinner.Api.Features.BusinessSettings;
@@ -71,11 +72,15 @@ public sealed class StartBookingCheckoutHandler
         if (services.Any(service => !service.IsActive))
             return Result<BookingCheckoutResponse>.Conflict("One or more selected services are not active.");
 
-        if (booking.FulfillmentType == FulfillmentType.PickupAndDelivery &&
-            services.Any(service => !service.SupportsPickupAndDelivery))
+        if (booking.FulfillmentType == FulfillmentType.PickupAndDelivery)
         {
-            return Result<BookingCheckoutResponse>.Validation(
-                "Every selected service must support pickup and delivery.");
+            var undeliverable = PickupDeliveryRule.UndeliverableNames(services);
+
+            if (undeliverable.Count > 0)
+            {
+                return Result<BookingCheckoutResponse>.Validation(
+                    PickupDeliveryRule.Describe(undeliverable));
+            }
         }
 
         // Priced from the shop's own list. The client sends what was chosen, never

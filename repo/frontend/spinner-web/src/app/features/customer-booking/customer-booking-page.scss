@@ -424,6 +424,24 @@ button {
   width: 100%;
 }
 
+/*
+ * An option the current fulfilment cannot carry.
+ *
+ * Kept visible rather than hidden from the list: the shop does offer the service, just not
+ * for collection, and a customer who came looking for it should see that it exists and why
+ * it is not selectable here. Muted rather than tinted red, because nothing has gone wrong.
+ */
+.service-card.unavailable .service-toggle {
+  background: var(--surface-soft);
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.service-unavailable {
+  color: #7a5200;
+  font-weight: 600;
+}
+
 .load-stepper {
   align-items: center;
   background: var(--surface-soft);

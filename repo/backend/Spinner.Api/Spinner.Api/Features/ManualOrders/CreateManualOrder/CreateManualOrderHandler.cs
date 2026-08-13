@@ -37,8 +37,13 @@ public sealed class CreateManualOrderHandler
         if (services.Any(service => !service.IsActive))
             return Result<OrderDetailsResponse>.Conflict("One or more selected services are inactive.");
 
-        if (request.Method == FulfillmentType.PickupAndDelivery && services.Any(service => !service.SupportsPickupAndDelivery))
-            return Result<OrderDetailsResponse>.Validation("Every selected service must support pickup and delivery.");
+        if (request.Method == FulfillmentType.PickupAndDelivery)
+        {
+            var undeliverable = PickupDeliveryRule.UndeliverableNames(services);
+
+            if (undeliverable.Count > 0)
+                return Result<OrderDetailsResponse>.Validation(PickupDeliveryRule.Describe(undeliverable));
+        }
 
         var settings = await BusinessSettingsDefaults.GetOrCreateAsync(_dbContext, cancellationToken);
 
