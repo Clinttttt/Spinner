@@ -78,6 +78,8 @@ public sealed class UpdateAccountProfileHandler
             normalizedMobile,
             now);
 
+        user.SetPhotoUrl(request.PhotoUrl, now);
+
         if (emailChanged)
         {
             var activeCodes = await _dbContext.AccountActionCodes

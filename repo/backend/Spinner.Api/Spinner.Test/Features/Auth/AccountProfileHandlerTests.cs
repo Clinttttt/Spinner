@@ -44,7 +44,8 @@ public sealed class AccountProfileHandlerTests
                 user.Id,
                 "  Clint Owner  ",
                 "CLINT@EXAMPLE.COM",
-                " 09171234567 "),
+                " 09171234567 ",
+                null),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -81,11 +82,93 @@ public sealed class AccountProfileHandlerTests
                 user.Id,
                 user.FullName,
                 otherUser.EmailAddress,
-                user.MobileNumber),
+                user.MobileNumber,
+                null),
             CancellationToken.None);
 
         Assert.False(result.IsSuccess);
         Assert.Equal(ResultStatus.Conflict, result.Status);
+    }
+
+    [Fact]
+    public async Task UpdateProfile_Should_Store_A_Profile_Photo()
+    {
+        await using var dbContext = AppDbContextFactory.Create();
+        var user = CreateUser();
+        dbContext.StaffUsers.Add(user);
+        await dbContext.SaveChangesAsync();
+
+        var handler = CreateUpdateHandler(dbContext);
+        var result = await handler.Handle(
+            new UpdateAccountProfileCommand(
+                user.Id,
+                user.FullName,
+                user.EmailAddress,
+                user.MobileNumber,
+                "  https://api.spinlaundry.online/api/media/profile-photos/abc.jpg  "),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(
+            "https://api.spinlaundry.online/api/media/profile-photos/abc.jpg",
+            result.Value!.PhotoUrl);
+
+        var persisted = await dbContext.StaffUsers.SingleAsync();
+        Assert.Equal(
+            "https://api.spinlaundry.online/api/media/profile-photos/abc.jpg",
+            persisted.PhotoUrl);
+    }
+
+    [Fact]
+    public async Task UpdateProfile_Should_Clear_The_Photo_When_It_Is_Blank()
+    {
+        await using var dbContext = AppDbContextFactory.Create();
+        var user = CreateUser();
+        user.SetPhotoUrl("https://example.com/old.jpg", DateTimeOffset.UtcNow);
+        dbContext.StaffUsers.Add(user);
+        await dbContext.SaveChangesAsync();
+
+        var handler = CreateUpdateHandler(dbContext);
+        var result = await handler.Handle(
+            new UpdateAccountProfileCommand(
+                user.Id,
+                user.FullName,
+                user.EmailAddress,
+                user.MobileNumber,
+                "   "),
+            CancellationToken.None);
+
+        // Removing your picture is a choice, so whitespace means none rather than nothing
+        // happening. The app then shows initials again.
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Value!.PhotoUrl);
+    }
+
+    [Fact]
+    public async Task UpdateProfile_Should_Not_Unverify_An_Email_When_Only_The_Photo_Changes()
+    {
+        // Changing an email address deliberately invalidates its verification. A picture must
+        // not do the same, or choosing a photo would silently demand a new verification code.
+        await using var dbContext = AppDbContextFactory.Create();
+        var user = CreateUser();
+        user.VerifyEmail(DateTimeOffset.UtcNow);
+        dbContext.StaffUsers.Add(user);
+        await dbContext.SaveChangesAsync();
+
+        var handler = CreateUpdateHandler(dbContext);
+        var result = await handler.Handle(
+            new UpdateAccountProfileCommand(
+                user.Id,
+                user.FullName,
+                user.EmailAddress,
+                user.MobileNumber,
+                "https://api.spinlaundry.online/api/media/profile-photos/abc.jpg"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value!.IsEmailVerified);
+        Assert.Empty(await dbContext.AccountActionCodes.ToListAsync());
+        Assert.Empty(await dbContext.NotificationOutboxMessages.ToListAsync());
     }
 
     [Fact]

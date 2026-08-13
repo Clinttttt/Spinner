@@ -173,7 +173,8 @@ public sealed class AuthController : ApiControllerBase
             userId,
             request.FullName,
             request.EmailAddress,
-            request.MobileNumber), ct);
+            request.MobileNumber,
+            request.PhotoUrl), ct);
         return HandleResponse(result);
     }
 

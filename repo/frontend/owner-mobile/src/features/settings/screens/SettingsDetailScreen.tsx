@@ -17,6 +17,15 @@ import {
 import { describeApiError } from "../../../api/apiClient";
 import { supportConfig } from "../../../api/supportConfig";
 import { refreshBusinessIdentity } from "../services/businessIdentityStore";
+import {
+  ImagePermissionError,
+  pickImageFromLibrary,
+} from "../../media/services/imagePicker";
+import {
+  uploadLogo,
+  uploadProfilePhoto,
+} from "../../media/services/mediaService";
+import { setAccountPhoto } from "../../auth/services/accountPhotoStore";
 import { appDialog } from "../../../components/common/DialogProvider";
 import { colors } from "../../../theme/colors";
 import {
@@ -202,6 +211,16 @@ function ProfileInformationPage() {
   const [role, setRole] = useState<string>(settingsDefaults.owner.role);
   const [status, setStatus] = useState<string>(settingsDefaults.owner.status);
   const [saving, setSaving] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  // What the server last confirmed, so choosing a picture saves those details rather than
+  // whatever is half-typed in the fields. It matters more here than elsewhere: changing an
+  // email address invalidates its verification and sends a new code.
+  const [savedProfile, setSavedProfile] = useState({
+    emailAddress: "",
+    fullName: "",
+    mobileNumber: "",
+  });
 
   useEffect(() => {
     void getAccountProfile()
@@ -211,9 +230,83 @@ function ProfileInformationPage() {
         setPhone(profile.mobileNumber ?? "");
         setRole(profile.role);
         setStatus(profile.isActive ? "Active" : "Inactive");
+        setPhotoUrl(profile.photoUrl ?? null);
+        setSavedProfile({
+          emailAddress: profile.emailAddress,
+          fullName: profile.fullName,
+          mobileNumber: profile.mobileNumber ?? "",
+        });
       })
       .catch((error) => showApiError("Unable to load profile", error));
   }, []);
+
+  const changePhoto = async () => {
+    if (uploadingPhoto || saving) return;
+
+    if (!savedProfile.emailAddress) {
+      showValidation(
+        "Profile not loaded",
+        "Your profile has not loaded yet. Go back and reopen this page before changing your photo.",
+      );
+      return;
+    }
+
+    try {
+      const image = await pickImageFromLibrary(true);
+      // Cancelling the picker is an ordinary outcome, not a failure.
+      if (!image) return;
+
+      setUploadingPhoto(true);
+
+      const uploaded = await uploadProfilePhoto(image);
+
+      // Saved straight away, using the details the server already has, so one action gives
+      // one result and no uploaded image is left in storage with nothing pointing at it.
+      const profile = await updateAccountProfile({
+        emailAddress: savedProfile.emailAddress,
+        fullName: savedProfile.fullName,
+        mobileNumber: savedProfile.mobileNumber || undefined,
+        photoUrl: uploaded.url,
+      });
+
+      setPhotoUrl(profile.photoUrl ?? null);
+      // The header shows the same face, so it is told directly rather than left stale
+      // until the app restarts.
+      setAccountPhoto(profile.photoUrl ?? null);
+      showSaved("Profile photo updated.");
+    } catch (error) {
+      if (error instanceof ImagePermissionError) {
+        showValidation("Photo access needed", error.message);
+        return;
+      }
+
+      showApiError("Unable to change your photo", error);
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const removePhoto = async () => {
+    if (uploadingPhoto || saving || !photoUrl) return;
+
+    setUploadingPhoto(true);
+    try {
+      const profile = await updateAccountProfile({
+        emailAddress: savedProfile.emailAddress,
+        fullName: savedProfile.fullName,
+        mobileNumber: savedProfile.mobileNumber || undefined,
+        photoUrl: null,
+      });
+
+      setPhotoUrl(profile.photoUrl ?? null);
+      setAccountPhoto(profile.photoUrl ?? null);
+      showSaved("Profile photo removed.");
+    } catch (error) {
+      showApiError("Unable to remove your photo", error);
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
 
   const saveProfile = async () => {
     if (!name.trim()) {
@@ -235,10 +328,19 @@ function ProfileInformationPage() {
         fullName: name.trim(),
         emailAddress: email.trim(),
         mobileNumber: phone.trim() || undefined,
+        // Sent deliberately. The API treats an absent photo as "remove it", so leaving this
+        // out would delete the person's picture every time they edited their phone number.
+        photoUrl,
       });
       setName(profile.fullName);
       setEmail(profile.emailAddress);
       setPhone(profile.mobileNumber ?? "");
+      setPhotoUrl(profile.photoUrl ?? null);
+      setSavedProfile({
+        emailAddress: profile.emailAddress,
+        fullName: profile.fullName,
+        mobileNumber: profile.mobileNumber ?? "",
+      });
       await updateAccountIdentity({
         emailAddress: profile.emailAddress,
         fullName: profile.fullName,
@@ -255,19 +357,72 @@ function ProfileInformationPage() {
     <>
       <SettingsCard style={styles.profileCard}>
         {/*
-          The account's own initials.
+          The account's own picture, or its own initials.
 
           This was a photograph bundled with the app, so every account saw the same face:
           a staff member opening their profile was shown the owner's photo as their own.
           Initials come from the profile that has just been loaded, so the avatar is whoever
           is signed in, and nobody's likeness ships inside the binary.
         */}
-        <View style={styles.avatar}>
-          <Text style={styles.avatarInitials}>{initialsFrom(name)}</Text>
-        </View>
+        {photoUrl ? (
+          <Image
+            accessibilityIgnoresInvertColors
+            fadeDuration={0}
+            resizeMode="cover"
+            source={{ uri: photoUrl }}
+            style={styles.avatar}
+          />
+        ) : (
+          <View style={styles.avatar}>
+            <Text style={styles.avatarInitials}>{initialsFrom(name)}</Text>
+          </View>
+        )}
         <View style={styles.profileCopy}>
           <Text style={styles.profileName}>{name}</Text>
           <Text style={styles.profileRole}>{role}</Text>
+          <View style={styles.photoActions}>
+            <Pressable
+              accessibilityLabel={
+                photoUrl ? "Change profile photo" : "Add a profile photo"
+              }
+              accessibilityRole="button"
+              accessibilityState={{
+                busy: uploadingPhoto,
+                disabled: uploadingPhoto || saving,
+              }}
+              disabled={uploadingPhoto || saving}
+              onPress={() => void changePhoto()}
+              style={({ pressed }) => [
+                styles.logoAction,
+                pressed && styles.logoActionPressed,
+                (uploadingPhoto || saving) && styles.logoActionDisabled,
+              ]}
+            >
+              {uploadingPhoto ? (
+                <ActivityIndicator color={colors.navy} size="small" />
+              ) : (
+                <Ionicons color={colors.navy} name="camera-outline" size={16} />
+              )}
+              <Text style={styles.logoActionLabel}>
+                {photoUrl ? "Change photo" : "Add photo"}
+              </Text>
+            </Pressable>
+            {photoUrl ? (
+              <Pressable
+                accessibilityLabel="Remove profile photo"
+                accessibilityRole="button"
+                disabled={uploadingPhoto || saving}
+                onPress={() => void removePhoto()}
+                style={({ pressed }) => [
+                  styles.photoRemove,
+                  pressed && styles.logoActionPressed,
+                  (uploadingPhoto || saving) && styles.logoActionDisabled,
+                ]}
+              >
+                <Text style={styles.photoRemoveLabel}>Remove</Text>
+              </Pressable>
+            ) : null}
+          </View>
         </View>
       </SettingsCard>
       <SettingsSectionTitle subtitle="Used for account access and staff identification.">
@@ -507,6 +662,7 @@ function NotificationPreferencesPage() {
 
 function BusinessInformationPage() {
   const [saving, setSaving] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   // Deliberately empty rather than seeded with the sample business. Pre-filling meant
   // that if the load failed the form still showed a plausible-looking name and
   // address, and saving would write that sample over the shop's real profile.
@@ -515,6 +671,14 @@ function BusinessInformationPage() {
   const [phone, setPhone] = useState("");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  // What the server last confirmed. Changing the logo saves immediately, and it saves
+  // these rather than whatever is currently in the fields, so a half-typed business name
+  // is never written to the shop's profile as a side effect of picking a picture.
+  const [savedProfile, setSavedProfile] = useState({
+    address: "",
+    businessName: "",
+    phoneNumber: "",
+  });
 
   useEffect(() => {
     let active = true;
@@ -526,6 +690,11 @@ function BusinessInformationPage() {
         setPhone(settings.phoneNumber);
         setAddress(settings.address);
         setLogoUrl(settings.logoUrl);
+        setSavedProfile({
+          address: settings.address,
+          businessName: settings.businessName,
+          phoneNumber: settings.phoneNumber,
+        });
         setLoaded(true);
       })
       .catch((error: unknown) => {
@@ -536,6 +705,50 @@ function BusinessInformationPage() {
       active = false;
     };
   }, []);
+
+  const changeLogo = async () => {
+    if (uploadingLogo || saving) return;
+
+    if (!loaded) {
+      showValidation(
+        "Details not loaded",
+        "Your business information has not loaded yet. Pull down to retry before changing the logo.",
+      );
+      return;
+    }
+
+    try {
+      const image = await pickImageFromLibrary(true);
+      // Cancelling the picker is an ordinary outcome, not a failure.
+      if (!image) return;
+
+      setUploadingLogo(true);
+
+      const uploaded = await uploadLogo(image);
+
+      // Stored, but not yet the shop's logo until the profile points at it. Saved here so
+      // one action is one result: no upload sitting in storage that nothing refers to.
+      await updateBusinessProfile({
+        address: savedProfile.address,
+        businessName: savedProfile.businessName,
+        logoUrl: uploaded.url,
+        phoneNumber: savedProfile.phoneNumber,
+      });
+
+      setLogoUrl(uploaded.url);
+      void refreshBusinessIdentity();
+      showSaved("Logo updated.");
+    } catch (error) {
+      if (error instanceof ImagePermissionError) {
+        showValidation("Photo access needed", error.message);
+        return;
+      }
+
+      showApiError("Unable to change the logo", error);
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
 
   const saveBusiness = async () => {
     if (saving) return;
@@ -566,6 +779,11 @@ function BusinessInformationPage() {
         phoneNumber: phone.trim(),
         address: address.trim(),
       });
+      setSavedProfile({
+        address: address.trim(),
+        businessName: name.trim(),
+        phoneNumber: phone.trim(),
+      });
       // The header reads the name and logo from the shared store, so it is re-read here
       // rather than leaving the previous one on screen until the app restarts.
       void refreshBusinessIdentity();
@@ -593,11 +811,32 @@ function BusinessInformationPage() {
             {/* This read "Managed by the application deployment", which told the owner
                 their own logo was someone else's to change — and there was no field to
                 change it with, even though the API has always accepted one. */}
-            {logoUrl?.trim()
-              ? "Shown in the app header"
-              : "Using the default mark"}
+            {uploadingLogo
+              ? "Uploading..."
+              : logoUrl?.trim()
+                ? "Shown in the app header and on your emails"
+                : "Using the default mark"}
           </Text>
         </View>
+        <Pressable
+          accessibilityLabel="Change business logo"
+          accessibilityRole="button"
+          accessibilityState={{ busy: uploadingLogo, disabled: uploadingLogo }}
+          disabled={uploadingLogo || saving}
+          onPress={() => void changeLogo()}
+          style={({ pressed }) => [
+            styles.logoAction,
+            pressed && styles.logoActionPressed,
+            (uploadingLogo || saving) && styles.logoActionDisabled,
+          ]}
+        >
+          {uploadingLogo ? (
+            <ActivityIndicator color={colors.navy} size="small" />
+          ) : (
+            <Ionicons color={colors.navy} name="image-outline" size={16} />
+          )}
+          <Text style={styles.logoActionLabel}>Change</Text>
+        </Pressable>
       </SettingsCard>
       <SettingsSectionTitle subtitle="Keep customer-facing information current.">
         Business profile
@@ -612,7 +851,7 @@ function BusinessInformationPage() {
           keyboardType="url"
           label="Logo image link"
           onChangeText={setLogoUrl}
-          placeholder="https://example.com/logo.png"
+          placeholder="Or paste a link to an image"
           value={logoUrl ?? ""}
         />
         <SettingsField
@@ -2133,6 +2372,42 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   logoCopy: { flex: 1, minWidth: 0 },
+  logoAction: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.navy,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 6,
+    minHeight: 36,
+    paddingHorizontal: 12,
+  },
+  logoActionDisabled: { opacity: 0.58 },
+  logoActionLabel: {
+    color: colors.navy,
+    fontSize: 12.5,
+    fontWeight: "700",
+    lineHeight: 16,
+  },
+  logoActionPressed: { opacity: 0.78 },
+  photoActions: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing.xs,
+    marginTop: 8,
+  },
+  photoRemove: {
+    justifyContent: "center",
+    minHeight: 36,
+    paddingHorizontal: 6,
+  },
+  photoRemoveLabel: {
+    color: colors.textSecondary,
+    fontSize: 12.5,
+    fontWeight: "600",
+    lineHeight: 16,
+  },
   logoSubtitle: {
     color: colors.textSecondary,
     fontSize: 11.5,

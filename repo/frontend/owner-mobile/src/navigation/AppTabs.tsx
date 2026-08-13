@@ -23,6 +23,7 @@ import {
   useOperationsCounts,
 } from "../features/operations/operationsCountsStore";
 import { refreshBusinessIdentity } from "../features/settings/services/businessIdentityStore";
+import { refreshAccountPhoto } from "../features/auth/services/accountPhotoStore";
 import { colors } from "../theme/colors";
 import { typography } from "../theme/typography";
 import type { RootTabParamList } from "./types";
@@ -110,6 +111,8 @@ export function AppTabs() {
     // The shop's name and logo, read once for the session. The header shows them on
     // nearly every screen, so it is fetched here rather than per header.
     void refreshBusinessIdentity();
+    // The signed-in person's photo, for the same reason and in the same place.
+    void refreshAccountPhoto();
 
     void restoreAcknowledgements().finally(() => {
       void refreshOperationsCounts().catch(() => undefined);

@@ -31,6 +31,7 @@ import {
 } from "../notifications/services/pushRegistration";
 import { resetOperationsCounts } from "../operations/operationsCountsStore";
 import { resetBusinessIdentity } from "../settings/services/businessIdentityStore";
+import { resetAccountPhoto } from "./services/accountPhotoStore";
 import { resetPickupTasks } from "../pickup/services/pickupStore";
 import { resetSeenTransactions } from "../transactions/services/seenTransactionsStore";
 import { resetTransactions } from "../transactions/services/transactionStore";
@@ -153,6 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // is the whole reason a device can be reassigned between staff.
       resetOperationsCounts();
       resetBusinessIdentity();
+      resetAccountPhoto();
       resetTransactions();
       resetSeenTransactions();
       resetPickupTasks();

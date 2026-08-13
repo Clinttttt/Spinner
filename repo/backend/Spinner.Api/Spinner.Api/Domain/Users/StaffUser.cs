@@ -30,6 +30,16 @@ public sealed class StaffUser
     public string FullName { get; private set; } = string.Empty;
     public string EmailAddress { get; private set; } = string.Empty;
     public string? MobileNumber { get; private set; }
+
+    /// <summary>
+    /// Address of this person's profile picture, or null when they have not set one.
+    /// </summary>
+    /// <remarks>
+    /// A URL rather than the image itself, because the bytes live in object storage and are
+    /// served by the media endpoint. Null is a normal, permanent state: the app draws the
+    /// person's initials instead, which is why nothing here requires a photo to exist.
+    /// </remarks>
+    public string? PhotoUrl { get; private set; }
     public string PasswordHash { get; private set; } = string.Empty;
     public StaffRole Role { get; private set; }
     public bool IsActive { get; private set; }
@@ -88,6 +98,20 @@ public sealed class StaffUser
         FullName = fullName.Trim();
         EmailAddress = normalizedEmail;
         MobileNumber = string.IsNullOrWhiteSpace(mobileNumber) ? null : mobileNumber.Trim();
+        UpdatedAt = now;
+    }
+
+    /// <summary>
+    /// Sets or clears this person's profile picture.
+    /// </summary>
+    /// <remarks>
+    /// Separate from <see cref="UpdateProfile"/> because a picture is not a detail that has to
+    /// be re-verified: changing an email address invalidates its verification, and folding the
+    /// photo into that method would mean choosing a new picture could quietly do the same.
+    /// </remarks>
+    public void SetPhotoUrl(string? photoUrl, DateTimeOffset now)
+    {
+        PhotoUrl = string.IsNullOrWhiteSpace(photoUrl) ? null : photoUrl.Trim();
         UpdatedAt = now;
     }
 

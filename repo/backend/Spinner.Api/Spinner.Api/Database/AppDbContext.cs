@@ -267,6 +267,9 @@ public sealed class AppDbContext : DbContext
             entity.Property(user => user.FullName).HasMaxLength(160).IsRequired();
             entity.Property(user => user.EmailAddress).HasMaxLength(254).IsRequired();
             entity.Property(user => user.MobileNumber).HasMaxLength(40);
+            // Same ceiling as the business logo URL, since both hold an address produced by
+            // the media endpoint or pasted in by hand.
+            entity.Property(user => user.PhotoUrl).HasMaxLength(500);
             entity.Property(user => user.PasswordHash).HasMaxLength(500).IsRequired();
             entity.Property(user => user.CreatedAt).IsRequired();
             entity.Property(user => user.UpdatedAt).IsRequired();

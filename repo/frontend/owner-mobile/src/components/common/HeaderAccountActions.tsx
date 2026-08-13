@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { useAuth } from "../../features/auth/AuthContext";
+import { useAccountPhoto } from "../../features/auth/services/accountPhotoStore";
 import {
   hasUnreadNotifications,
   useOperationsCounts,
@@ -26,6 +27,7 @@ export function HeaderAccountActions({
   const isAddTransaction = primaryAction === "addTransaction";
 
   const { session } = useAuth();
+  const { photoUrl } = useAccountPhoto();
 
   // Subscribed for the re-render, not the value: the dot reads acknowledged counts
   // through the store, and this is what redraws the bell when either side changes.
@@ -103,14 +105,25 @@ export function HeaderAccountActions({
         >
           <View style={styles.profileFrame}>
             {/*
-              The signed-in person's initials.
+              The signed-in person's picture, or their initials.
               
               This was a photograph bundled with the app, which meant every account saw the
               same face: a staff member signing in was shown the owner's photo as though it
-              were their own. Initials come from the session, so the avatar is whoever is
-              actually signed in, and nobody's likeness ships inside the binary.
+              were their own. Now it is either the photo they uploaded themselves or their
+              initials from the session, so the avatar is whoever is actually signed in, and
+              nobody's likeness ships inside the binary.
             */}
-            <Text style={styles.profileInitials}>{initials}</Text>
+            {photoUrl ? (
+              <Image
+                accessibilityIgnoresInvertColors
+                fadeDuration={0}
+                resizeMode="cover"
+                source={{ uri: photoUrl }}
+                style={styles.profilePhoto}
+              />
+            ) : (
+              <Text style={styles.profileInitials}>{initials}</Text>
+            )}
           </View>
           <View pointerEvents="none" style={styles.profileBadge}>
             <Ionicons color={colors.actionBlue} name="scan-outline" size={15} />
@@ -194,6 +207,13 @@ const styles = StyleSheet.create({
     fontSize: 19,
     fontWeight: "700",
     letterSpacing: 0.5,
+  },
+  // Fills the ring completely. Slightly smaller than the frame so the gold border stays
+  // visible all the way round rather than being covered by the image's corners.
+  profilePhoto: {
+    borderRadius: 26,
+    height: 53,
+    width: 53,
   },
   transactionIcon: { height: 68, width: 68 },
   profileBadge: {

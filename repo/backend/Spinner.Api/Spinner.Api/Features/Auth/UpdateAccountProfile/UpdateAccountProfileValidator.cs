@@ -14,5 +14,6 @@ public sealed class UpdateAccountProfileValidator
             .EmailAddress()
             .MaximumLength(254);
         RuleFor(command => command.MobileNumber).MaximumLength(40);
+        RuleFor(command => command.PhotoUrl).MaximumLength(500);
     }
 }

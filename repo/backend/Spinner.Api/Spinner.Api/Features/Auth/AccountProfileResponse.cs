@@ -9,7 +9,8 @@ public sealed record AccountProfileResponse(
     string? MobileNumber,
     StaffRole Role,
     bool IsActive,
-    bool IsEmailVerified)
+    bool IsEmailVerified,
+    string? PhotoUrl)
 {
     public static AccountProfileResponse FromEntity(StaffUser user) =>
         new(
@@ -19,5 +20,6 @@ public sealed record AccountProfileResponse(
             user.MobileNumber,
             user.Role,
             user.IsActive,
-            user.IsEmailVerified);
+            user.IsEmailVerified,
+            user.PhotoUrl);
 }

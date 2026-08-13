@@ -9,6 +9,9 @@ import {
 import { apiConfig } from "./apiConfig";
 
 const REQUEST_TIMEOUT_MS = 10_000;
+// Uploading an image is not like fetching JSON: the request carries the file, so on a slow
+// mobile connection it can legitimately take far longer than a read should ever be allowed to.
+const UPLOAD_TIMEOUT_MS = 45_000;
 const SESSION_STORAGE_KEY = "spinner.owner.session";
 
 export interface AuthSession {
@@ -128,9 +131,13 @@ async function persistSession(session: AuthSession) {
   await SecureStore.setItemAsync(SESSION_STORAGE_KEY, JSON.stringify(session));
 }
 
-async function fetchApi(path: string, options: RequestInit): Promise<Response> {
+async function fetchApi(
+  path: string,
+  options: RequestInit,
+  timeoutMs: number = REQUEST_TIMEOUT_MS,
+): Promise<Response> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     return await fetch(`${apiConfig.baseUrl}${path}`, {
@@ -143,7 +150,7 @@ async function fetchApi(path: string, options: RequestInit): Promise<Response> {
     if (error instanceof Error && error.name === "AbortError") {
       throw new NetworkUnavailableError(
         "timeout",
-        `${endpoint} did not respond within ${REQUEST_TIMEOUT_MS / 1000}s.`,
+        `${endpoint} did not respond within ${timeoutMs / 1000}s.`,
       );
     }
 
@@ -421,6 +428,10 @@ export async function apiRequest<T>(
   const { authenticated = true, body, headers, ...requestInit } = options;
   const method = (requestInit.method ?? "GET").toUpperCase();
   const isCacheableRead = method === "GET" && body === undefined;
+  // A file upload is multipart, not JSON. It has to be handed to fetch as-is, and the
+  // Content-Type header has to be left alone: the boundary is generated with the body,
+  // so setting the type by hand produces a request the server cannot parse.
+  const isMultipart = body instanceof FormData;
   const cacheUserId = authenticated
     ? (currentSession?.userId ?? "signed-in")
     : "public";
@@ -429,14 +440,21 @@ export async function apiRequest<T>(
     const token = authenticated ? await getAccessToken() : undefined;
     return fetchApi(path, {
       ...requestInit,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body:
+        body === undefined
+          ? undefined
+          : isMultipart
+            ? (body as FormData)
+            : JSON.stringify(body),
       headers: {
         Accept: "application/json",
-        ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+        ...(body === undefined || isMultipart
+          ? {}
+          : { "Content-Type": "application/json" }),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...headers,
       },
-    });
+    }, isMultipart ? UPLOAD_TIMEOUT_MS : REQUEST_TIMEOUT_MS);
   };
 
   try {
