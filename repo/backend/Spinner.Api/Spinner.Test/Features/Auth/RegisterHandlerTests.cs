@@ -22,7 +22,7 @@ public sealed class RegisterHandlerTests
             "  MARIA@EXAMPLE.COM ",
             "09171234567",
             "SecurePass1",
-            "SecurePass1"), CancellationToken.None);
+            "SecurePass1", null), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal("maria@example.com", result.Value!.EmailAddress);
@@ -55,7 +55,7 @@ public sealed class RegisterHandlerTests
             "OWNER@SPINNER.LOCAL",
             "09179999999",
             "SecurePass1",
-            "SecurePass1"), CancellationToken.None);
+            "SecurePass1", null), CancellationToken.None);
 
         Assert.False(result.IsSuccess);
         Assert.Equal(ResultStatus.Conflict, result.Status);
@@ -77,12 +77,85 @@ public sealed class RegisterHandlerTests
             "another@example.com",
             "09170000000",
             "SecurePass1",
-            "SecurePass1"), CancellationToken.None);
+            "SecurePass1", null), CancellationToken.None);
 
         Assert.False(result.IsSuccess);
         Assert.Equal(ResultStatus.Conflict, result.Status);
         Assert.Single(await dbContext.StaffUsers.ToListAsync());
         Assert.Empty(await dbContext.RefreshTokenSessions.ToListAsync());
+    }
+
+    [Fact]
+    public async Task Register_Should_Accept_An_Invited_Staff_Member()
+    {
+        // The invitation path was unreachable in the running app: the controller built the
+        // command without the code, and because the parameter had a default the compiler
+        // accepted it. Every invited staff member was told a code was required while holding
+        // a good one. The command now takes the argument explicitly, so that omission is a
+        // build error, and this covers the path itself.
+        await using var dbContext = AppDbContextFactory.Create();
+        var hasher = new PasswordHasher();
+        var owner = CreateExistingUser(hasher);
+        dbContext.StaffUsers.Add(owner);
+        dbContext.StaffInvitations.Add(new StaffInvitation(
+            "helper@example.com",
+            StaffRole.Staff,
+            hasher.Hash("398595"),
+            owner.Id,
+            DateTimeOffset.UtcNow.AddDays(7),
+            DateTimeOffset.UtcNow));
+        await dbContext.SaveChangesAsync();
+
+        var result = await CreateHandler(dbContext, hasher).Handle(new RegisterCommand(
+            "Helpful Person",
+            "helper@example.com",
+            "09171112222",
+            "SecurePass1",
+            "SecurePass1",
+            "398595"), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var created = await dbContext.StaffUsers
+            .SingleAsync(user => user.EmailAddress == "helper@example.com");
+
+        // Invited accounts take the role the invitation carried, not Owner.
+        Assert.Equal(StaffRole.Staff, created.Role);
+
+        // The invitation is single use, so it must be spent.
+        var invitation = await dbContext.StaffInvitations.SingleAsync();
+        Assert.NotNull(invitation.AcceptedAt);
+        Assert.Equal(created.Id, invitation.AcceptedByUserId);
+    }
+
+    [Fact]
+    public async Task Register_Should_Reject_A_Code_Issued_For_Another_Email()
+    {
+        // The whole point of tying a code to an address: a leaked code is useless to anyone
+        // it was not sent to.
+        await using var dbContext = AppDbContextFactory.Create();
+        var hasher = new PasswordHasher();
+        var owner = CreateExistingUser(hasher);
+        dbContext.StaffUsers.Add(owner);
+        dbContext.StaffInvitations.Add(new StaffInvitation(
+            "helper@example.com",
+            StaffRole.Staff,
+            hasher.Hash("398595"),
+            owner.Id,
+            DateTimeOffset.UtcNow.AddDays(7),
+            DateTimeOffset.UtcNow));
+        await dbContext.SaveChangesAsync();
+
+        var result = await CreateHandler(dbContext, hasher).Handle(new RegisterCommand(
+            "Somebody Else",
+            "stranger@example.com",
+            "09173334444",
+            "SecurePass1",
+            "SecurePass1",
+            "398595"), CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Single(await dbContext.StaffUsers.ToListAsync());
     }
 
     private static StaffUser CreateExistingUser(IPasswordHasher hasher) =>

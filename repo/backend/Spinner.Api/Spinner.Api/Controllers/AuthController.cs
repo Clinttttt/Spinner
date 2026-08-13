@@ -51,7 +51,8 @@ public sealed class AuthController : ApiControllerBase
             request.EmailAddress,
             request.MobileNumber,
             request.Password,
-            request.ConfirmPassword), ct);
+            request.ConfirmPassword,
+            request.InvitationCode), ct);
         return HandleResponse(result);
     }
 
