@@ -1,5 +1,7 @@
 import * as SecureStore from "expo-secure-store";
 
+import * as FileSystem from "expo-file-system/legacy";
+
 import { getConnectivitySnapshot } from "../offline/connectivityStore";
 import {
   cacheApiResponse,
@@ -9,9 +11,6 @@ import {
 import { apiConfig } from "./apiConfig";
 
 const REQUEST_TIMEOUT_MS = 10_000;
-// Uploading an image is not like fetching JSON: the request carries the file, so on a slow
-// mobile connection it can legitimately take far longer than a read should ever be allowed to.
-const UPLOAD_TIMEOUT_MS = 45_000;
 const SESSION_STORAGE_KEY = "spinner.owner.session";
 
 export interface AuthSession {
@@ -428,37 +427,22 @@ export async function apiRequest<T>(
   const { authenticated = true, body, headers, ...requestInit } = options;
   const method = (requestInit.method ?? "GET").toUpperCase();
   const isCacheableRead = method === "GET" && body === undefined;
-  // A file upload is multipart, not JSON. It has to be handed to fetch as-is, and the
-  // Content-Type header has to be left alone: the boundary is generated with the body,
-  // so setting the type by hand produces a request the server cannot parse.
-  const isMultipart = body instanceof FormData;
   const cacheUserId = authenticated
     ? (currentSession?.userId ?? "signed-in")
     : "public";
   const cacheKey = `${cacheUserId}:${path}`;
   const send = async () => {
     const token = authenticated ? await getAccessToken() : undefined;
-    return fetchApi(
-      path,
-      {
-        ...requestInit,
-        body:
-          body === undefined
-            ? undefined
-            : isMultipart
-              ? (body as FormData)
-              : JSON.stringify(body),
-        headers: {
-          Accept: "application/json",
-          ...(body === undefined || isMultipart
-            ? {}
-            : { "Content-Type": "application/json" }),
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          ...headers,
-        },
+    return fetchApi(path, {
+      ...requestInit,
+      body: body === undefined ? undefined : JSON.stringify(body),
+      headers: {
+        Accept: "application/json",
+        ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...headers,
       },
-      isMultipart ? UPLOAD_TIMEOUT_MS : REQUEST_TIMEOUT_MS,
-    );
+    });
   };
 
   try {
@@ -493,6 +477,108 @@ export async function apiRequest<T>(
     }
     throw error;
   }
+}
+
+/**
+ * Uploads one file and returns the parsed response.
+ *
+ * Deliberately not `fetch` with a `FormData` body. On Android that path is unreliable for
+ * files, and worse, it is opaque: React Native reports an early server response — a 401, a
+ * 413, an authorisation failure — as a transport error indistinguishable from having no
+ * signal. That is how a failing upload came to be reported to the owner as "this change
+ * needs an internet connection" when the connection was fine.
+ *
+ * `uploadAsync` performs the multipart upload natively and hands back the real status code
+ * and body, so a refusal can be reported as what it is.
+ */
+export async function apiUpload<T>(
+  path: string,
+  fileUri: string,
+  options: { fieldName?: string; mimeType: string },
+): Promise<T> {
+  const url = `${apiConfig.baseUrl}${path}`;
+
+  const send = async () => {
+    const token = await getAccessToken();
+
+    return FileSystem.uploadAsync(url, fileUri, {
+      fieldName: options.fieldName ?? "file",
+      headers: {
+        Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      httpMethod: "POST",
+      mimeType: options.mimeType,
+      uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+    });
+  };
+
+  let result: FileSystem.FileSystemUploadResult;
+  try {
+    result = await send();
+
+    // Same one-shot refresh the JSON path performs. Possible here only because the real
+    // status is visible rather than collapsed into a transport failure.
+    if (result.status === 401) {
+      await refreshApiSession();
+      result = await send();
+    }
+  } catch (error) {
+    // A genuine transport failure: the request never completed.
+    throw new NetworkUnavailableError(
+      getConnectivitySnapshot() === "offline" ? "offline" : "unreachable",
+      `${url} could not be reached: ${
+        error instanceof Error ? error.message : "unknown transport error"
+      }`,
+    );
+  }
+
+  if (result.status === 401) {
+    await resetApiSession();
+    sessionExpiredHandler?.();
+  }
+
+  if (result.status < 200 || result.status >= 300) {
+    throw buildUploadError(result);
+  }
+
+  return (result.body ? JSON.parse(result.body) : undefined) as T;
+}
+
+/**
+ * Turns a refused upload into the same shape of error the JSON path produces, so callers
+ * and dialogs treat both identically.
+ */
+function buildUploadError(result: FileSystem.FileSystemUploadResult): ApiError {
+  let problem: ProblemDetails | undefined;
+  try {
+    problem = result.body
+      ? (JSON.parse(result.body) as ProblemDetails)
+      : undefined;
+  } catch {
+    // A non-JSON body, which is what a rejection by the web server rather than the
+    // application looks like. The status code still says enough.
+    problem = undefined;
+  }
+
+  const validationMessage = [
+    ...new Set(collectErrorMessages(problem?.errors)),
+  ].join(" ");
+
+  // Named explicitly, because these two are refused before the application ever sees the
+  // file and would otherwise arrive as a bare status number.
+  const fallback =
+    result.status === 413
+      ? "That image is too large to upload. Choose a smaller one."
+      : result.status === 415
+        ? "That file type cannot be uploaded."
+        : `Upload failed with status ${result.status}.`;
+
+  return new ApiError(
+    validationMessage || problem?.detail || problem?.title || fallback,
+    result.status,
+    problem,
+  );
 }
 
 export async function resetApiSession() {

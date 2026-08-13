@@ -1,4 +1,4 @@
-import { apiRequest } from "../../../api/apiClient";
+import { apiUpload } from "../../../api/apiClient";
 import type { PreparedImage } from "./imagePicker";
 
 /**
@@ -34,19 +34,16 @@ export function uploadProfilePhoto(
   return upload("/api/media/profile-photo", image);
 }
 
+/**
+ * Sends the file itself, natively.
+ *
+ * The file is handed over as a URI rather than read into JavaScript first: the platform
+ * streams it straight out, and a refusal comes back as a status code we can explain instead
+ * of as an error that looks like a lost connection. See apiUpload.
+ */
 function upload(path: string, image: PreparedImage): Promise<UploadedMedia> {
-  const form = new FormData();
-
-  // React Native builds the multipart part from this shape rather than from a Blob, so the
-  // cast is unavoidable: the platform's FormData accepts it, the DOM type does not describe it.
-  form.append("file", {
-    name: image.fileName,
-    type: image.contentType,
-    uri: image.uri,
-  } as unknown as Blob);
-
-  return apiRequest<UploadedMedia>(path, {
-    body: form,
-    method: "POST",
+  return apiUpload<UploadedMedia>(path, image.uri, {
+    fieldName: "file",
+    mimeType: image.contentType,
   });
 }
