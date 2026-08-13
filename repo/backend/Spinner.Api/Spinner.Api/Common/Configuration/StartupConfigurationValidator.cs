@@ -1,5 +1,6 @@
 using System.Net.Mail;
 using Spinner.Api.Features.Notifications.ProcessNotificationOutbox;
+using Spinner.Api.Integrations.Media;
 using Spinner.Api.Integrations.Notifications;
 using Spinner.Api.Integrations.OnlinePayments;
 
@@ -26,6 +27,7 @@ public static class StartupConfigurationValidator
             throw new InvalidOperationException("Jwt:Audience must be configured.");
 
         ValidateNotificationDelivery(configuration, environment);
+        ValidateMediaStorage(configuration, environment);
 
         if (environment.IsDevelopment())
             return;
@@ -109,6 +111,69 @@ public static class StartupConfigurationValidator
                 throw new InvalidOperationException(
                     $"OnlinePayments:{name} must be an absolute HTTPS URL when PayMongo is configured.");
             }
+        }
+    }
+
+    /// <summary>
+    /// Checks the image storage settings only when they are present.
+    /// </summary>
+    /// <remarks>
+    /// Image upload is optional, like online payment: a deployment without it refuses uploads
+    /// with a clear message and the owner can still point the logo at a link. What must not
+    /// happen is a half-configured one, where the app offers an upload button that fails on
+    /// every press. So the moment any one of the four settings appears, all four are required.
+    /// </remarks>
+    private static void ValidateMediaStorage(
+        IConfiguration configuration,
+        IHostEnvironment environment)
+    {
+        var section = MediaStorageOptions.SectionName;
+        var names = new[] { "AccountId", "AccessKeyId", "SecretAccessKey", "BucketName" };
+        var supplied = names
+            .Where(name => !string.IsNullOrWhiteSpace(configuration[$"{section}:{name}"]))
+            .ToArray();
+
+        if (supplied.Length == 0)
+            return;
+
+        var missing = names.Except(supplied, StringComparer.Ordinal).ToArray();
+        if (missing.Length > 0)
+        {
+            throw new InvalidOperationException(
+                $"{section} is partly configured. Missing: " +
+                string.Join(", ", missing.Select(name => $"{section}:{name}")) + ".");
+        }
+
+        var maxUploadBytes =
+            configuration.GetValue<int?>($"{section}:MaxUploadBytes") ??
+            new MediaStorageOptions().MaxUploadBytes;
+
+        if (maxUploadBytes <= 0)
+            throw new InvalidOperationException($"{section}:MaxUploadBytes must be greater than zero.");
+
+        // Above the ceiling the endpoint would refuse the request before the application could
+        // explain why, so the owner would see a dead connection rather than a message.
+        if (maxUploadBytes > MediaStorageOptions.RequestBodyByteCeiling)
+        {
+            throw new InvalidOperationException(
+                $"{section}:MaxUploadBytes must not exceed " +
+                $"{MediaStorageOptions.RequestBodyByteCeiling} bytes, the request size limit " +
+                "applied by the upload endpoints.");
+        }
+
+        if (environment.IsDevelopment())
+            return;
+
+        // Absolute, because this address is written into the shop's settings and then into
+        // emails, where a relative path means a broken image.
+        var publicBaseUrl = configuration[$"{section}:PublicBaseUrl"];
+        if (!Uri.TryCreate(publicBaseUrl, UriKind.Absolute, out var mediaUri) ||
+            !string.Equals(mediaUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"{section}:PublicBaseUrl must be an absolute HTTPS URL when image storage is " +
+                "configured. Stored image addresses end up in emails, which cannot follow a " +
+                "relative path.");
         }
     }
 

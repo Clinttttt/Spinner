@@ -17,6 +17,7 @@ using Spinner.Api.Features.Notifications.ProcessNotificationOutbox;
 using Spinner.Api.Features.ServiceArea;
 using Spinner.Api.Integrations.Notifications;
 using Spinner.Api.Features.Payments;
+using Spinner.Api.Integrations.Media;
 using Spinner.Api.Integrations.OnlinePayments;
 using System.Text;
 using System.Text.Json.Serialization;
@@ -143,6 +144,11 @@ builder.Services.AddScoped<INotificationSender, NotificationSenderRouter>();
 builder.Services.AddHostedService<NotificationOutboxWorker>();
 builder.Services.Configure<OnlinePaymentOptions>(
     builder.Configuration.GetSection(OnlinePaymentOptions.SectionName));
+builder.Services.Configure<MediaStorageOptions>(
+    builder.Configuration.GetSection(MediaStorageOptions.SectionName));
+// Singleton because it holds one reusable S3 client and its connection pool. Building a
+// client per request is the standard way to run out of sockets.
+builder.Services.AddSingleton<IMediaStorage, R2MediaStorage>();
 builder.Services.AddScoped<OnlinePaymentSignatureVerifier>();
 builder.Services.AddScoped<PayMongoWebhookSignatureVerifier>();
 builder.Services.AddScoped<PaidBookingFinaliser>();

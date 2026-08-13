@@ -32,6 +32,16 @@ public static class RateLimitPolicies
     /// <summary>Anonymous lookups keyed on a code, which are guessable.</summary>
     public const string PublicLookup = "public-lookup";
 
+    /// <summary>Anonymous image reads.</summary>
+    /// <remarks>
+    /// Generous, because these are ordinary page and email images: a settings screen showing
+    /// the logo and a list of staff photos is a handful of requests at once, and several real
+    /// people can share one address. It exists so the free storage allowance cannot be spent
+    /// by somebody fetching the same logo in a loop, not to ration normal viewing. Long cache
+    /// headers mean a returning viewer usually does not reach this endpoint at all.
+    /// </remarks>
+    public const string PublicMedia = "public-media";
+
     public static void AddSpinnerRateLimiting(this IServiceCollection services)
     {
         services.AddRateLimiter(options =>
@@ -66,6 +76,10 @@ public static class RateLimitPolicies
 
             // Order codes are short, so unlimited lookups mean they can be walked.
             AddFixedWindow(options, PublicLookup, permitLimit: 30, windowMinutes: 1);
+
+            // Images. High enough that no real viewer meets it, low enough that the storage
+            // allowance cannot be drained by a script.
+            AddFixedWindow(options, PublicMedia, permitLimit: 300, windowMinutes: 1);
         });
     }
 
