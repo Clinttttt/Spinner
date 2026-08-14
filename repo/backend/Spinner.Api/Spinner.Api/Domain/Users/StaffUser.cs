@@ -115,6 +115,35 @@ public sealed class StaffUser
         UpdatedAt = now;
     }
 
+    /// <summary>
+    /// Withdraws this account's access without deleting it.
+    /// </summary>
+    /// <remarks>
+    /// Deactivating rather than deleting keeps the orders, receipts and activity this person
+    /// recorded attributable, which matters for the shop's books. Sign-in, token refresh,
+    /// password change and password reset all check <see cref="IsActive"/>, so this closes
+    /// every route back in rather than only the front door.
+    /// </remarks>
+    public void Deactivate(DateTimeOffset now)
+    {
+        if (!IsActive) return;
+
+        IsActive = false;
+        UpdatedAt = now;
+    }
+
+    /// <summary>Restores access to a previously deactivated account.</summary>
+    public void Activate(DateTimeOffset now)
+    {
+        if (IsActive) return;
+
+        IsActive = true;
+        // A returning member should not inherit a lockout from whenever they left.
+        FailedLoginCount = 0;
+        LockedOutUntil = null;
+        UpdatedAt = now;
+    }
+
     public void ChangePassword(string passwordHash, DateTimeOffset now)
     {
         PasswordHash = passwordHash;
