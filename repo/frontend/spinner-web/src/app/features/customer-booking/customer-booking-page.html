@@ -1,10 +1,20 @@
 <main class="customer-page">
   <header class="site-header page-width">
-    <a class="brand" href="#top" aria-label="Engr. Spin Laundromat home">
-      <img src="/assets/logo.jpg" alt="Engr. Spin Laundromat logo" />
+    <a
+      class="brand"
+      href="#top"
+      [attr.aria-label]="(businessName() || 'Laundry') + ' home'"
+    >
+      <!-- The shop's own logo once it has one, otherwise the mark bundled with the site. -->
+      <img
+        [src]="businessLogoUrl() ?? '/assets/logo.jpg'"
+        [alt]="(businessName() || 'Laundry') + ' logo'"
+      />
       <span class="brand-copy">
-        <strong>ENGR. SPIN</strong>
-        <small>LAUNDROMAT</small>
+        <strong>{{ brandLines().first }}</strong>
+        @if (brandLines().second) {
+          <small>{{ brandLines().second }}</small>
+        }
       </span>
     </a>
     <button
@@ -25,7 +35,7 @@
       <img
         class="hero-image"
         src="/assets/laundromat-background.png"
-        alt="Modern Engr. Spin laundromat machines"
+        alt="Modern laundromat machines"
       />
       <div class="hero-shade"></div>
       <div class="hero-content">

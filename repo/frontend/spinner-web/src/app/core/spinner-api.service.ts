@@ -87,6 +87,8 @@ export interface ServiceAreaCheckDto {
 
 export interface PublicBusinessSettingsDto {
   businessName: string;
+  /** The shop's own logo. Null until the owner sets one, when the bundled mark is used. */
+  logoUrl: string | null;
   pickupOriginLatitude: number | null;
   pickupOriginLongitude: number | null;
   pickupServiceRadiusKm: number;

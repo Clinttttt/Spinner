@@ -1,6 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import { Title } from '@angular/platform-browser';
 
 import { CustomerBookingPage } from './customer-booking-page';
 import {
@@ -1054,7 +1055,47 @@ describe('CustomerBookingPage pickup location', () => {
     });
   });
 
-  // Not every service can be collected: Self-Service is used on the premises. The API has
+  // The header used to have the shop's name and logo file written into it, so this site was
+  // one particular laundromat's site. It now reads the settings the owner controls, which the
+  // page was already fetching for the address search bias.
+  describe('shop identity', () => {
+    it('splits the business name with the last word beneath the rest', () => {
+      const { page } = createPage();
+
+      expect(page.businessName()).toBe('Engr. Spin Laundry');
+      expect(page.brandLines()).toEqual({ first: 'ENGR. SPIN', second: 'LAUNDRY' });
+    });
+
+    it('puts the shop name in the browser tab', () => {
+      createPage();
+
+      expect(TestBed.inject(Title).getTitle()).toBe('Book Laundry | Engr. Spin Laundry');
+    });
+
+    it('shows nothing rather than a guessed name when settings carry none', () => {
+      // A flash of the wrong shop's name is worse than a moment of blank space.
+      const { page } = createPage();
+
+      page.businessName.set('');
+
+      expect(page.brandLines()).toEqual({ first: '', second: '' });
+    });
+
+    it('handles a one-word name without an empty second line', () => {
+      const { page } = createPage();
+
+      page.businessName.set('Spinner');
+
+      expect(page.brandLines()).toEqual({ first: 'SPINNER', second: '' });
+    });
+
+    it('falls back to the bundled mark when the shop has no logo', () => {
+      const { page } = createPage();
+
+      expect(page.businessLogoUrl()).toBeNull();
+    });
+  });
+
   // always refused such a service on a pickup booking, but the page used to offer it anyway
   // and the customer only found out when the finished form was rejected. Every fixture above
   // sets supportsPickupAndDelivery to true, which is exactly why nothing caught it.

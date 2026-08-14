@@ -9,6 +9,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { Meta, Title } from '@angular/platform-browser';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import {
   Subject,
@@ -131,6 +132,8 @@ export class CustomerBookingPage {
   private readonly addressLookup = inject(AddressLookupService);
   private readonly deviceLocation = inject(DeviceLocationService);
   private readonly savedDetails = inject(SavedBookingDetailsService);
+  private readonly title = inject(Title);
+  private readonly meta = inject(Meta);
   private readonly addressQuery = new Subject<string>();
   private readonly serviceAreaQuery = new Subject<PickupPin>();
 
@@ -285,6 +288,37 @@ export class CustomerBookingPage {
     latitude: 9.2381784,
     longitude: 125.9624521,
     radiusKm: 25,
+  });
+
+  /**
+   * The shop's own name and logo, read from the settings the owner controls.
+   *
+   * The header used to have the name and the logo file written into it, so this site was one
+   * particular laundromat's site. Reading business settings was already happening here for the
+   * address search bias; nothing used the identity it also returns.
+   *
+   * Empty until it arrives, so the header shows the bundled mark rather than flashing a name
+   * that then changes.
+   */
+  readonly businessName = signal('');
+  readonly businessLogoUrl = signal<string | null>(null);
+
+  /**
+   * The name split across two lines, the last word beneath the rest.
+   *
+   * That is the shape this header has always had — "ENGR. SPIN" over "LAUNDROMAT" — and it
+   * still reads correctly for a one-word or a four-word name.
+   */
+  readonly brandLines = computed(() => {
+    const parts = this.businessName().trim().split(/\s+/).filter(Boolean);
+
+    if (parts.length === 0) return { first: '', second: '' };
+    if (parts.length === 1) return { first: parts[0].toUpperCase(), second: '' };
+
+    return {
+      first: parts.slice(0, -1).join(' ').toUpperCase(),
+      second: parts[parts.length - 1].toUpperCase(),
+    };
   });
 
   readonly selectedServices = computed(() =>
@@ -1211,6 +1245,12 @@ export class CustomerBookingPage {
         catchError(() => of(null)),
       )
       .subscribe((settings) => {
+        if (settings?.businessName?.trim()) {
+          this.businessName.set(settings.businessName.trim());
+          this.applyBrandToDocument(settings.businessName.trim());
+        }
+        this.businessLogoUrl.set(settings?.logoUrl?.trim() ? settings.logoUrl.trim() : null);
+
         if (!settings?.pickupOriginLatitude || !settings.pickupOriginLongitude) return;
         this.searchBias.set({
           latitude: settings.pickupOriginLatitude,
@@ -1218,6 +1258,21 @@ export class CustomerBookingPage {
           radiusKm: settings.pickupServiceRadiusKm || 25,
         });
       });
+  }
+
+  /**
+   * Puts the shop's name in the browser tab and the page description.
+   *
+   * index.html can only carry a generic title, because it is a static file served before
+   * anything knows whose shop this is. Setting it here means the tab, and what a link preview
+   * shows, follow the name the owner set rather than a name compiled into the site.
+   */
+  private applyBrandToDocument(name: string) {
+    this.title.setTitle(`Book Laundry | ${name}`);
+    this.meta.updateTag({
+      content: `Book pickup, delivery, and laundry services with ${name}.`,
+      name: 'description',
+    });
   }
 
   private toDateInputValue(date: Date): string {
