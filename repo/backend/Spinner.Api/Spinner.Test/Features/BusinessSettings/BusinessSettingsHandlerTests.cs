@@ -16,7 +16,13 @@ public sealed class BusinessSettingsHandlerTests
         var result = await handler.Handle(new GetBusinessSettingsQuery(), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("Engr. Spin Laundry", result.Value!.BusinessName);
+        // A row has to exist before anything can read a radius or a payment method, but what
+        // it contains must not be a real laundromat's details. Asserting the absence of one
+        // shop's name is what stops it being written back in.
+        Assert.False(string.IsNullOrWhiteSpace(result.Value!.BusinessName));
+        Assert.DoesNotContain("Engr", result.Value.BusinessName, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(string.Empty, result.Value.PhoneNumber);
+        Assert.Equal(string.Empty, result.Value.Address);
         Assert.True(result.Value.IsCashOnDeliveryEnabled);
         Assert.Single(dbContext.BusinessSettings);
     }

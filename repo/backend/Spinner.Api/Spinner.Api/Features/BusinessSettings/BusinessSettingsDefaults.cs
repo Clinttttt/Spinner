@@ -15,10 +15,14 @@ public static class BusinessSettingsDefaults
         if (settings is not null)
             return settings;
 
+        // First run only: a settings row has to exist before anything can read a radius or a
+        // payment method. Deliberately placeholders rather than a real shop's details, so a
+        // fresh deployment shows something obviously unset instead of quietly presenting
+        // another laundromat's name, number and address as its own.
         settings = new DomainBusinessSettings(
-            "Engr. Spin Laundry",
-            "09170000000",
-            "Cabadbaran City",
+            "My Laundry Shop",
+            "",
+            "",
             DateTimeOffset.UtcNow);
 
         dbContext.BusinessSettings.Add(settings);

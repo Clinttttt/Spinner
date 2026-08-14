@@ -26,6 +26,7 @@ public sealed class BusinessSettingsServiceAreaPolicyProvider : IServiceAreaPoli
 
         return new RadiusServiceAreaPolicy(
             new GeoPoint(settings.PickupOriginLatitude!.Value, settings.PickupOriginLongitude!.Value),
-            settings.PickupServiceRadiusKm);
+            settings.PickupServiceRadiusKm,
+            settings.BusinessName);
     }
 }

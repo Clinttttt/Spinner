@@ -82,9 +82,12 @@ public sealed class ResendNotificationSender : IEmailNotificationSender
     /// </remarks>
     private string BuildHtml(string encodedMessage)
     {
+        // The sender name the deployment configured, which startup validation insists on
+        // outside development. The fallback carries no shop's name: a generic letterhead is
+        // honest, whereas one shop's name on another shop's receipt is not.
         var shopName = WebUtility.HtmlEncode(
             string.IsNullOrWhiteSpace(_options.FromName)
-                ? "Engr. Spin Laundromat"
+                ? "Laundry Service"
                 : _options.FromName);
 
         var logo = string.IsNullOrWhiteSpace(_options.LogoUrl)

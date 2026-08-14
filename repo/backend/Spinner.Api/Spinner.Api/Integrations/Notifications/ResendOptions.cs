@@ -7,8 +7,14 @@ public sealed class ResendOptions
     public string BaseUrl { get; set; } = "https://api.resend.com/";
     public string ApiKey { get; set; } = string.Empty;
     public string FromEmail { get; set; } = string.Empty;
-    public string FromName { get; set; } = "Engr. Spin Laundromat";
-    public string DefaultSubject { get; set; } = "Engr. Spin Laundromat Update";
+    /// <summary>
+    /// Name the shop's emails are sent under. Required outside development, and checked at
+    /// startup, so it is deliberately empty here rather than defaulting to any one shop.
+    /// </summary>
+    public string FromName { get; set; } = string.Empty;
+
+    /// <summary>Subject used when a message does not supply its own.</summary>
+    public string DefaultSubject { get; set; } = "Laundry Update";
 
     /// <summary>
     /// Publicly reachable image shown at the top of every email.

@@ -47,6 +47,29 @@ public sealed class RadiusServiceAreaPolicyTests
     }
 
     [Fact]
+    public void Should_Name_The_Shop_From_Settings_When_Refusing()
+    {
+        // This sentence is read by the public, so it used to put one particular laundromat's
+        // name in front of every customer of every deployment.
+        var faraway = new GeoPoint(8.9475m, 125.5406m);
+
+        var decision = new RadiusServiceAreaPolicy(Shop, 15m, "Sunrise Laundry").Evaluate(faraway);
+
+        Assert.Contains("Please contact Sunrise Laundry", decision.Message);
+        Assert.DoesNotContain("Engr", decision.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Should_Still_Read_Sensibly_When_No_Shop_Name_Is_Configured()
+    {
+        var faraway = new GeoPoint(8.9475m, 125.5406m);
+
+        var decision = new RadiusServiceAreaPolicy(Shop, 15m).Evaluate(faraway);
+
+        Assert.Contains("Please contact the shop", decision.Message);
+    }
+
+    [Fact]
     public void Radius_Should_Be_Configurable_Not_Fixed_At_15km()
     {
         // ~3 km from the shop: inside a 15 km area, outside a 2 km one.

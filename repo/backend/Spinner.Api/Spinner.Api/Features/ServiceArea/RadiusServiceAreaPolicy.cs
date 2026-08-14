@@ -9,8 +9,15 @@ public sealed class RadiusServiceAreaPolicy : IServiceAreaPolicy
 {
     private readonly GeoPoint _origin;
     private readonly double _radiusKm;
+    private readonly string _businessName;
 
-    public RadiusServiceAreaPolicy(GeoPoint origin, decimal radiusKm)
+    /// <param name="businessName">
+    /// The shop's own name, used only in the message a customer reads when their pin falls
+    /// outside the area. It used to be written into that sentence, which made a message the
+    /// public sees belong to one particular laundromat. Empty is allowed and reads as "the
+    /// shop", so a deployment that has not set a name still says something sensible.
+    /// </param>
+    public RadiusServiceAreaPolicy(GeoPoint origin, decimal radiusKm, string businessName = "")
     {
         if (!origin.IsValid)
             throw new ArgumentOutOfRangeException(nameof(origin), "Origin must be a valid coordinate.");
@@ -20,6 +27,7 @@ public sealed class RadiusServiceAreaPolicy : IServiceAreaPolicy
 
         _origin = origin;
         _radiusKm = (double)radiusKm;
+        _businessName = businessName.Trim();
     }
 
     public string Name => "radius";
@@ -54,7 +62,7 @@ public sealed class RadiusServiceAreaPolicy : IServiceAreaPolicy
             _radiusKm,
             Name,
             $"This point is about {Format(distanceKm)} away, outside our {Format(_radiusKm)} pickup area. " +
-            "Please contact Engr. Spin to arrange it.");
+            $"Please contact {(_businessName.Length > 0 ? _businessName : "the shop")} to arrange it.");
     }
 
     private static string Format(double kilometres) =>
