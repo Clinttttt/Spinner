@@ -30,8 +30,11 @@ function HomeHeaderComponent({
    * The last word becomes the second line, which is what turns "Engr. Spin Laundromat" into
    * "ENGR. SPIN" over "LAUNDROMAT" — the look this header already had — and still reads
    * sensibly for any other name. A single-word name simply occupies the first line.
+   *
+   * The fallback carries no shop's name. It shows for the moment before settings arrive, and
+   * a generic word there is better than briefly presenting one laundromat's name to another.
    */
-  const name = identity.businessName || "ENGR. SPIN LAUNDROMAT";
+  const name = identity.businessName || "LAUNDRY";
   const words = name.trim().split(/\s+/);
   const title = (
     words.length > 1 ? words.slice(0, -1).join(" ") : name

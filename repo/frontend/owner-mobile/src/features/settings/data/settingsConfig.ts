@@ -108,20 +108,15 @@ export const settingsDefaults = {
     role: "Owner / Staff",
     status: "Active",
   },
-  business: {
-    name: "ENGR. SPIN Laundromat",
-    phone: "Not set",
-    email: "Not set",
-    addressLine: "Business address not configured",
-    cityProvince: "",
-    pickupServiceArea: "Not configured",
-  },
   paymentMethods: {
     cashOnDelivery: false,
     qrOnlinePayment: false,
   },
   app: {
-    name: "Engr. Spin Owner",
+    // The application's own name, which is not the shop's name: the shop's comes from
+    // business settings. This used to read as one particular laundromat, which made the
+    // About screen present someone else's brand as the owner's own.
+    name: "Spinner",
     version: "1.0.0",
     tagline: "Laundry operations made simple",
   },

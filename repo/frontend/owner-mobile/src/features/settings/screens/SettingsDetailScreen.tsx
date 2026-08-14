@@ -133,7 +133,7 @@ const pageCopy: Record<SettingsPageId, { title: string; subtitle: string }> = {
     title: "Privacy Policy",
     subtitle: "How your business data is handled",
   },
-  about: { title: "About App", subtitle: "Engr. Spin Owner" },
+  about: { title: "About App", subtitle: "Version and app details" },
 };
 
 export function SettingsDetailScreen({
@@ -205,11 +205,15 @@ function showValidation(title: string, message: string) {
 
 function ProfileInformationPage() {
   const { updateAccountIdentity } = useAuth();
-  const [name, setName] = useState<string>(settingsDefaults.owner.fullName);
-  const [email, setEmail] = useState<string>(settingsDefaults.owner.email);
-  const [phone, setPhone] = useState<string>(settingsDefaults.owner.phone);
-  const [role, setRole] = useState<string>(settingsDefaults.owner.role);
-  const [status, setStatus] = useState<string>(settingsDefaults.owner.status);
+  // Deliberately empty rather than seeded with placeholders. Pre-filling meant that if the
+  // profile failed to load, the form still showed a plausible-looking name and role, and
+  // saving would write that placeholder over the real account.
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [role, setRole] = useState("");
+  const [status, setStatus] = useState("");
+  const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -236,6 +240,7 @@ function ProfileInformationPage() {
           fullName: profile.fullName,
           mobileNumber: profile.mobileNumber ?? "",
         });
+        setLoaded(true);
       })
       .catch((error) => showApiError("Unable to load profile", error));
   }, []);
@@ -309,6 +314,15 @@ function ProfileInformationPage() {
   };
 
   const saveProfile = async () => {
+    // Saving before the account is known would write an empty form over it.
+    if (!loaded) {
+      showValidation(
+        "Profile not loaded",
+        "Your profile has not loaded yet. Go back and reopen this page before saving.",
+      );
+      return;
+    }
+
     if (!name.trim()) {
       showValidation("Name required", "Full name is required.");
       return;
@@ -1801,7 +1815,7 @@ function HelpCenterPage() {
         <View style={styles.helpHeroCopy}>
           <Text style={styles.helpHeroTitle}>Find answers and get support</Text>
           <Text style={styles.helpHeroSubtitle}>
-            Guidance for the Engr. Spin Owner app.
+            Guidance for using this app.
           </Text>
         </View>
       </SettingsCard>
@@ -1900,12 +1914,12 @@ function LegalDocument({
 function TermsPage() {
   return (
     <LegalDocument
-      intro="Terms for authorized use of the Engr. Spin Owner app."
+      intro="Terms for authorized use of this app."
       notice="These terms cover use of this app by the shop owner and any staff given an account."
       sections={[
         {
           heading: "1. Acceptance of Terms",
-          body: "By using the Engr. Spin Owner app, authorized users agree to follow these terms and the business’s operating policies.",
+          body: "By using this app, authorized users agree to follow these terms and the business’s operating policies.",
         },
         {
           heading: "2. Authorized Account Use",
@@ -2014,9 +2028,11 @@ function AboutAppPage() {
         </Text>
         <Text style={styles.aboutTagline}>{settingsDefaults.app.tagline}</Text>
         <Text style={styles.aboutDescription}>
-          Engr. Spin Owner is a laundry booking and operations app for managing
-          customer orders, pickup schedules, order tracking, payments, digital
-          receipts, and business reports.
+          {/* Named from business settings rather than compiled in, so the shop reading this
+              sees itself. "your laundromat" covers the moment before settings arrive. */}
+          {`The owner and staff app for ${
+            businessName === "—" ? "your laundromat" : businessName
+          }: customer orders, pickup schedules, order tracking, payments, digital receipts, and business reports.`}
         </Text>
       </SettingsCard>
       <SettingsSectionTitle>Key Features</SettingsSectionTitle>
