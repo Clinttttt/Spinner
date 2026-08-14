@@ -48,6 +48,9 @@ import { SettingsField } from "../components/SettingsField";
 import { SettingsPageScaffold } from "../components/SettingsPageScaffold";
 import {
   getStaffInvitations,
+  getStaffAccounts,
+  setStaffAccountActive,
+  type StaffAccountDto,
   inviteStaff,
   revokeStaffInvitation,
   type IssuedInvitationDto,
@@ -1532,6 +1535,10 @@ function StaffAccountsPage() {
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
   const [invitations, setInvitations] = useState<StaffInvitationDto[]>([]);
+  const [accounts, setAccounts] = useState<StaffAccountDto[]>([]);
+  const [changingAccountId, setChangingAccountId] = useState<string | null>(
+    null,
+  );
   const [issued, setIssued] = useState<IssuedInvitationDto | null>(null);
 
   // Bumped to refetch. A token rather than a callback in the effect's dependencies,
@@ -1555,6 +1562,16 @@ function StaffAccountsPage() {
       })
       .finally(() => {
         if (active) setLoading(false);
+      });
+
+    // The accounts those invitations became. Fetched separately so a failure to read one list
+    // does not blank the other.
+    getStaffAccounts()
+      .then((rows) => {
+        if (active) setAccounts(rows);
+      })
+      .catch((error: unknown) => {
+        if (active) showApiError("Unable to load staff accounts", error);
       });
 
     return () => {
@@ -1613,6 +1630,45 @@ function StaffAccountsPage() {
     }
   };
 
+  /**
+   * Withdraws or restores one person's access.
+   *
+   * Deactivating keeps the account, so the orders and receipts they recorded stay
+   * attributable — it is their way in that is closed, not their history. The API refuses to
+   * deactivate your own account or the last active owner, and those refusals are shown as
+   * they are rather than being second-guessed here.
+   */
+  const changeAccountAccess = async (account: StaffAccountDto) => {
+    if (changingAccountId) return;
+
+    const withdrawing = account.isActive;
+
+    const accepted = await appDialog.confirm({
+      confirmLabel: withdrawing ? "Withdraw access" : "Restore access",
+      message: withdrawing
+        ? `${account.fullName} will be signed out and will not be able to sign in again. Their past orders and receipts are kept.`
+        : `${account.fullName} will be able to sign in again.`,
+      title: withdrawing ? "Withdraw access?" : "Restore access?",
+      tone: withdrawing ? "danger" : "info",
+    });
+
+    if (!accepted) return;
+
+    setChangingAccountId(account.id);
+    try {
+      await setStaffAccountActive(account.id, !account.isActive);
+      showSaved(withdrawing ? "Access withdrawn." : "Access restored.");
+      reload();
+    } catch (error) {
+      showApiError(
+        withdrawing ? "Unable to withdraw access" : "Unable to restore access",
+        error,
+      );
+    } finally {
+      setChangingAccountId(null);
+    }
+  };
+
   return (
     <>
       <InlineNotice>
@@ -1620,6 +1676,65 @@ function StaffAccountsPage() {
         address. Staff can run the day&apos;s work; only an owner can change
         prices, settings and reports.
       </InlineNotice>
+
+      {/*
+        Who can actually get in. Until now this screen only showed invitations, so an owner
+        could see a pending code but not the accounts those codes became — and had no way to
+        withdraw access from someone who had left.
+      */}
+      <SettingsSectionTitle subtitle="Withdrawing access keeps their past orders and receipts.">
+        People with access
+      </SettingsSectionTitle>
+      <SettingsCard>
+        {accounts.length === 0 ? (
+          <Text style={styles.staffEmpty}>
+            {loading ? "Loading accounts..." : "No accounts to show."}
+          </Text>
+        ) : (
+          accounts.map((account, index) => (
+            <View
+              key={account.id}
+              style={[
+                styles.accountRow,
+                index < accounts.length - 1 && styles.accountRowDivider,
+              ]}
+            >
+              <View style={styles.accountCopy}>
+                <Text style={styles.accountName}>{account.fullName}</Text>
+                <Text style={styles.accountMeta}>
+                  {account.role}
+                  {account.isActive ? "" : " · Access withdrawn"}
+                </Text>
+                <Text style={styles.accountMeta}>{account.emailAddress}</Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                disabled={changingAccountId !== null}
+                onPress={() => void changeAccountAccess(account)}
+                style={({ pressed }) => [
+                  styles.accountAction,
+                  !account.isActive && styles.accountActionRestore,
+                  pressed && styles.pressed,
+                  changingAccountId !== null && styles.accountActionBusy,
+                ]}
+              >
+                {changingAccountId === account.id ? (
+                  <ActivityIndicator color={colors.navy} size="small" />
+                ) : (
+                  <Text
+                    style={[
+                      styles.accountActionLabel,
+                      account.isActive && styles.accountActionLabelDanger,
+                    ]}
+                  >
+                    {account.isActive ? "Withdraw" : "Restore"}
+                  </Text>
+                )}
+              </Pressable>
+            </View>
+          ))
+        )}
+      </SettingsCard>
 
       <SettingsSectionTitle subtitle="The code is shown once, so pass it on before leaving this screen.">
         Invite someone
@@ -2407,6 +2522,53 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   logoActionPressed: { opacity: 0.78 },
+  accountAction: {
+    alignItems: "center",
+    borderColor: colors.border,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 36,
+    minWidth: 88,
+    paddingHorizontal: 10,
+  },
+  accountActionBusy: { opacity: 0.6 },
+  accountActionLabel: {
+    color: colors.navy,
+    fontSize: 12.5,
+    fontWeight: "700",
+  },
+  accountActionLabelDanger: { color: colors.danger },
+  accountActionRestore: { borderColor: colors.navy },
+  accountCopy: { flex: 1, minWidth: 0 },
+  accountMeta: {
+    color: colors.textSecondary,
+    fontSize: 11.5,
+    lineHeight: 16,
+    marginTop: 2,
+  },
+  accountName: {
+    color: colors.navy,
+    fontSize: 13.5,
+    fontWeight: "700",
+    lineHeight: 18,
+  },
+  accountRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+  },
+  accountRowDivider: {
+    borderBottomColor: colors.divider,
+    borderBottomWidth: 1,
+  },
+  staffEmpty: {
+    color: colors.textSecondary,
+    fontSize: 12.5,
+    padding: spacing.md,
+  },
   photoActions: {
     alignItems: "center",
     flexDirection: "row",

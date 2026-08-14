@@ -3,6 +3,37 @@ import { apiRequest } from "../../../api/apiClient";
 /** Owner sets prices and sees the books; staff run the day's work. */
 export type StaffRole = "Owner" | "Staff";
 
+/**
+ * A person who can sign in, as opposed to an invitation that has not been accepted.
+ */
+export interface StaffAccountDto {
+  id: string;
+  fullName: string;
+  emailAddress: string;
+  mobileNumber: string | null;
+  role: StaffRole;
+  isActive: boolean;
+  isEmailVerified: boolean;
+  createdAt: string;
+}
+
+export function getStaffAccounts() {
+  return apiRequest<StaffAccountDto[]>("/api/staff");
+}
+
+/**
+ * Withdraws or restores one person's access.
+ *
+ * The account is kept either way, so the orders and receipts they recorded stay attributable.
+ * The API refuses to deactivate your own account or the last active owner.
+ */
+export function setStaffAccountActive(staffUserId: string, isActive: boolean) {
+  return apiRequest<StaffAccountDto>(
+    `/api/staff/${staffUserId}/${isActive ? "activate" : "deactivate"}`,
+    { method: "POST" },
+  );
+}
+
 export interface StaffInvitationDto {
   invitationId: string;
   emailAddress: string;
