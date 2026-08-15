@@ -10,8 +10,9 @@ public sealed record GetStaffAccountsQuery : IRequest<Result<IReadOnlyList<Staff
 /// One person who can sign in to the shop's app.
 /// </summary>
 /// <remarks>
-/// Deliberately no password or token material, and no photo: this is the owner's list of who
-/// has access, not a profile view.
+/// Deliberately no password or token material. The photo is included because this is the
+/// owner's list of who has access, and a face identifies a person faster than an email
+/// address does — particularly where staff share a counter phone.
 /// </remarks>
 public sealed record StaffAccountResponse(
     Guid Id,
@@ -21,7 +22,8 @@ public sealed record StaffAccountResponse(
     StaffRole Role,
     bool IsActive,
     bool IsEmailVerified,
-    DateTimeOffset CreatedAt)
+    DateTimeOffset CreatedAt,
+    string? PhotoUrl)
 {
     public static StaffAccountResponse FromEntity(StaffUser user) =>
         new(
@@ -32,5 +34,6 @@ public sealed record StaffAccountResponse(
             user.Role,
             user.IsActive,
             user.IsEmailVerified,
-            user.CreatedAt);
+            user.CreatedAt,
+            user.PhotoUrl);
 }

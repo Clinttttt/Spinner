@@ -1739,6 +1739,23 @@ function StaffAccountsPage() {
                 index < accounts.length - 1 && styles.accountRowDivider,
               ]}
             >
+              {/* A face identifies a person faster than an email address, and staff who share
+                  a counter phone are easier to tell apart. Initials when there is no photo. */}
+              {account.photoUrl ? (
+                <Image
+                  accessibilityIgnoresInvertColors
+                  fadeDuration={0}
+                  resizeMode="cover"
+                  source={{ uri: account.photoUrl }}
+                  style={styles.accountAvatar}
+                />
+              ) : (
+                <View style={styles.accountAvatar}>
+                  <Text style={styles.accountAvatarInitials}>
+                    {initialsFrom(account.fullName)}
+                  </Text>
+                </View>
+              )}
               <View style={styles.accountCopy}>
                 <Text style={styles.accountName}>{account.fullName}</Text>
                 <Text style={styles.accountMeta}>
@@ -2580,6 +2597,19 @@ const styles = StyleSheet.create({
   },
   accountActionLabelDanger: { color: colors.danger },
   accountActionRestore: { borderColor: colors.navy },
+  accountAvatar: {
+    alignItems: "center",
+    backgroundColor: colors.blueSoft,
+    borderRadius: 19,
+    height: 38,
+    justifyContent: "center",
+    width: 38,
+  },
+  accountAvatarInitials: {
+    color: colors.navy,
+    fontSize: 13,
+    fontWeight: "700",
+  },
   accountCopy: { flex: 1, minWidth: 0 },
   accountMeta: {
     color: colors.textSecondary,

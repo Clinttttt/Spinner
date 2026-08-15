@@ -15,6 +15,8 @@ export interface StaffAccountDto {
   isActive: boolean;
   isEmailVerified: boolean;
   createdAt: string;
+  /** Their own photo, or null. Null is normal, and the row falls back to initials. */
+  photoUrl: string | null;
 }
 
 export function getStaffAccounts() {
