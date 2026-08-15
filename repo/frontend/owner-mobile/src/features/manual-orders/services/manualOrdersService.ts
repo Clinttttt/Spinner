@@ -207,15 +207,59 @@ export function calculateManualOrder(
  *
  * Matches localDate in pickupStore, which already does this correctly.
  */
-function dateFromLabel(label: string) {
-  const date = new Date();
-  if (/tomorrow/i.test(label)) date.setDate(date.getDate() + 1);
-
+function localDateOf(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
+}
+
+/**
+ * The date an order is filed against, taken from the chosen schedule label.
+ *
+ * Returns null when the label is a custom one whose date cannot be read. That matters: the
+ * "Custom" option lets the owner type a date, and this used to ignore anything that was not
+ * "tomorrow", so a job typed for next Friday was filed against today. It then appeared in
+ * today's list and today's takings while still displaying the typed text, so nothing looked
+ * wrong. Refusing is the honest outcome; the caller turns null into a message.
+ */
+export function scheduledDateFromLabel(label: string): string | null {
+  const today = new Date();
+
+  if (/tomorrow/i.test(label)) {
+    today.setDate(today.getDate() + 1);
+    return localDateOf(today);
+  }
+
+  if (!/^custom/i.test(label.trim())) return localDateOf(today);
+
+  // "Custom · Jul 18, 2026 · 2:00 PM" — the date is the part after the first separator, and
+  // the time, if any, follows a second one. Date cannot parse the separator itself.
+  const typed = label.replace(/^custom\s*·?\s*/i, "").trim();
+  if (!typed) return null;
+
+  const datePart = typed.split("·")[0].trim();
+  if (!datePart) return null;
+
+  const parsed = new Date(datePart);
+  if (Number.isNaN(parsed.getTime())) return null;
+
+  return localDateOf(parsed);
+}
+
+function dateFromLabel(label: string) {
+  const date = scheduledDateFromLabel(label);
+
+  // Belt and braces. The screen validates this first, but filing an order against the wrong
+  // day is not a failure worth risking on one caller remembering to check.
+  if (date === null) {
+    throw new Error(
+      "The scheduled date could not be read. Enter it as Jul 18, 2026.",
+    );
+  }
+
+  return date;
 }
 
 function mapListOrder(dto: ManualOrderListDto): ManualOrder {

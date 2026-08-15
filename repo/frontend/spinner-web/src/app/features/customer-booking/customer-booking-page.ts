@@ -10,7 +10,13 @@ import {
   signal,
 } from '@angular/core';
 import { Meta, Title } from '@angular/platform-browser';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  type AbstractControl,
+  FormBuilder,
+  ReactiveFormsModule,
+  type ValidationErrors,
+  Validators,
+} from '@angular/forms';
 import {
   Subject,
   catchError,
@@ -117,6 +123,25 @@ const MAX_SERVICE_LOADS = 20;
 
 /** Laundromat service area centre, used as the map's starting view. */
 const SERVICE_AREA_CENTRE: MapPoint = { latitude: 9.2381784, longitude: 125.9624521 };
+
+/**
+ * Accepts a Philippine mobile number written the way people actually write it.
+ *
+ * The field's own placeholder demonstrates "09XX XXX XXXX", with spaces, while validation used
+ * to reject any space at all — so a customer following the example on screen was told their
+ * number was invalid and could not book. The submitted payload has always stripped spaces, so
+ * only the validation disagreed with the rest of the page.
+ *
+ * Emptiness is left to Validators.required, so the customer sees one message rather than two.
+ */
+function philippineMobileNumber(control: AbstractControl): ValidationErrors | null {
+  const digits = String(control.value ?? '').replace(/\s+/g, '');
+
+  if (!digits) return null;
+
+  // Keyed "pattern" so the template's existing error handling is unchanged.
+  return /^(09|\+639)\d{9}$/.test(digits) ? null : { pattern: true };
+}
 
 @Component({
   selector: 'app-customer-booking-page',
@@ -258,7 +283,7 @@ export class CustomerBookingPage {
   readonly bookingForm = this.formBuilder.nonNullable.group({
     orderMethod: this.formBuilder.nonNullable.control<OrderMethod>('pickupDelivery'),
     fullName: ['', [Validators.required, Validators.minLength(2)]],
-    mobileNumber: ['', [Validators.required, Validators.pattern(/^(09|\+639)\d{9}$/)]],
+    mobileNumber: ['', [Validators.required, philippineMobileNumber]],
     email: ['', Validators.email],
     preferredDate: ['', Validators.required],
     preferredTime: ['', Validators.required],

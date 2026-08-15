@@ -1058,6 +1058,41 @@ describe('CustomerBookingPage pickup location', () => {
   // The header used to have the shop's name and logo file written into it, so this site was
   // one particular laundromat's site. It now reads the settings the owner controls, which the
   // page was already fetching for the address search bias.
+  // The field's placeholder demonstrates "09XX XXX XXXX". Validation used to reject any space,
+  // so a customer following the example on screen was told their own number was invalid and
+  // could not book at all.
+  describe('mobile number entry', () => {
+    function validityOf(entered: string): boolean {
+      const { page } = createPage();
+      page.bookingForm.controls.mobileNumber.setValue(entered);
+      return page.bookingForm.controls.mobileNumber.valid;
+    }
+
+    it('accepts a number grouped with spaces, as the placeholder shows', () => {
+      expect(validityOf('0917 123 4567')).toBe(true);
+    });
+
+    it('accepts the same number written without spaces', () => {
+      expect(validityOf('09171234567')).toBe(true);
+    });
+
+    it('accepts the international form', () => {
+      expect(validityOf('+639171234567')).toBe(true);
+    });
+
+    it('still refuses something that is not a mobile number', () => {
+      // One page for all three, because TestBed cannot be reconfigured once instantiated.
+      const { page } = createPage();
+      const control = page.bookingForm.controls.mobileNumber;
+
+      for (const entered of ['12345', '0917 123 456', 'not a number']) {
+        control.setValue(entered);
+        expect(control.valid, `"${entered}" should be refused`).toBe(false);
+      }
+    });
+  });
+
+
   describe('shop identity', () => {
     it('splits the business name with the last word beneath the rest', () => {
       const { page } = createPage();

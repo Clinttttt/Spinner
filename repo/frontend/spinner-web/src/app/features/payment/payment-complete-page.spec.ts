@@ -140,8 +140,15 @@ describe('PaymentCompletePage', () => {
     });
     fixture.detectChanges();
 
+    // A genuinely unpaid customer must still be able to pay — but only once the page has
+    // stopped checking, because until then an unpaid answer may just be a webhook in flight.
+    fixture.componentInstance.settling.set(false);
+    fixture.detectChanges();
+
     const link = fixture.nativeElement.querySelector('a.primary') as HTMLAnchorElement;
     expect(link.getAttribute('href')).toBe('https://checkout.paymongo.test/abc');
+    // And they are warned, in case they did pay and the confirmation was simply slow.
+    expect(fixture.nativeElement.textContent).toContain('do not pay again');
   });
 
   it('handles an expired link without alarming the customer about money', () => {
@@ -170,6 +177,61 @@ describe('PaymentCompletePage', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('could not find that payment');
+  });
+
+
+  // The provider redirects the customer back before its webhook lands, so a booking that has
+  // genuinely just been paid still reads as awaiting payment for a second or two. The page used
+  // to state "Nothing has been charged" and offer to charge again, which is how somebody pays
+  // twice for one wash.
+  describe('a payment that may still be settling', () => {
+    const AWAITING: BookingCheckoutStatusDto = {
+      ...PAID,
+      checkoutUrl: 'https://checkout.paymongo.example/abc',
+      orderCode: null,
+      state: 'awaitingPayment',
+      trackingCode: null,
+    };
+
+    it('does not claim nothing was charged while it is still checking', () => {
+      const fixture = createPage(AWAITING.reference);
+      flushStatus(AWAITING);
+      fixture.detectChanges();
+
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('Checking your payment');
+      expect(text).not.toContain('Nothing has been charged');
+    });
+
+    it('does not offer to charge again while it is still checking', () => {
+      const fixture = createPage(AWAITING.reference);
+      flushStatus(AWAITING);
+      fixture.detectChanges();
+
+      // The pay link is what turns a confirmation delay into a second payment.
+      const links = Array.from(
+        fixture.nativeElement.querySelectorAll('a'),
+      ) as HTMLAnchorElement[];
+      expect(links.some((link) => link.href.includes('checkout.paymongo.example'))).toBe(false);
+    });
+
+    it('keeps checking rather than settling on the first unpaid answer', () => {
+      const fixture = createPage(AWAITING.reference);
+      flushStatus(AWAITING);
+      fixture.detectChanges();
+
+      // Polling only used to start for a payment already known to have arrived.
+      expect(fixture.componentInstance.settling()).toBe(true);
+    });
+
+    it('confirms the payment once the webhook has landed', () => {
+      const fixture = createPage(PAID.reference);
+      flushStatus(PAID);
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.settling()).toBe(false);
+      expect(fixture.nativeElement.textContent).toContain('Payment received');
+    });
   });
 
   afterEach(() => http.verify());

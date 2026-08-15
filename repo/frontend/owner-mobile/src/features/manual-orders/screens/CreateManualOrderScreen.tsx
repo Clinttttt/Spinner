@@ -39,6 +39,7 @@ import type {
 import {
   calculateManualOrder,
   createManualOrder,
+  scheduledDateFromLabel,
   getManualOrderServices,
   PossibleDuplicateOrderError,
 } from "../services/manualOrdersService";
@@ -237,7 +238,11 @@ export function CreateManualOrderScreen({
       schedule:
         !draft.scheduleLabel.trim() || draft.scheduleLabel === "Custom · "
           ? "Select a valid schedule."
-          : undefined,
+          : // A custom label carries a typed date. If it cannot be read, the order would be
+            // filed against today while still displaying what was typed.
+            scheduledDateFromLabel(draft.scheduleLabel) === null
+            ? "Enter the date as Jul 18, 2026 so it can be scheduled."
+            : undefined,
       services:
         draft.selectedServiceIds.length > 0
           ? undefined

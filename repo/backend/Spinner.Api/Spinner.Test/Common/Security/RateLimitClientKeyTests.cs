@@ -9,68 +9,72 @@ namespace Spinner.Test.Common.Security;
 /// endpoints. It partitions on the caller's address, so how that address is decided is the
 /// whole of its strength.
 ///
-/// X-Forwarded-For grows left to right, each proxy appending the address it received the
-/// request from. Everything already in the header when it arrives was put there by the
-/// caller. Reading the leftmost entry therefore let a caller choose its own bucket, send a
-/// different value each time, and never be limited.
+/// It used to read X-Forwarded-For, taking the last entry on the reasoning that each proxy
+/// appends the address it received from, so the final entry is what our own ingress saw and
+/// cannot be forged. That was tested against the deployed system and proved false: fourteen
+/// sign-in attempts each carrying a different X-Forwarded-For were not limited at all, while
+/// the same fourteen without the header were refused after ten. The header is caller-controlled
+/// from end to end here, so every forged value bought a fresh bucket and unlimited guessing.
+///
+/// These tests exist to stop that returning: whatever a caller puts in the header, the bucket
+/// must not move.
 /// </summary>
 public sealed class RateLimitClientKeyTests
 {
     [Fact]
-    public void Should_Ignore_An_Address_The_Caller_Put_In_The_Header()
+    public void Should_Ignore_The_Forwarded_Header_Entirely()
     {
-        // Our ingress appended the address it actually saw, on the right. The value on the
-        // left is the caller's invention.
         var context = Request("198.51.100.7, 203.0.113.4");
+        context.Connection.RemoteIpAddress = IPAddress.Parse("192.0.2.10");
 
-        Assert.Equal("203.0.113.4", RateLimitPolicies.ClientKey(context));
+        Assert.Equal("192.0.2.10", RateLimitPolicies.ClientKey(context));
     }
 
     [Fact]
-    public void Should_Give_A_Spoofing_Caller_The_Same_Bucket_Every_Time()
+    public void Should_Give_A_Spoofing_Caller_The_Same_Bucket_However_The_Header_Changes()
     {
-        // The point of the fix: rotating the forged part must not move the caller between
-        // buckets, or the limit counts to one and never trips.
-        var first = RateLimitPolicies.ClientKey(Request("10.0.0.1, 203.0.113.4"));
-        var second = RateLimitPolicies.ClientKey(Request("172.16.9.9, 203.0.113.4"));
-        var third = RateLimitPolicies.ClientKey(Request("junk, 203.0.113.4"));
+        // The regression guard for the real defect. Every one of these was a separate bucket
+        // before, which is why the limit counted to one and never tripped.
+        var headers = new[]
+        {
+            "10.0.0.1, 203.0.113.4",
+            "172.16.9.9, 198.51.100.1",
+            "203.0.113.9",
+            "junk",
+            "2001:db8::1",
+            "203.0.113.4:51514",
+        };
 
-        Assert.Equal(first, second);
-        Assert.Equal(first, third);
+        var keys = headers
+            .Select(header =>
+            {
+                var context = Request(header);
+                context.Connection.RemoteIpAddress = IPAddress.Parse("192.0.2.10");
+                return RateLimitPolicies.ClientKey(context);
+            })
+            .Distinct()
+            .ToArray();
+
+        Assert.Single(keys);
+        Assert.Equal("192.0.2.10", keys[0]);
     }
 
     [Fact]
-    public void Should_Use_The_Single_Entry_When_There_Is_Only_One()
-    {
-        Assert.Equal("203.0.113.4", RateLimitPolicies.ClientKey(Request("203.0.113.4")));
-    }
-
-    [Fact]
-    public void Should_Drop_The_Port_So_One_Caller_Is_One_Bucket()
-    {
-        // Envoy appends the port it saw. Left on, every request from one client would look
-        // like a new caller, which is the same failure by accident.
-        var first = RateLimitPolicies.ClientKey(Request("203.0.113.4:51514"));
-        var second = RateLimitPolicies.ClientKey(Request("203.0.113.4:51988"));
-
-        Assert.Equal("203.0.113.4", first);
-        Assert.Equal(first, second);
-    }
-
-    [Fact]
-    public void Should_Keep_An_IPv6_Address_Intact()
-    {
-        Assert.Equal("2001:db8::1", RateLimitPolicies.ClientKey(Request("2001:db8::1")));
-        Assert.Equal("2001:db8::1", RateLimitPolicies.ClientKey(Request("[2001:db8::1]:51514")));
-    }
-
-    [Fact]
-    public void Should_Fall_Back_To_The_Socket_Address_Without_A_Header()
+    public void Should_Use_The_Socket_Address()
     {
         var context = new DefaultHttpContext();
         context.Connection.RemoteIpAddress = IPAddress.Parse("192.0.2.10");
 
         Assert.Equal("192.0.2.10", RateLimitPolicies.ClientKey(context));
+    }
+
+    [Fact]
+    public void Should_Keep_An_IPv6_Socket_Address_Intact()
+    {
+        var context = new DefaultHttpContext();
+        context.Connection.RemoteIpAddress = IPAddress.Parse("2001:db8::1");
+
+        Assert.Equal("2001:db8::1", RateLimitPolicies.ClientKey(context));
     }
 
     [Fact]

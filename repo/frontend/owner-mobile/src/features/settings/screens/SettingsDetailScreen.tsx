@@ -591,6 +591,10 @@ function NotificationPreferencesPage() {
   const update = (key: keyof typeof preferences) => (value: boolean) =>
     setPreferences((current) => ({ ...current, [key]: value }));
 
+  // Same reason as the payment methods page: saving before these have loaded writes assumed
+  // values over the shop's real ones.
+  const [loaded, setLoaded] = useState(false);
+
   useEffect(() => {
     void getBusinessSettings()
       .then((settings) => {
@@ -600,6 +604,7 @@ function NotificationPreferencesPage() {
           statusEmail: settings.isEmailCompletedEnabled,
           receiptEmail: settings.isEmailReceiptEnabled,
         }));
+        setLoaded(true);
       })
       .catch((error: unknown) =>
         showApiError("Unable to load preferences", error),
@@ -608,6 +613,15 @@ function NotificationPreferencesPage() {
 
   const savePreferences = async () => {
     if (saving) return;
+
+    if (!loaded) {
+      showValidation(
+        "Preferences not loaded",
+        "These have not loaded yet. Go back and reopen this page before saving.",
+      );
+      return;
+    }
+
     setSaving(true);
     try {
       await updateNotificationSettings({
@@ -1038,6 +1052,7 @@ function OperatingHoursPage() {
   const [saving, setSaving] = useState(false);
   const [days, setDays] = useState<OperatingDay[]>(operatingDays);
   const [windows, setWindows] = useState<PickupWindowSetting[]>(pickupWindows);
+  const [loaded, setLoaded] = useState(false);
 
   const toggleDay = (dayName: string, open: boolean) =>
     setDays((current) =>
@@ -1068,6 +1083,7 @@ function OperatingHoursPage() {
       .then((settings) => {
         setDays(getOperatingDays(settings, operatingDays));
         setWindows(getPickupWindows(settings, pickupWindows));
+        setLoaded(true);
       })
       .catch((error: unknown) =>
         showApiError("Unable to load operating hours", error),
@@ -1076,6 +1092,17 @@ function OperatingHoursPage() {
 
   const saveSchedules = async () => {
     if (saving) return;
+
+    // The bundled defaults have every day closed and no pickup window enabled, so saving
+    // before the real schedule arrives would show the shop as shut all week.
+    if (!loaded) {
+      showValidation(
+        "Hours not loaded",
+        "Your operating hours have not loaded yet. Go back and reopen this page before saving.",
+      );
+      return;
+    }
+
     setSaving(true);
     try {
       await updateSchedules(days, windows);
@@ -1174,12 +1201,16 @@ function PaymentMethodsPage() {
   const [online, setOnline] = useState<boolean>(
     settingsDefaults.paymentMethods.qrOnlinePayment,
   );
+  // Both defaults are off, so a failed load followed by a save would switch off every way a
+  // customer can pay and quietly stop the shop taking bookings at all.
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     void getBusinessSettings()
       .then((settings) => {
         setCod(settings.isCashOnDeliveryEnabled);
         setOnline(settings.isQrCodeOnlinePaymentEnabled);
+        setLoaded(true);
       })
       .catch((error: unknown) =>
         showApiError("Unable to load payment methods", error),
@@ -1188,6 +1219,15 @@ function PaymentMethodsPage() {
 
   const savePaymentMethods = async () => {
     if (saving) return;
+
+    if (!loaded) {
+      showValidation(
+        "Payment methods not loaded",
+        "These have not loaded yet. Go back and reopen this page before saving, or the shop could stop accepting payments.",
+      );
+      return;
+    }
+
     setSaving(true);
     try {
       await updatePaymentMethods({

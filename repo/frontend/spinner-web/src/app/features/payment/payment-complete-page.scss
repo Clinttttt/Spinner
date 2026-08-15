@@ -29,8 +29,7 @@
 .state {
   display: grid;
   gap: 12px;
-  justify-items: center;
-  text-align: center;
+  justify-items: center;  text-align: center;
 }
 
 h1 {
@@ -247,4 +246,18 @@ b {
   background: #fff;
   border: 1px solid var(--navy);
   color: var(--navy);
+}
+
+/*
+ * The warning against paying a second time.
+ *
+ * Deliberately quieter than the pay button it sits beneath: a customer who has not paid should
+ * still be led to pay, while a customer who has can find the reason not to.
+ */
+.fine-print {
+  color: var(--muted, #5b6b7f);
+  font-size: 13px;
+  line-height: 1.5;
+  max-width: 34ch;
+  text-align: center;
 }

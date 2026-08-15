@@ -64,22 +64,28 @@ public static class RateLimitPolicies
                     cancellationToken);
             };
 
-            // Password and code guessing. Tight, because a person signing in legitimately
-            // needs a handful of attempts, not hundreds.
-            AddFixedWindow(options, Authentication, permitLimit: 10, windowMinutes: 1);
+            // Every limit below is now shared by all callers behind the ingress, because the
+            // partition key is the socket address rather than a header the caller can choose.
+            // They are raised accordingly: the purpose is to make brute force and cost abuse
+            // impractical, not to ration a busy Saturday at one laundromat.
+
+            // Password and code guessing. An individual account is additionally protected by
+            // its own lockout, so this only has to stop bulk attempts.
+            AddFixedWindow(options, Authentication, permitLimit: 30, windowMinutes: 1);
 
             // Each of these sends a message that costs money and annoys the recipient.
-            AddFixedWindow(options, AccountCodes, permitLimit: 5, windowMinutes: 5);
+            AddFixedWindow(options, AccountCodes, permitLimit: 15, windowMinutes: 5);
 
-            // Real bookings are occasional. This still allows a busy shared phone.
-            AddFixedWindow(options, Booking, permitLimit: 20, windowMinutes: 10);
+            // Real bookings are occasional, but a shared bucket has to cover every customer
+            // booking at once.
+            AddFixedWindow(options, Booking, permitLimit: 60, windowMinutes: 10);
 
             // Order codes are short, so unlimited lookups mean they can be walked.
-            AddFixedWindow(options, PublicLookup, permitLimit: 30, windowMinutes: 1);
+            AddFixedWindow(options, PublicLookup, permitLimit: 90, windowMinutes: 1);
 
             // Images. High enough that no real viewer meets it, low enough that the storage
             // allowance cannot be drained by a script.
-            AddFixedWindow(options, PublicMedia, permitLimit: 300, windowMinutes: 1);
+            AddFixedWindow(options, PublicMedia, permitLimit: 600, windowMinutes: 1);
         });
     }
 
@@ -102,57 +108,23 @@ public static class RateLimitPolicies
     /// Identifies the caller for partitioning.
     /// </summary>
     /// <remarks>
-    /// The API runs behind Azure Container Apps, so the socket address is the ingress proxy
-    /// and would put every caller in one bucket. The forwarded header carries the real
-    /// address, but only the end of it can be trusted.
+    /// Uses the socket address, and deliberately ignores X-Forwarded-For.
     ///
-    /// X-Forwarded-For grows left to right: each proxy appends the address it received the
-    /// request from. Anything already in the header arrived from the client, so the leftmost
-    /// entry is whatever the caller chose to put there. This used to read that first entry,
-    /// which meant a caller could send a different value on every request, land in a fresh
-    /// bucket each time, and never be limited at all — on the login and public booking
-    /// endpoints these policies exist to protect.
+    /// This used to read the last entry of that header, on the reasoning that each proxy
+    /// appends the address it received the request from, so the final entry is what our own
+    /// ingress observed and therefore cannot be forged. That reasoning was tested against the
+    /// deployed system and is false here: fourteen sign-in attempts, each sending a different
+    /// X-Forwarded-For, produced no rate limiting at all, while the same fourteen without the
+    /// header were throttled after ten. The header is caller-controlled end to end, so every
+    /// forged value bought a fresh bucket and unlimited password guessing.
     ///
-    /// The last entry is the address our own ingress observed, which a caller cannot forge.
-    /// There is exactly one proxy in front of this API: the custom domain points straight at
-    /// Container Apps with nothing else in between.
-    ///
-    /// Kept internal rather than private so the parsing can be tested directly.
+    /// The consequence of using the socket address is that behind the container platform's
+    /// ingress all callers share one bucket, so these limits are effectively global. That is a
+    /// real trade: one abusive caller can consume the shop's allowance. It is accepted because
+    /// an unlimited number of guesses is worse than a temporary refusal, the limits below are
+    /// raised to account for the shared bucket, and a targeted attack on one account is
+    /// separately stopped by that account's own lockout.
     /// </remarks>
-    internal static string ClientKey(HttpContext httpContext)
-    {
-        var forwarded = httpContext.Request.Headers["X-Forwarded-For"].ToString();
-
-        if (!string.IsNullOrWhiteSpace(forwarded))
-        {
-            var entries = forwarded.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-
-            if (entries.Length > 0)
-            {
-                // Envoy appends a port to the address it saw, which has to come off or every
-                // request from one client would look like a different caller.
-                var candidate = WithoutPort(entries[^1]);
-
-                if (!string.IsNullOrWhiteSpace(candidate))
-                    return candidate;
-            }
-        }
-
-        return httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-    }
-
-    /// <summary>
-    /// Strips a trailing port from a forwarded address, leaving IPv6 addresses intact.
-    /// </summary>
-    private static string WithoutPort(string address)
-    {
-        if (IPAddress.TryParse(address, out var parsed))
-            return parsed.ToString();
-
-        // "203.0.113.4:51514", or "[::1]:51514".
-        if (IPEndPoint.TryParse(address, out var endpoint))
-            return endpoint.Address.ToString();
-
-        return address;
-    }
+    internal static string ClientKey(HttpContext httpContext) =>
+        httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 }

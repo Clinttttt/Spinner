@@ -141,18 +141,35 @@
 
         @case ('awaitingPayment') {
           <div class="state">
-            <span class="badge warning" aria-hidden="true">!</span>
-            <h1>This booking has not been paid yet</h1>
-            <p>
-              Nothing has been charged. Your booking is held for a short while, so you can still
-              complete the payment.
-            </p>
-            @if (result.checkoutUrl) {
-              <a class="primary" [href]="result.checkoutUrl"
-                >Pay ₱{{ result.amount | number: '1.2-2' }} now</a
-              >
+            @if (settling()) {
+              <!--
+                The customer may have paid a second ago: the provider's redirect regularly
+                arrives before its webhook. Until that is resolved the page must not say
+                anything about whether money has moved, and must not offer to charge again.
+              -->
+              <span class="badge" aria-hidden="true">…</span>
+              <h1>Checking your payment</h1>
+              <p aria-live="polite">
+                This takes a few seconds. Please do not close this page or pay again while we
+                check.
+              </p>
+            } @else {
+              <span class="badge warning" aria-hidden="true">!</span>
+              <h1>We have not received your payment</h1>
+              <p>
+                Your booking is held for a short while, so you can still complete the payment.
+              </p>
+              @if (result.checkoutUrl) {
+                <a class="primary" [href]="result.checkoutUrl"
+                  >Pay ₱{{ result.amount | number: '1.2-2' }} now</a
+                >
+              }
+              <p class="fine-print">
+                If you have already paid, do not pay again. Contact us with payment reference
+                <strong>{{ result.reference }}</strong> and we will confirm it.
+              </p>
+              <a class="secondary" routerLink="/">Start again</a>
             }
-            <a class="secondary" routerLink="/">Start again</a>
           </div>
         }
 
