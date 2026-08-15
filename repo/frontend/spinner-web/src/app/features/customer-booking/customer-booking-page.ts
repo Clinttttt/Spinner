@@ -213,6 +213,22 @@ export class CustomerBookingPage {
   /** True only when the API has positively judged the pin out of range. */
   readonly outsideServiceArea = computed(() => this.serviceArea()?.status === 'outside');
 
+  /**
+   * Whether the pin's location actually prevents this booking.
+   *
+   * The service area governs collection only. A customer outside it who chooses drop-off is
+   * bringing the laundry in themselves, so where they live is irrelevant.
+   *
+   * The submit button used to be disabled by outsideServiceArea alone, while the booking rule
+   * itself only blocked pickup. A customer who dropped a pin outside the radius and then
+   * switched to drop-off found the button dead with nothing explaining why, and only clearing
+   * the pin or reloading recovered it — so somebody willing to travel to the shop was turned
+   * away instead of served.
+   */
+  readonly blockedByServiceArea = computed(
+    () => this.pickupChosen() && this.outsideServiceArea(),
+  );
+
   readonly geolocationSupported = this.deviceLocation.isSupported;
   readonly inAppBrowser = this.deviceLocation.isInAppBrowser;
 

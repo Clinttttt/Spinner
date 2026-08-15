@@ -1058,6 +1058,43 @@ describe('CustomerBookingPage pickup location', () => {
   // The header used to have the shop's name and logo file written into it, so this site was
   // one particular laundromat's site. It now reads the settings the owner controls, which the
   // page was already fetching for the address search bias.
+  // The service area governs collection only. Someone outside it who chooses drop-off is
+  // bringing the laundry in themselves, so the pin must not stop them booking — the submit
+  // button used to be disabled by the pin alone, with nothing explaining why.
+  describe('a pin outside the pickup area', () => {
+    it('blocks a pickup booking', () => {
+      const { page } = createPage();
+
+      page.serviceArea.set({
+        allowsBooking: false,
+        distanceKm: 59.6,
+        maxRadiusKm: 15,
+        message: 'outside our 15 km pickup area',
+        policy: 'radius',
+        status: 'outside',
+      });
+
+      expect(page.blockedByServiceArea()).toBe(true);
+    });
+
+    it('does not block a drop-off booking', () => {
+      const { fixture, page } = createPage();
+
+      page.serviceArea.set({
+        allowsBooking: false,
+        distanceKm: 59.6,
+        maxRadiusKm: 15,
+        message: 'outside our 15 km pickup area',
+        policy: 'radius',
+        status: 'outside',
+      });
+      page.selectOrderMethod('dropOff');
+      fixture.detectChanges();
+
+      expect(page.blockedByServiceArea()).toBe(false);
+    });
+  });
+
   // The field's placeholder demonstrates "09XX XXX XXXX". Validation used to reject any space,
   // so a customer following the example on screen was told their own number was invalid and
   // could not book at all.

@@ -664,7 +664,7 @@
             class="primary-button"
             type="submit"
             [disabled]="
-              submitting() || loadingServices() || !services().length || outsideServiceArea()
+              submitting() || loadingServices() || !services().length || blockedByServiceArea()
             "
           >
             <span>{{ submitting() ? 'Submitting…' : 'Confirm booking request' }}</span>

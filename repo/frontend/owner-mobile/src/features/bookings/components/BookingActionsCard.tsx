@@ -18,6 +18,13 @@ interface BookingActionsCardProps {
   onClearPress?: () => void;
   onEditPress?: () => void;
   onMessagePress: () => void;
+  /**
+   * Shown only for an unpaid order the customer is meant to pay online.
+   *
+   * A QR payment can only be settled by the provider's webhook, so the owner needs something to
+   * send rather than a button that marks it paid.
+   */
+  onPaymentLinkPress?: () => void;
   onPrimaryPress: () => void;
   primaryDisabled?: boolean;
   primaryLabel: string;
@@ -88,6 +95,7 @@ function ActionButton({
 
 export function BookingActionsCard({
   onClearPress,
+  onPaymentLinkPress,
   onEditPress,
   onMessagePress,
   onPrimaryPress,
@@ -130,6 +138,15 @@ export function BookingActionsCard({
           onPress={onPrimaryPress}
           primary
         />
+        {onPaymentLinkPress ? (
+          <ActionButton
+            accessibilityLabel="Create and send an online payment link"
+            fullWidth
+            icon="qr-code-outline"
+            label="Send payment link"
+            onPress={onPaymentLinkPress}
+          />
+        ) : null}
         {onClearPress ? (
           <ActionButton
             accessibilityLabel="Clear this order from the active list"

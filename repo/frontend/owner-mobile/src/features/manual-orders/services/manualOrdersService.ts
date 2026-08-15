@@ -341,6 +341,29 @@ export async function getManualOrders() {
   return response.map(mapListOrder);
 }
 
+export interface OnlinePaymentLink {
+  orderCode: string;
+  paymentReference: string;
+  checkoutUrl: string;
+  amount: number;
+}
+
+/**
+ * Produces the link a customer pays an existing order through.
+ *
+ * Needed because an order can be raised in the shop with QR Online chosen, and staff must never
+ * mark a QR payment settled by hand — only the provider's webhook may do that. Without this the
+ * owner had no way to hand the customer anything to pay, so the order could only be cancelled.
+ *
+ * Safe to call more than once: the API returns the existing reference and URL if one was already
+ * created, rather than starting a second checkout for the same order.
+ */
+export function createOnlinePaymentLink(orderId: string) {
+  return apiRequest<OnlinePaymentLink>(`/api/payments/${orderId}/online/link`, {
+    method: "POST",
+  });
+}
+
 export async function getManualOrderServices(): Promise<ManualServiceOption[]> {
   const services = await apiRequest<LaundryServiceDto[]>(
     "/api/services-pricing/services",

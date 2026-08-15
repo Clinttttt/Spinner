@@ -1,6 +1,6 @@
 import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import { useEffect, useMemo, useState } from "react";
-import { Linking } from "react-native";
+import { Linking, Share } from "react-native";
 
 import { describeApiError } from "../../../api/apiClient";
 import { useDialog } from "../../../components/common/DialogProvider";
@@ -25,6 +25,7 @@ import type { ManualOrder, ManualOrderStatus } from "../models/manualOrder";
 import {
   advanceManualOrder,
   clearManualOrder,
+  createOnlinePaymentLink,
   getManualOrderDetails,
   manualOrderAction,
   methodLabel,
@@ -152,6 +153,34 @@ export function ManualOrderDetailsScreen({
     await updateStatus();
   };
 
+  /**
+   * Produces the link a customer pays a QR order through, and offers to share it.
+   *
+   * An order raised in the shop can have QR Online chosen, and a QR payment may only be settled
+   * by the provider's webhook — staff must never mark one paid by hand. Without this the owner
+   * had nothing to give the customer, so a QR order could only ever be cancelled.
+   */
+  const sharePaymentLink = async () => {
+    if (submitting) return;
+
+    setSubmitting(true);
+    try {
+      const link = await createOnlinePaymentLink(currentOrder.id);
+
+      await Share.share({
+        message: `Pay ${peso(link.amount)} for order ${link.orderCode}: ${link.checkoutUrl}`,
+      });
+    } catch (error) {
+      await dialog.notify({
+        message: describeApiError(error, "Please try again."),
+        title: "Unable to create a payment link",
+        tone: "danger",
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleClear = async () => {
     const accepted = await dialog.confirm({
       bullets: [`${currentOrder.orderCode} · ${currentOrder.customerName}`],
@@ -196,6 +225,12 @@ export function ManualOrderDetailsScreen({
             : undefined
         }
         onMessagePress={() => void Linking.openURL(`sms:${currentOrder.phone}`)}
+        onPaymentLinkPress={
+          currentOrder.paymentMethod === "qrOnline" &&
+          currentOrder.paymentStatus === "unpaid"
+            ? () => void sharePaymentLink()
+            : undefined
+        }
         onPrimaryPress={() => void handlePrimaryAction()}
         primaryDisabled={primaryAction.disabled || submitting}
         primaryLoading={submitting}
