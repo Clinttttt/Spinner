@@ -278,11 +278,13 @@
               <input
                 class="field-control"
                 formControlName="fullName"
+                [attr.aria-invalid]="hasError('fullName') ? 'true' : null"
+                [attr.aria-describedby]="hasError('fullName') ? 'fullName-error' : null"
                 autocomplete="name"
                 placeholder="Juan Dela Cruz"
               />
               @if (hasError('fullName')) {
-                <small class="field-error">Please enter your full name.</small>
+                <small class="field-error" id="fullName-error">Please enter your full name.</small>
               }
             </label>
             <label class="field">
@@ -290,12 +292,14 @@
               <input
                 class="field-control"
                 formControlName="mobileNumber"
+                [attr.aria-invalid]="hasError('mobileNumber') ? 'true' : null"
+                [attr.aria-describedby]="hasError('mobileNumber') ? 'mobileNumber-error' : null"
                 autocomplete="tel"
                 inputmode="tel"
                 placeholder="09XX XXX XXXX"
               />
               @if (hasError('mobileNumber')) {
-                <small class="field-error">Enter a valid Philippine mobile number.</small>
+                <small class="field-error" id="mobileNumber-error">Enter a valid Philippine mobile number.</small>
               }
             </label>
             <label class="field field-wide">
@@ -303,12 +307,14 @@
               <input
                 class="field-control"
                 formControlName="email"
+                [attr.aria-invalid]="hasError('email') ? 'true' : null"
+                [attr.aria-describedby]="hasError('email') ? 'email-error' : null"
                 autocomplete="email"
                 inputmode="email"
                 placeholder="you@example.com"
               />
               @if (hasError('email')) {
-                <small class="field-error">Enter a valid email address.</small>
+                <small class="field-error" id="email-error">Enter a valid email address.</small>
               }
             </label>
           </div>
@@ -333,6 +339,8 @@
                 <input
                   class="field-control"
                   formControlName="preferredDate"
+                [attr.aria-invalid]="hasError('preferredDate') ? 'true' : null"
+                [attr.aria-describedby]="hasError('preferredDate') ? 'preferredDate-error' : null"
                   type="date"
                   [min]="minimumDate"
                 />
@@ -341,7 +349,7 @@
                 }
               </span>
               @if (hasError('preferredDate')) {
-                <small class="field-error">Choose your preferred date.</small>
+                <small class="field-error" id="preferredDate-error">Choose your preferred date.</small>
               }
             </label>
             <div class="field">
@@ -357,6 +365,8 @@
                 class="time-options"
                 role="radiogroup"
                 aria-labelledby="preferred-time-label"
+              [attr.aria-invalid]="hasError('preferredTime') ? 'true' : null"
+              [attr.aria-describedby]="hasError('preferredTime') ? 'preferredTime-error' : null"
               >
                 @for (window of pickupTimeWindows; track window.value) {
                   <button
@@ -374,7 +384,7 @@
                 }
               </div>
               @if (hasError('preferredTime')) {
-                <small class="field-error">Choose a preferred time.</small>
+                <small class="field-error" id="preferredTime-error">Choose a preferred time.</small>
               }
             </div>
             <label class="field">
@@ -405,6 +415,8 @@
                   id="pickup-address"
                   class="field-control textarea"
                   formControlName="address"
+                [attr.aria-invalid]="hasError('address') ? 'true' : null"
+                [attr.aria-describedby]="hasError('address') ? 'address-error' : null"
                   autocomplete="street-address"
                   role="combobox"
                   aria-autocomplete="list"
@@ -415,7 +427,7 @@
                   (keydown)="onAddressKeydown($event)"
                 ></textarea>
                 @if (hasError('address')) {
-                  <small class="field-error">Pickup address is required.</small>
+                  <small class="field-error" id="address-error">Pickup address is required.</small>
                 }
               </label>
 

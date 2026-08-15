@@ -1095,6 +1095,38 @@ describe('CustomerBookingPage pickup location', () => {
     });
   });
 
+  // A visible red message is no use to someone using a screen reader: the field has to say it is
+  // invalid, and point at the text that explains why. Neither was wired before.
+  describe('error messages and assistive technology', () => {
+    it('marks an invalid field and points it at its message', () => {
+      const { fixture, page } = createPage();
+
+      page.bookingForm.controls.fullName.setValue('');
+      page.bookingForm.controls.fullName.markAsTouched();
+      fixture.detectChanges();
+
+      const input = fixture.nativeElement.querySelector(
+        'input[formcontrolname="fullName"]',
+      ) as HTMLInputElement;
+
+      expect(input.getAttribute('aria-invalid')).toBe('true');
+      expect(input.getAttribute('aria-describedby')).toBe('fullName-error');
+      expect(fixture.nativeElement.querySelector('#fullName-error')).not.toBeNull();
+    });
+
+    it('says nothing about validity while the field is untouched', () => {
+      // Announcing every empty field as invalid before anyone has typed is its own failure.
+      const { fixture } = createPage();
+
+      const input = fixture.nativeElement.querySelector(
+        'input[formcontrolname="fullName"]',
+      ) as HTMLInputElement;
+
+      expect(input.getAttribute('aria-invalid')).toBeNull();
+      expect(input.getAttribute('aria-describedby')).toBeNull();
+    });
+  });
+
   // The field's placeholder demonstrates "09XX XXX XXXX". Validation used to reject any space,
   // so a customer following the example on screen was told their own number was invalid and
   // could not book at all.
