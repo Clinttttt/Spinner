@@ -27,7 +27,7 @@ module.exports = {
       // this remotely (appVersionSource: remote in eas.json) and ignores the value here,
       // so a local build otherwise defaulted to 1 and Android refused to install it over
       // an EAS build that had already reached 23.
-      versionCode: 39,
+      versionCode: 40,
       // Firebase client configuration, which is what lets Cloud Messaging issue this
       // app a device token. Kept out of the repository because it is public and the
       // file carries the project's Android API key: EAS supplies it as a file secret
