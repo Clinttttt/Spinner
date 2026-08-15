@@ -105,6 +105,24 @@ public sealed class R2MediaStorage : IMediaStorage, IDisposable
         }
     }
 
+    public async Task DeleteAsync(string key, CancellationToken cancellationToken)
+    {
+        var client = RequireClient();
+
+        try
+        {
+            await client.DeleteObjectAsync(_options.BucketName, key, cancellationToken);
+
+            _logger.LogInformation("Removed superseded media object {Key}.", key);
+        }
+        catch (AmazonS3Exception exception)
+            when (exception.StatusCode is HttpStatusCode.NotFound)
+        {
+            // Already gone. Nothing to do, and nothing worth reporting: the desired end state
+            // is exactly what we have.
+        }
+    }
+
     private IAmazonS3 RequireClient() =>
         _client?.Value ?? throw new InvalidOperationException(
             "Media storage is not configured. Check that MediaStorage:AccountId, " +

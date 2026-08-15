@@ -52,6 +52,14 @@ internal sealed class FakeMediaStorage : IMediaStorage
             "\"fake-etag\""));
     }
 
+    public List<string> DeletedKeys { get; } = [];
+
+    public Task DeleteAsync(string key, CancellationToken cancellationToken)
+    {
+        DeletedKeys.Add(key);
+        _objects.Remove(key);
+        return Task.CompletedTask;
+    }
     /// <summary>Puts an object in place without going through the upload rules.</summary>
     public void Seed(string key, string contentType, string content = "image bytes") =>
         _objects[key] = (Encoding.UTF8.GetBytes(content), contentType);

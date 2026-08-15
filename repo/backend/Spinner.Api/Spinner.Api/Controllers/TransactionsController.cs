@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Spinner.Api.Common.Pagination;
+using Spinner.Api.Common.Security;
 using Spinner.Api.Domain.Transactions;
 using Spinner.Api.Features.Transactions;
 using Spinner.Api.Features.Transactions.CreateManualTransaction;
@@ -10,7 +11,13 @@ using Spinner.Api.Features.Transactions.GetTransactionHistory;
 namespace Spinner.Api.Controllers;
 
 [Route("api/transactions")]
-[Authorize]
+// Owner only. This is the shop's money: the running ledger of what came in and went out, and
+// the ability to add an entry to it. Staff run the day's work and handle cash on orders, which
+// is recorded against the order itself; the books are the owner's.
+//
+// It was previously a bare [Authorize], so any staff account could read every figure and post
+// arbitrary income or expenses.
+[Authorize(Policy = AuthorizationPolicies.OwnerOnly)]
 public sealed class TransactionsController : ApiControllerBase
 {
     public TransactionsController(ISender sender)

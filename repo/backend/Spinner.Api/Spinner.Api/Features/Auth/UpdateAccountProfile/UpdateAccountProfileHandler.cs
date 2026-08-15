@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using Spinner.Api.Common.Results;
 using Spinner.Api.Common.Security;
 using Spinner.Api.Database;
+using Spinner.Api.Features.Media;
+using Spinner.Api.Integrations.Media;
 using Spinner.Api.Domain.Notifications;
 using Spinner.Api.Domain.Users;
 using Microsoft.Extensions.Options;
@@ -16,17 +18,23 @@ public sealed class UpdateAccountProfileHandler
     private readonly IPasswordHasher _passwordHasher;
     private readonly IAccountCodeGenerator _codeGenerator;
     private readonly AccountSecurityOptions _options;
+    private readonly IMediaStorage _mediaStorage;
+    private readonly ILogger<UpdateAccountProfileHandler> _logger;
 
     public UpdateAccountProfileHandler(
         AppDbContext dbContext,
         IPasswordHasher passwordHasher,
         IAccountCodeGenerator codeGenerator,
-        IOptions<AccountSecurityOptions> options)
+        IOptions<AccountSecurityOptions> options,
+        IMediaStorage mediaStorage,
+        ILogger<UpdateAccountProfileHandler> logger)
     {
         _dbContext = dbContext;
         _passwordHasher = passwordHasher;
         _codeGenerator = codeGenerator;
         _options = options.Value;
+        _mediaStorage = mediaStorage;
+        _logger = logger;
     }
 
     public async Task<Result<AccountProfileResponse>> Handle(
@@ -72,6 +80,8 @@ public sealed class UpdateAccountProfileHandler
             StringComparison.Ordinal);
         var now = DateTimeOffset.UtcNow;
 
+        var previousPhotoUrl = user.PhotoUrl;
+
         user.UpdateProfile(
             request.FullName,
             normalizedEmail,
@@ -108,6 +118,13 @@ public sealed class UpdateAccountProfileHandler
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        await MediaCleanup.RemoveSupersededAsync(
+            _mediaStorage,
+            _logger,
+            previousPhotoUrl,
+            user.PhotoUrl,
+            cancellationToken);
 
         return Result<AccountProfileResponse>.Success(AccountProfileResponse.FromEntity(user));
     }

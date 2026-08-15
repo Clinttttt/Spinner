@@ -32,4 +32,13 @@ public interface IMediaStorage
     /// Opens a stored object, or returns null when there is no such key.
     /// </summary>
     Task<MediaContent?> OpenAsync(string key, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Removes a stored object. Succeeds quietly when the key is already gone.
+    /// </summary>
+    /// <remarks>
+    /// Used when an image is replaced. Every upload gets a fresh key so a cached copy can never
+    /// go stale, which means the previous object would otherwise sit in the bucket for ever.
+    /// </remarks>
+    Task DeleteAsync(string key, CancellationToken cancellationToken);
 }

@@ -9,8 +9,8 @@ namespace Spinner.Api.Features.Notifications;
 /// Tells the shop's own phones that something needs attention.
 /// </summary>
 /// <remarks>
-/// Every other notification in the system goes to a customer. This is the one that goes
-/// inward, and it exists because a booking placed on the website was otherwise invisible
+/// Every other notification in the system goes to a customer. These are the ones that go
+/// inward, and the first exists because a booking placed on the website was otherwise invisible
 /// until somebody thought to open the app and look.
 ///
 /// One message per registered device, queued on the same outbox as everything else, so a
@@ -27,11 +27,7 @@ public static class StaffAlertQueue
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        var tokens = await dbContext.StaffDevices
-            .AsNoTracking()
-            .Where(device => device.IsActive)
-            .Select(device => device.RegistrationToken)
-            .ToListAsync(cancellationToken);
+        var tokens = await ActiveDeviceTokensAsync(dbContext, cancellationToken);
 
         if (tokens.Count == 0)
             return;
@@ -57,4 +53,54 @@ public static class StaffAlertQueue
                 now));
         }
     }
+
+    /// <summary>
+    /// Tells the shop that money has been taken but no order exists for it.
+    /// </summary>
+    /// <remarks>
+    /// This is the worst state the system can reach: the customer has paid, the provider has
+    /// confirmed it, and something stopped the order being written. Until now it produced a log
+    /// line and nothing else, so unless somebody happened to read the container logs the shop
+    /// would only find out when the customer asked where their laundry was.
+    ///
+    /// No order id is attached because there is no order — that is the whole point — so this
+    /// uses the outbox's order-less constructor.
+    /// </remarks>
+    public static async Task QueuePaidBookingNeedsAttentionAsync(
+        AppDbContext dbContext,
+        string reference,
+        decimal amount,
+        string customerName,
+        string reason,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var tokens = await ActiveDeviceTokensAsync(dbContext, cancellationToken);
+
+        if (tokens.Count == 0)
+            return;
+
+        var message =
+            $"{customerName} paid {amount:N2} but the order could not be created. " +
+            $"Reference {reference}. Reason: {reason}";
+
+        foreach (var token in tokens)
+        {
+            dbContext.NotificationOutboxMessages.Add(new NotificationOutboxMessage(
+                NotificationChannel.Push,
+                token,
+                "Paid booking needs attention",
+                message,
+                now));
+        }
+    }
+
+    private static Task<List<string>> ActiveDeviceTokensAsync(
+        AppDbContext dbContext,
+        CancellationToken cancellationToken) =>
+        dbContext.StaffDevices
+            .AsNoTracking()
+            .Where(device => device.IsActive)
+            .Select(device => device.RegistrationToken)
+            .ToListAsync(cancellationToken);
 }

@@ -14,6 +14,9 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { appDialog } from "../../../components/common/DialogProvider";
+import { useAuth } from "../../auth/AuthContext";
+import { isOwner } from "../../auth/permissions";
+import { OwnerOnlyScreen } from "../../reports/screens/OwnerOnlyScreen";
 import type { RootTabParamList } from "../../../navigation/types";
 import { appNotifications } from "../../notifications/components/NotificationsProvider";
 import { colors } from "../../../theme/colors";
@@ -59,6 +62,8 @@ const extractTransactionId = (item: TransactionHistoryItem) => item.id;
 export function TransactionHistoryScreen({
   navigation,
 }: TransactionHistoryScreenProps) {
+  const { session } = useAuth();
+  const owner = isOwner(session);
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const {
@@ -305,6 +310,13 @@ export function TransactionHistoryScreen({
       visibleTransactions.length,
     ],
   );
+
+  // The shop's books. Staff record payments against orders, which is their part of the money;
+  // the ledger itself is the owner's. A locked screen that says so is the right answer here —
+  // the API refuses this too, and a bare 403 would look like a broken app.
+  if (!owner) {
+    return <OwnerOnlyScreen onBackPress={() => navigation.navigate("Home")} />;
+  }
 
   return (
     <View style={styles.screen}>

@@ -252,7 +252,9 @@ public sealed class AccountProfileHandlerTests
             dbContext,
             new PasswordHasher(),
             new StubAccountCodeGenerator(),
-            Options.Create(new AccountSecurityOptions()));
+            Options.Create(new AccountSecurityOptions()),
+            new Spinner.Test.Features.Media.FakeMediaStorage(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<UpdateAccountProfileHandler>.Instance);
 
     private sealed class StubAccountCodeGenerator : IAccountCodeGenerator
     {

@@ -7,6 +7,15 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Never shipped. It holds a localhost connection string, a development signing key and
+         the flag that enables account seeding. Startup validation rejects those values outside
+         Development and the platform pins the environment, so nothing was exposed — but a file
+         that has no business in a release should not be in the image for a misconfiguration to
+         find. Still copied to the build output, so running locally is unaffected. -->
+    <Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- So tests can reach helpers that exist for verification rather than for
          callers, such as reproducing a provider's webhook signature. -->
     <InternalsVisibleTo Include="Spinner.Test" />

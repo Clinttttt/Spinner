@@ -3,6 +3,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Spinner.Api.Common.Results;
 using Spinner.Api.Database;
+using Spinner.Api.Features.Notifications;
 using Spinner.Api.Domain.Payments;
 using Spinner.Api.Features.Bookings.CreateBooking;
 using Spinner.Api.Features.Bookings.StartBookingCheckout;
@@ -91,6 +92,7 @@ public sealed class PaidBookingFinaliser
                 "Paid booking {Reference} could not be created: {Error}",
                 pending.Reference,
                 created.Error.Message);
+            await AlertShopAsync(pending, command.FullName, created.Error.Message, cancellationToken);
             return Result<Guid>.Conflict(created.Error.Message);
         }
 
@@ -102,6 +104,11 @@ public sealed class PaidBookingFinaliser
         if (order is null)
         {
             await transaction.RollbackAsync(cancellationToken);
+            await AlertShopAsync(
+                pending,
+                command.FullName,
+                "The paid booking was not stored correctly.",
+                cancellationToken);
             return Result<Guid>.Conflict("The paid booking was not stored correctly.");
         }
 
@@ -121,6 +128,7 @@ public sealed class PaidBookingFinaliser
                 pending.Reference,
                 order.OrderCode,
                 payment.Error.Message);
+            await AlertShopAsync(pending, command.FullName, payment.Error.Message, cancellationToken);
             return Result<Guid>.Conflict(payment.Error.Message);
         }
 
@@ -149,6 +157,49 @@ public sealed class PaidBookingFinaliser
         }
 
         return Result<Guid>.Success(orderId);
+    }
+
+    /// <summary>
+    /// Tells the shop's phones that money was taken but no order came of it.
+    /// </summary>
+    /// <remarks>
+    /// Called after the transaction has been rolled back, which is why the change tracker is
+    /// cleared first: it still holds the order and payment that were just discarded, and saving
+    /// with those attached would write the very records the rollback rejected.
+    ///
+    /// Every failure here is swallowed. This runs on the payment provider's webhook, and an
+    /// exception raised while reporting a problem would answer the provider with a server error;
+    /// repeated server errors make it disable the endpoint, which would cost the shop later
+    /// payments as well as this one.
+    /// </remarks>
+    private async Task AlertShopAsync(
+        PendingBooking pending,
+        string customerName,
+        string reason,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            _dbContext.ChangeTracker.Clear();
+
+            await StaffAlertQueue.QueuePaidBookingNeedsAttentionAsync(
+                _dbContext,
+                pending.Reference,
+                pending.Amount,
+                string.IsNullOrWhiteSpace(customerName) ? "A customer" : customerName,
+                reason,
+                DateTimeOffset.UtcNow,
+                cancellationToken);
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                exception,
+                "Could not queue the paid-booking alert for {Reference}.",
+                pending.Reference);
+        }
     }
 
     private static string ReceiptCode(PendingBooking pending) =>

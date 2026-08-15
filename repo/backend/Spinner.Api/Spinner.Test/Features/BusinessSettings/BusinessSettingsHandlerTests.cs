@@ -1,3 +1,5 @@
+using Spinner.Test.Features.Media;
+using Microsoft.Extensions.Logging.Abstractions;
 using Spinner.Api.Features.BusinessSettings.GetBusinessSettings;
 using Spinner.Api.Features.BusinessSettings.UpdateBusinessProfile;
 using Spinner.Api.Features.BusinessSettings.UpdatePaymentMethods;
@@ -31,7 +33,7 @@ public sealed class BusinessSettingsHandlerTests
     public async Task UpdateBusinessProfile_Should_Update_Default_Settings()
     {
         await using var dbContext = AppDbContextFactory.Create();
-        var handler = new UpdateBusinessProfileHandler(dbContext);
+        var handler = new UpdateBusinessProfileHandler(dbContext, new FakeMediaStorage(), NullLogger<UpdateBusinessProfileHandler>.Instance);
 
         var result = await handler.Handle(
             new UpdateBusinessProfileCommand(

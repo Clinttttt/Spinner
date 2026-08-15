@@ -35,6 +35,32 @@ public static class MediaObjectKey
         $"{FolderFor(purpose)}/{Guid.NewGuid():N}{ImageUploadRules.ExtensionFor(contentType)}";
 
     /// <summary>
+    /// Recovers the storage key from an address this API previously handed out.
+    /// </summary>
+    /// <remarks>
+    /// Used when an image is replaced, so the superseded object can be removed. It returns null
+    /// for anything that is not one of our own media addresses, which is the point: the owner may
+    /// paste a link to an image hosted anywhere, and this must never be turned into a delete of
+    /// something we do not own.
+    /// </remarks>
+    public static string? ReadKeyFromUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return null;
+
+        var marker = $"/{MediaRoutes.Base}/";
+        var at = url.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+        if (at < 0) return null;
+
+        var key = url[(at + marker.Length)..].Trim();
+
+        // A query string or fragment is not part of the key.
+        var cut = key.IndexOfAny(['?', '#']);
+        if (cut >= 0) key = key[..cut];
+
+        return IsReadable(key) ? key : null;
+    }
+
+    /// <summary>
     /// True when a key may be fetched: one of our folders, then an unremarkable filename.
     /// </summary>
     public static bool IsReadable(string? key)
