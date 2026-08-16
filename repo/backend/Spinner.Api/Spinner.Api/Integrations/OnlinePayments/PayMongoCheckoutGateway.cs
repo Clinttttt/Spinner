@@ -82,6 +82,10 @@ public sealed class PayMongoCheckoutGateway : IPaymentCheckoutGateway
                         amount = ToCentavos(item.UnitAmount),
                         currency = "PHP",
                         description = item.Description,
+                        // Omitted entirely rather than sent empty: PayMongo draws a large grey
+                        // tile with the line's first letter when there is no image, and an empty
+                        // array is treated the same way as none.
+                        images = LineItemImages(request.LineItemImageUrl),
                         name = item.Name,
                         quantity = item.Quantity,
                     }).ToArray(),
@@ -90,6 +94,7 @@ public sealed class PayMongoCheckoutGateway : IPaymentCheckoutGateway
                     send_email_receipt = false,
                     show_description = true,
                     show_line_items = true,
+                    statement_descriptor = StatementDescriptor(request.StatementDescriptor),
                     success_url = request.SuccessUrl,
                 },
             },
@@ -145,6 +150,45 @@ public sealed class PayMongoCheckoutGateway : IPaymentCheckoutGateway
     }
 
     /// <summary>PayMongo works in centavos, so pesos are scaled and rounded once.</summary>
+    /// <summary>
+    /// Longest statement descriptor sent to PayMongo.
+    /// </summary>
+    /// <remarks>
+    /// Truncated rather than sent long, because a rejected checkout would stop the customer
+    /// paying at all — a slightly clipped shop name is a far better outcome than that.
+    /// </remarks>
+    private const int StatementDescriptorLimit = 30;
+
+    internal static string? StatementDescriptor(string? value)
+    {
+        var descriptor = value?.Trim();
+
+        if (string.IsNullOrWhiteSpace(descriptor))
+            return null;
+
+        return descriptor.Length <= StatementDescriptorLimit
+            ? descriptor
+            : descriptor[..StatementDescriptorLimit].TrimEnd();
+    }
+
+    /// <summary>
+    /// The image list for a checkout line, or null so the field is omitted.
+    /// </summary>
+    /// <remarks>
+    /// Only an absolute HTTPS address is offered. PayMongo's page fetches this itself, so a
+    /// relative path or a local address would render as a broken image on the customer's
+    /// screen — worse than the placeholder it replaces.
+    /// </remarks>
+    internal static string[]? LineItemImages(string? imageUrl)
+    {
+        if (string.IsNullOrWhiteSpace(imageUrl)) return null;
+
+        return Uri.TryCreate(imageUrl.Trim(), UriKind.Absolute, out var uri) &&
+               string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+            ? [uri.ToString()]
+            : null;
+    }
+
     internal static int ToCentavos(decimal pesos) =>
         (int)decimal.Round(pesos * 100m, 0, MidpointRounding.AwayFromZero);
 }

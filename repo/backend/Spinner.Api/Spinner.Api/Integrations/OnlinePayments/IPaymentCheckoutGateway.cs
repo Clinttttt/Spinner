@@ -14,7 +14,30 @@ public sealed record CheckoutSessionRequest(
     string MobileNumber,
     string? EmailAddress,
     string SuccessUrl,
-    string CancelUrl);
+    string CancelUrl,
+    /// <summary>
+    /// What the shop should be called on the customer's statement.
+    /// </summary>
+    /// <remarks>
+    /// Sent because PayMongo falls back to the account's own business name when this is absent.
+    /// Where one PayMongo account serves more than one business, that default is the other
+    /// business's name — which is how a laundry payment came to be labelled with an unrelated
+    /// trade name.
+    ///
+    /// Worth knowing: this governs the statement descriptor, not the merchant identity that a
+    /// wallet shows on its own receipt. That name comes from the PayMongo account's registered
+    /// business and cannot be set per payment.
+    /// </remarks>
+    string? StatementDescriptor = null,
+    /// <summary>
+    /// Image shown beside each line on the hosted checkout page.
+    /// </summary>
+    /// <remarks>
+    /// Without one, PayMongo draws a large grey tile containing the first letter of the line's
+    /// name, which is what made the checkout look unfinished. Must be a publicly fetchable
+    /// absolute URL: the page is rendered by PayMongo, not by us.
+    /// </remarks>
+    string? LineItemImageUrl = null);
 
 public sealed record CheckoutSessionResult(string SessionId, string CheckoutUrl);
 

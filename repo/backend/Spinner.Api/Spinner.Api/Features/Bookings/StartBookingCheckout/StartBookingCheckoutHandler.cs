@@ -139,14 +139,21 @@ public sealed class StartBookingCheckoutHandler
         var session = await _gateway.CreateSessionAsync(
             new CheckoutSessionRequest(
                 reference,
-                $"{settings.BusinessName} laundry booking",
+                // "{name} laundry booking" read as "Engr. Spin Laundry laundry booking" for any
+                // shop whose name already contains the word.
+                $"Laundry booking with {settings.BusinessName}",
                 items,
                 quote.TotalAmount,
                 booking.FullName,
                 booking.MobileNumber,
                 booking.EmailAddress,
                 BuildReturnUrl(_options.CheckoutSuccessUrl, reference),
-                BuildReturnUrl(_options.CheckoutCancelUrl, reference)),
+                BuildReturnUrl(_options.CheckoutCancelUrl, reference),
+                // So the charge is labelled with this shop rather than whatever business the
+                // PayMongo account defaults to.
+                settings.BusinessName,
+                // Replaces the grey placeholder tile PayMongo draws on each checkout line.
+                settings.LogoUrl),
             cancellationToken);
 
         if (!session.IsSuccess)
